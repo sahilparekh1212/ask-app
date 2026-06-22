@@ -1,0 +1,8 @@
+rootProject.name = 'backend'
+
+include 'Account'
+include 'Transaction'
+include 'Audit'
+include 'Notification'
+include 'Offers'
+
