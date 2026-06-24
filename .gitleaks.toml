@@ -1,0 +1,13 @@
+# gitleaks config — extends the default ruleset and allowlists known placeholders
+# that appear in documentation and *.example.yaml templates (NOT real secrets).
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Documentation placeholders and template filenames"
+regexes = [
+  '''REPLACE_WITH_PKCS8_PEM_PRIVATE_KEY''',
+  '''private_pkcs8\.pem''',
+  '''your-google-client-id''',
+  '''your-google-client-secret''',
+]

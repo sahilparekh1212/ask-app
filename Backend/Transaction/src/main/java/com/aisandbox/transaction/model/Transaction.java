@@ -5,15 +5,17 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.math.BigDecimal;
 
 @Entity
 @Table(name = "transactions")
-public class Transaction {
+public class Transaction extends AuditableEntity {
 
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
+	@Schema(accessMode = Schema.AccessMode.READ_ONLY)
 	private Long id;
 
 	private Long accountId;
@@ -21,6 +23,9 @@ public class Transaction {
 	private BigDecimal amount;
 
 	private String type;
+
+	@Schema(accessMode = Schema.AccessMode.READ_ONLY)
+	private boolean deleted = false;
 
 	protected Transaction() {
 	}
@@ -57,6 +62,14 @@ public class Transaction {
 
 	public void setType(String type) {
 		this.type = type;
+	}
+
+	public boolean isDeleted() {
+		return deleted;
+	}
+
+	public void setDeleted(boolean deleted) {
+		this.deleted = deleted;
 	}
 
 }

@@ -1,5 +1,7 @@
 package com.aisandbox.report.controller;
 
+import com.aisandbox.report.aggregation.AggregatedUuidsResponse;
+import com.aisandbox.report.aggregation.UuidAggregationService;
 import com.aisandbox.report.exception.ResourceNotFoundException;
 import com.aisandbox.report.model.Report;
 import com.aisandbox.report.ratelimit.TransactionalRequestExecutor;
@@ -8,6 +10,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.batch.core.Job;
 import org.springframework.batch.core.JobParameters;
 import org.springframework.batch.core.JobParametersBuilder;
@@ -18,6 +21,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
@@ -36,13 +40,15 @@ public class ReportController {
 	private final ReportRepository reportRepository;
 	// Wraps mutations so a superseding request rolls the work back transactionally.
 	private final TransactionalRequestExecutor txExecutor;
+	private final UuidAggregationService uuidAggregationService;
 
 	public ReportController(JobLauncher jobLauncher, Job reportJob, ReportRepository reportRepository,
-			TransactionalRequestExecutor txExecutor) {
+			TransactionalRequestExecutor txExecutor, UuidAggregationService uuidAggregationService) {
 		this.jobLauncher = jobLauncher;
 		this.reportJob = reportJob;
 		this.reportRepository = reportRepository;
 		this.txExecutor = txExecutor;
+		this.uuidAggregationService = uuidAggregationService;
 	}
 
 	@GetMapping
@@ -69,6 +75,15 @@ public class ReportController {
 		jobLauncher.run(reportJob, params);
 		log.info("Report batch job triggered");
 		return ResponseEntity.ok("Report job started");
+	}
+
+	@PostMapping("/uuids")
+	@Operation(summary = "Aggregate request UUIDs of all transaction/audit/notification records "
+		+ "(including soft-deleted) across all accounts")
+	public AggregatedUuidsResponse aggregateUuids(
+			@RequestHeader(value = "Authorization", required = false) String authorization) {
+		log.info("Aggregating cross-service request UUIDs (including soft-deleted)");
+		return uuidAggregationService.aggregate(authorization, MDC.get("requestId"));
 	}
 
 	@DeleteMapping("/{id}")

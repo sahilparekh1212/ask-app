@@ -30,7 +30,9 @@ public class SecurityConfig {
 					"/auth/logout",
 					"/.well-known/jwks.json",
 					"/swagger-ui/**",
+					"/swagger-ui.html",
 					"/v3/api-docs/**",
+					"/actuator/**",
 					"/oauth2/**",
 					"/login/**"
 				).permitAll()

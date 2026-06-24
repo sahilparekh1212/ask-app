@@ -1,0 +1,12 @@
+# Loads dashboard JSON files bundled under /var/lib/grafana/dashboards.
+apiVersion: 1
+
+providers:
+  - name: aisandbox
+    orgId: 1
+    folder: AI-Sandbox
+    type: file
+    disableDeletion: false
+    editable: true
+    options:
+      path: /var/lib/grafana/dashboards

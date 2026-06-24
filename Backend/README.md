@@ -192,6 +192,65 @@ the stack trace.
 
 ---
 
+## Request correlation & auditing
+
+Every request carries a correlation UUID:
+
+- The UI sends it as the **`X-Request-Id`** header; if absent, the service generates one.
+- It is placed in the logging MDC (`requestId=` appears on every log line) and **echoed
+  back** on the response `X-Request-Id` header, so responses, logs, and audit rows can be
+  stitched together.
+- It is included in error response payloads (`requestId` field).
+
+**Auditing** works at two levels:
+
+1. **Persistence auditing** (Spring Data JPA): every entity extends `AuditableEntity` and
+   automatically records `created_at`, `updated_at`, and `created_by_request_id` /
+   `updated_by_request_id`. The "by" columns store **the request UUID — never a user
+   identity** — resolved from the correlation UUID via an `AuditorAware` bean.
+2. **Request-event auditing** (`AuditInterceptor`): emits one structured line per request
+   under the `AUDIT` logger —
+   `AUDIT action=<method> resource=<path> status=<code> outcome=<SUCCESS|ERROR> durationMs=<n>`
+   — with the actor, timestamp, and `requestId` coming from the MDC. Only method/path/status/
+   duration are recorded (no bodies, headers, or query strings).
+
+Neither path captures personally identifiable information, and both are correlated by the
+same request UUID. Filter the in-app audit trail in Loki with `{app=~".+-service"} |= "AUDIT"`.
+
+---
+
+## Observability (Prometheus + Loki + Grafana)
+
+| Tool       | Role                                | Source from each service              |
+|------------|-------------------------------------|---------------------------------------|
+| Prometheus | Scrapes metrics                     | Micrometer `/actuator/prometheus`     |
+| Loki       | Aggregates logs                     | logback `Loki4jAppender` (push)       |
+| Grafana    | Dashboards over Prometheus + Loki   | Both datasources, auto-provisioned    |
+
+Every service exposes `/actuator/prometheus` (metrics tagged with `application=<service>`)
+and ships logs to Loki via a logback appender that is **only active in DEV/SIT/UAT/PROD**
+(LOCAL stays console-only). The Loki target defaults to `http://loki:3100/...` and is
+overridable with the `LOKI_URL` env var.
+
+### Run the stack locally
+
+```bash
+# 1. Start Prometheus, Loki and Grafana (datasources + a starter dashboard are pre-provisioned)
+docker compose -f monitoring/docker-compose.yml up -d
+
+# 2. Run services under DEV so they push logs to Loki and Prometheus can scrape them
+SPRING_PROFILES_ACTIVE=DEV LOKI_URL=http://localhost:3100/loki/api/v1/push ./gradlew :Account:bootRun
+```
+
+Then open **Grafana at http://localhost:3000** (admin / admin) → the *AI-Sandbox Overview*
+dashboard shows request/error rates, JVM heap, and live logs. Prometheus UI is at
+http://localhost:9090.
+
+Config lives under `monitoring/` (`prometheus/`, `loki/`, `grafana/provisioning/` +
+`grafana/dashboards/`).
+
+---
+
 ## Deploying to OpenShift
 
 Manifests live under `openshift/<service>/` (Deployment, Service, Route, ConfigMap,
@@ -202,7 +261,10 @@ HorizontalPodAutoscaler.
 # 1. Namespace
 oc apply -f openshift/namespace.yaml
 
-# 2. Auth secret — fill in real values first (Google creds + RSA private key)
+# 2. Secrets — real values are NEVER committed. Copy the gitignored templates and fill them in,
+#    or create the Secrets imperatively (oc create secret ...). See "Secrets" section below.
+cp openshift/auth/secret.example.yaml openshift/auth/secret.yaml                 # then edit real values
+cp openshift/monitoring/grafana/secret.example.yaml openshift/monitoring/grafana/secret.yaml  # then edit
 oc apply -f openshift/auth/secret.yaml
 
 # 3. Build & push each image (build context is the repo root)
@@ -216,7 +278,16 @@ oc apply -f openshift/transaction/
 oc apply -f openshift/audit/
 oc apply -f openshift/notification/
 oc apply -f openshift/report/
+
+# 5. Observability stack (Prometheus scrapes the services, Grafana reads Prometheus + Loki)
+oc apply -f openshift/monitoring/prometheus/
+oc apply -f openshift/monitoring/loki/
+oc apply -f openshift/monitoring/grafana/
 ```
+
+> The Grafana/Loki/Prometheus images may need a relaxed SCC on OpenShift, e.g.
+> `oc adm policy add-scc-to-user anyuid -z default -n ai-sandbox`. The bundled
+> manifests use `emptyDir` storage (non-persistent) — swap in PVCs for retention.
 
 Scale a service manually at any time:
 
@@ -224,6 +295,35 @@ Scale a service manually at any time:
 oc scale deployment account-service --replicas=3 -n ai-sandbox
 ```
 
-> **Auth + scaling:** set `AUTH_RSA_PRIVATE_KEY` (in `openshift/auth/secret.yaml`) so
+> **Auth + scaling:** set `AUTH_RSA_PRIVATE_KEY` (in your `openshift/auth/secret.yaml`) so
 > every Auth replica signs JWTs with the same key. Without it each pod generates an
 > ephemeral key and tokens fail validation across replicas/restarts.
+
+---
+
+## Secrets
+
+**Real secrets are never committed** — not even to a private repo. The repo contains only
+`*.example.yaml` templates; the real `secret.yaml` files are gitignored.
+
+```bash
+# Option A — copy the template, fill it in (file is gitignored), apply it
+cp openshift/auth/secret.example.yaml openshift/auth/secret.yaml   # edit real values
+oc apply -f openshift/auth/secret.yaml
+
+# Option B — create the Secret imperatively, nothing touches the repo
+oc create secret generic auth-secret -n ai-sandbox \
+  --from-literal=GOOGLE_CLIENT_ID=... \
+  --from-literal=GOOGLE_CLIENT_SECRET=... \
+  --from-file=AUTH_RSA_PRIVATE_KEY=private_pkcs8.pem
+```
+
+A **gitleaks pre-commit hook** guards against accidental commits — enable it once:
+
+```bash
+pip install pre-commit && pre-commit install
+pre-commit run --all-files   # scan the whole repo on demand
+```
+
+If a real secret ever lands in git history, **rotate it** (regenerate the Google client
+secret / RSA key / Grafana password) — deleting the file does not remove it from history.

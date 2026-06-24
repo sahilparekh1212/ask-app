@@ -15,6 +15,7 @@ data:
   SPRING_H2_CONSOLE_ENABLED: "false"
   # Points to the auth-service Kubernetes Service (in-cluster DNS)
   SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI: http://auth-service:8085/.well-known/jwks.json
+  AUDIT_SERVICE_URL: http://audit-service:8083
   SPRINGDOC_API_DOCS_PATH: /v3/api-docs
   SPRINGDOC_SWAGGER_UI_PATH: /swagger-ui.html
   MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health
