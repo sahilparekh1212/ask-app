@@ -8,10 +8,8 @@ COPY gradle gradle
 COPY build.gradle settings.gradle ./
 # Stub other modules so Gradle can resolve the project graph without their sources
 COPY Account/build.gradle Account/build.gradle
-COPY Transaction/build.gradle Transaction/build.gradle
 COPY Audit/build.gradle Audit/build.gradle
 COPY Notification/build.gradle Notification/build.gradle
-COPY Report/build.gradle Report/build.gradle
 # Full source only for this service
 COPY Auth/build.gradle Auth/build.gradle
 COPY Auth/src Auth/src

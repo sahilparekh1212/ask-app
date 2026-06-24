@@ -14,8 +14,6 @@ data:
         static_configs:
           - targets:
               - account-service:8081
-              - transaction-service:8082
               - audit-service:8083
               - notification-service:8084
               - auth-service:8085
-              - report-service:8086
