@@ -4,11 +4,31 @@
 
     <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
         <encoder>
-            <pattern>[${appName}] %d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX} userId=%X{userId:-anonymous} threadId=%thread url=%X{urlParts:-/} - %msg%n</pattern>
+            <pattern>[${appName}] %d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX} requestId=%X{requestId:-} userId=%X{userId:-anonymous} threadId=%thread url=%X{urlParts:-/} - %msg%n</pattern>
         </encoder>
     </appender>
 
+    <!-- Ship logs to Grafana Loki in deployed environments. LOKI_URL overrides the target. -->
+    <springProfile name="DEV,SIT,UAT,PROD">
+        <appender name="LOKI" class="com.github.loki4j.logback.Loki4jAppender">
+            <http>
+                <url>${LOKI_URL:-http://loki:3100/loki/api/v1/push}</url>
+            </http>
+            <format>
+                <label>
+                    <pattern>app=${appName},host=${HOSTNAME:-local},level=%level</pattern>
+                </label>
+                <message>
+                    <pattern>[${appName}] %d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX} requestId=%X{requestId:-} userId=%X{userId:-anonymous} threadId=%thread url=%X{urlParts:-/} - %msg</pattern>
+                </message>
+            </format>
+        </appender>
+    </springProfile>
+
     <root level="INFO">
         <appender-ref ref="CONSOLE"/>
+        <springProfile name="DEV,SIT,UAT,PROD">
+            <appender-ref ref="LOKI"/>
+        </springProfile>
     </root>
 </configuration>

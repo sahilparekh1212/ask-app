@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -38,10 +39,10 @@ public class AuditLogController {
 	}
 
 	@GetMapping
-	@Operation(summary = "List all audit logs")
-	public List<AuditLog> findAll() {
-		log.info("Fetching all audit logs");
-		return auditLogRepository.findAll();
+	@Operation(summary = "List audit logs (excludes soft-deleted unless includeDeleted=true)")
+	public List<AuditLog> findAll(@RequestParam(defaultValue = "false") boolean includeDeleted) {
+		log.info("Fetching audit logs includeDeleted={}", includeDeleted);
+		return includeDeleted ? auditLogRepository.findAll() : auditLogRepository.findByDeletedFalse();
 	}
 
 	@GetMapping("/{id}")
@@ -66,13 +67,13 @@ public class AuditLogController {
 	@Operation(summary = "Delete an audit log entry")
 	public void delete(@PathVariable Long id) {
 		txExecutor.run(() -> {
-			if (!auditLogRepository.existsById(id)) {
-				throw new ResourceNotFoundException("Audit log not found: " + id);
-			}
-			auditLogRepository.deleteById(id);
+			AuditLog auditLog = auditLogRepository.findById(id)
+				.orElseThrow(() -> new ResourceNotFoundException("Audit log not found: " + id));
+			auditLog.setDeleted(true);
+			auditLogRepository.save(auditLog);
 			return null;
 		});
-		log.info("Deleted audit log id={}", id);
+		log.info("Soft-deleted audit log id={}", id);
 	}
 
 	@GetMapping("/health")

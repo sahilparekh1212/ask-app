@@ -5,13 +5,15 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 @Entity
 @Table(name = "accounts")
-public class Account {
+public class Account extends AuditableEntity {
 
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
+	@Schema(accessMode = Schema.AccessMode.READ_ONLY)
 	private Long id;
 
 	private String ownerName;

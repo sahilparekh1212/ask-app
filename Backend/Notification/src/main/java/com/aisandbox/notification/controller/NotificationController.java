@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -39,10 +40,10 @@ public class NotificationController {
 	}
 
 	@GetMapping
-	@Operation(summary = "List all notifications")
-	public List<Notification> findAll() {
-		log.info("Fetching all notifications");
-		return notificationRepository.findAll();
+	@Operation(summary = "List notifications (excludes soft-deleted unless includeDeleted=true)")
+	public List<Notification> findAll(@RequestParam(defaultValue = "false") boolean includeDeleted) {
+		log.info("Fetching notifications includeDeleted={}", includeDeleted);
+		return includeDeleted ? notificationRepository.findAll() : notificationRepository.findByDeletedFalse();
 	}
 
 	@GetMapping("/{id}")
@@ -83,13 +84,13 @@ public class NotificationController {
 	@Operation(summary = "Delete a notification")
 	public void delete(@PathVariable Long id) {
 		txExecutor.run(() -> {
-			if (!notificationRepository.existsById(id)) {
-				throw new ResourceNotFoundException("Notification not found: " + id);
-			}
-			notificationRepository.deleteById(id);
+			Notification notification = notificationRepository.findById(id)
+				.orElseThrow(() -> new ResourceNotFoundException("Notification not found: " + id));
+			notification.setDeleted(true);
+			notificationRepository.save(notification);
 			return null;
 		});
-		log.info("Deleted notification id={}", id);
+		log.info("Soft-deleted notification id={}", id);
 	}
 
 	@GetMapping("/health")

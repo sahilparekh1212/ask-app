@@ -4,6 +4,7 @@ import com.aisandbox.account.ratelimit.RateLimitProperties;
 import com.aisandbox.account.ratelimit.RequestDiscardedException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -65,7 +66,8 @@ public class GlobalExceptionHandler {
 			"timestamp", Instant.now().toString(),
 			"status", status,
 			"error", error,
-			"message", ex.getMessage() != null ? ex.getMessage() : ""
+			"message", ex.getMessage() != null ? ex.getMessage() : "",
+			"requestId", MDC.get("requestId") != null ? MDC.get("requestId") : ""
 		);
 	}
 

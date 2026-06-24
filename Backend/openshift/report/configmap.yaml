@@ -15,6 +15,9 @@ data:
   SPRING_H2_CONSOLE_ENABLED: "false"
   SPRING_BATCH_JOB_ENABLED: "false"
   SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI: http://auth-service:8085/.well-known/jwks.json
+  AUDIT_SERVICE_URL: http://audit-service:8083
+  TRANSACTION_SERVICE_URL: http://transaction-service:8082
+  NOTIFICATION_SERVICE_URL: http://notification-service:8084
   SPRINGDOC_API_DOCS_PATH: /v3/api-docs
   SPRINGDOC_SWAGGER_UI_PATH: /swagger-ui.html
   MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health

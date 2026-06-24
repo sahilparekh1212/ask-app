@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -39,10 +40,10 @@ public class TransactionController {
 	}
 
 	@GetMapping
-	@Operation(summary = "List all transactions")
-	public List<Transaction> findAll() {
-		log.info("Fetching all transactions");
-		return transactionRepository.findAll();
+	@Operation(summary = "List transactions (excludes soft-deleted unless includeDeleted=true)")
+	public List<Transaction> findAll(@RequestParam(defaultValue = "false") boolean includeDeleted) {
+		log.info("Fetching transactions includeDeleted={}", includeDeleted);
+		return includeDeleted ? transactionRepository.findAll() : transactionRepository.findByDeletedFalse();
 	}
 
 	@GetMapping("/{id}")
@@ -82,13 +83,13 @@ public class TransactionController {
 	@Operation(summary = "Delete a transaction")
 	public void delete(@PathVariable Long id) {
 		txExecutor.run(() -> {
-			if (!transactionRepository.existsById(id)) {
-				throw new ResourceNotFoundException("Transaction not found: " + id);
-			}
-			transactionRepository.deleteById(id);
+			Transaction transaction = transactionRepository.findById(id)
+				.orElseThrow(() -> new ResourceNotFoundException("Transaction not found: " + id));
+			transaction.setDeleted(true);
+			transactionRepository.save(transaction);
 			return null;
 		});
-		log.info("Deleted transaction id={}", id);
+		log.info("Soft-deleted transaction id={}", id);
 	}
 
 	@GetMapping("/health")

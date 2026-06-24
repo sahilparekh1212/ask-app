@@ -1,0 +1,29 @@
+# ── Secrets — never commit real values; commit *.example.yaml templates only ──
+**/secret.yaml
+!**/secret.example.yaml
+.env
+.env.*
+!.env.example
+*.local.properties
+# Key material
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+
+# ── Build output ──
+build/
+.gradle/
+
+# ── IDE ──
+.idea/
+*.iml
+.vscode/
+.settings/
+.classpath
+.project
+
+# ── OS ──
+.DS_Store
+Thumbs.db

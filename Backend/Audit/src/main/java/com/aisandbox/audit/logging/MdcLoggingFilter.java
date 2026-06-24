@@ -13,22 +13,38 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.Base64;
 import java.util.List;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Component
 @Order(1)
 public class MdcLoggingFilter extends OncePerRequestFilter {
 
+	/** Correlation UUID supplied by the UI; we honour it and generate one only if absent. */
+	public static final String REQUEST_ID_HEADER = "X-Request-Id";
+
 	@Override
 	protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
 			FilterChain chain) throws ServletException, IOException {
 		try {
+			String requestId = resolveRequestId(request);
+			MDC.put("requestId", requestId);
+			// Echo the correlation id back so the UI/clients can stitch responses to logs.
+			response.setHeader(REQUEST_ID_HEADER, requestId);
 			MDC.put("userId", extractUserId(request));
 			MDC.put("urlParts", extractLastTwoParts(request.getRequestURI()));
 			chain.doFilter(request, response);
 		} finally {
 			MDC.clear();
 		}
+	}
+
+	private String resolveRequestId(HttpServletRequest request) {
+		String headerValue = request.getHeader(REQUEST_ID_HEADER);
+		if (headerValue != null && !headerValue.isBlank()) {
+			return headerValue;
+		}
+		return UUID.randomUUID().toString();
 	}
 
 	private String extractUserId(HttpServletRequest request) {

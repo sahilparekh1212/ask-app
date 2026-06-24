@@ -5,13 +5,15 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 @Entity
 @Table(name = "notifications")
-public class Notification {
+public class Notification extends AuditableEntity {
 
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
+	@Schema(accessMode = Schema.AccessMode.READ_ONLY)
 	private Long id;
 
 	private Long recipientId;
@@ -21,6 +23,9 @@ public class Notification {
 	private String message;
 
 	private boolean read;
+
+	@Schema(accessMode = Schema.AccessMode.READ_ONLY)
+	private boolean deleted = false;
 
 	protected Notification() {
 	}
@@ -66,6 +71,14 @@ public class Notification {
 
 	public void setRead(boolean read) {
 		this.read = read;
+	}
+
+	public boolean isDeleted() {
+		return deleted;
+	}
+
+	public void setDeleted(boolean deleted) {
+		this.deleted = deleted;
 	}
 
 }

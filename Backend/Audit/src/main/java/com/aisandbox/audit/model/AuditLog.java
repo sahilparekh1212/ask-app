@@ -5,15 +5,15 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
-
-import java.time.Instant;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 @Entity
 @Table(name = "audit_logs")
-public class AuditLog {
+public class AuditLog extends AuditableEntity {
 
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
+	@Schema(accessMode = Schema.AccessMode.READ_ONLY)
 	private Long id;
 
 	private String entityType;
@@ -22,7 +22,8 @@ public class AuditLog {
 
 	private String details;
 
-	private Instant createdAt;
+	@Schema(accessMode = Schema.AccessMode.READ_ONLY)
+	private boolean deleted = false;
 
 	protected AuditLog() {
 	}
@@ -31,7 +32,6 @@ public class AuditLog {
 		this.entityType = entityType;
 		this.action = action;
 		this.details = details;
-		this.createdAt = Instant.now();
 	}
 
 	public Long getId() {
@@ -62,8 +62,14 @@ public class AuditLog {
 		this.details = details;
 	}
 
-	public Instant getCreatedAt() {
-		return createdAt;
+	public boolean isDeleted() {
+		return deleted;
 	}
+
+	public void setDeleted(boolean deleted) {
+		this.deleted = deleted;
+	}
+
+	// createdAt / updatedAt / createdByRequestId are inherited from AuditableEntity.
 
 }

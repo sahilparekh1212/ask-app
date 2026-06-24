@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-config
+  namespace: ai-sandbox
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 15s
+      evaluation_interval: 15s
+    scrape_configs:
+      - job_name: aisandbox-services
+        metrics_path: /actuator/prometheus
+        static_configs:
+          - targets:
+              - account-service:8081
+              - transaction-service:8082
+              - audit-service:8083
+              - notification-service:8084
+              - auth-service:8085
+              - report-service:8086
