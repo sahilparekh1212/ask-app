@@ -9,7 +9,6 @@ scalable Gradle subproject.
 | Service        | Port | Module         | Purpose                                              |
 |----------------|------|----------------|------------------------------------------------------|
 | Auth           | 8085 | `Auth`         | Google OAuth2 login, issues/refreshes JWTs, JWKS     |
-| Account        | 8081 | `Account`      | Account CRUD                                          |
 | Audit          | 8083 | `Audit`        | Audit-log create/read/delete (immutable)             |
 | Notification   | 8084 | `Notification` | Notification CRUD                                     |
 
@@ -33,10 +32,10 @@ limiter described below.
 ./gradlew build
 
 # Build a single service
-./gradlew :Account:build
+./gradlew :Audit:build
 
 # Run the tests for one service
-./gradlew :Account:test
+./gradlew :Audit:test
 ```
 
 ---
@@ -51,7 +50,6 @@ in-memory H2 database — no external database required to get started.
 ./gradlew :Auth:bootRun
 
 # Then, in separate terminals:
-./gradlew :Account:bootRun
 ./gradlew :Audit:bootRun
 ./gradlew :Notification:bootRun
 ```
@@ -59,9 +57,9 @@ in-memory H2 database — no external database required to get started.
 To run a service under a non-default profile:
 
 ```bash
-SPRING_PROFILES_ACTIVE=DEV ./gradlew :Account:bootRun
+SPRING_PROFILES_ACTIVE=DEV ./gradlew :Audit:bootRun
 # Windows PowerShell:
-$env:SPRING_PROFILES_ACTIVE="DEV"; ./gradlew :Account:bootRun
+$env:SPRING_PROFILES_ACTIVE="DEV"; ./gradlew :Audit:bootRun
 ```
 
 ### Google OAuth2 (Auth service)
@@ -88,7 +86,6 @@ Each service exposes the H2 web console. With the service running, open:
 
 | Service      | H2 console URL                       | JDBC URL                    |
 |--------------|--------------------------------------|-----------------------------|
-| Account      | http://localhost:8081/h2-console     | `jdbc:h2:mem:accountdb`     |
 | Audit        | http://localhost:8083/h2-console     | `jdbc:h2:mem:auditdb`       |
 | Notification | http://localhost:8084/h2-console     | `jdbc:h2:mem:notificationdb`|
 
@@ -107,10 +104,10 @@ service at PostgreSQL, MySQL, etc. Example for PostgreSQL:
 2. Provide the connection via env vars:
    ```bash
    export SPRING_PROFILES_ACTIVE=DEV
-   export SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5432/accountdb
+   export SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5432/auditdb
    export SPRING_DATASOURCE_USERNAME=app
    export SPRING_DATASOURCE_PASSWORD=secret
-   ./gradlew :Account:bootRun
+   ./gradlew :Audit:bootRun
    ```
 
 ---
@@ -233,7 +230,7 @@ overridable with the `LOKI_URL` env var.
 docker compose -f monitoring/docker-compose.yml up -d
 
 # 2. Run services under DEV so they push logs to Loki and Prometheus can scrape them
-SPRING_PROFILES_ACTIVE=DEV LOKI_URL=http://localhost:3100/loki/api/v1/push ./gradlew :Account:bootRun
+SPRING_PROFILES_ACTIVE=DEV LOKI_URL=http://localhost:3100/loki/api/v1/push ./gradlew :Audit:bootRun
 ```
 
 Then open **Grafana at http://localhost:3000** (admin / admin) → the *AI-Sandbox Overview*
@@ -262,12 +259,11 @@ cp openshift/monitoring/grafana/secret.example.yaml openshift/monitoring/grafana
 oc apply -f openshift/auth/secret.yaml
 
 # 3. Build & push each image (build context is the repo root)
-docker build -f Account/Dockerfile -t <registry>/ai-sandbox/account-service:latest .
+docker build -f Audit/Dockerfile -t <registry>/ai-sandbox/audit-service:latest .
 # ...repeat per service, then push
 
 # 4. Apply each service's manifests
 oc apply -f openshift/auth/
-oc apply -f openshift/account/
 oc apply -f openshift/audit/
 oc apply -f openshift/notification/
 
@@ -284,7 +280,7 @@ oc apply -f openshift/monitoring/grafana/
 Scale a service manually at any time:
 
 ```bash
-oc scale deployment account-service --replicas=3 -n ai-sandbox
+oc scale deployment audit-service --replicas=3 -n ai-sandbox
 ```
 
 > **Auth + scaling:** set `AUTH_RSA_PRIVATE_KEY` (in your `openshift/auth/secret.yaml`) so

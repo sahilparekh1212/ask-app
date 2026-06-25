@@ -13,7 +13,6 @@ data:
         metrics_path: /actuator/prometheus
         static_configs:
           - targets:
-              - account-service:8081
               - audit-service:8083
               - notification-service:8084
               - auth-service:8085

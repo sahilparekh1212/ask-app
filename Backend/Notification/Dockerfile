@@ -7,7 +7,6 @@ COPY gradlew gradlew
 COPY gradle gradle
 COPY build.gradle settings.gradle ./
 COPY Auth/build.gradle Auth/build.gradle
-COPY Account/build.gradle Account/build.gradle
 COPY Audit/build.gradle Audit/build.gradle
 COPY Notification/build.gradle Notification/build.gradle
 COPY Notification/src Notification/src

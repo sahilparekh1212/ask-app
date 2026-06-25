@@ -3,7 +3,7 @@
 #   docker compose -f monitoring/docker-compose.yml up -d
 #
 # Run the Spring services under the DEV profile so they ship logs to Loki, e.g.:
-#   SPRING_PROFILES_ACTIVE=DEV LOKI_URL=http://localhost:3100/loki/api/v1/push ./gradlew :Account:bootRun
+#   SPRING_PROFILES_ACTIVE=DEV LOKI_URL=http://localhost:3100/loki/api/v1/push ./gradlew :Audit:bootRun
 #
 # Then open Grafana at http://localhost:3000 (admin / admin). Prometheus and Loki
 # datasources are pre-provisioned.
