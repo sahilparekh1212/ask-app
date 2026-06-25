@@ -8,9 +8,7 @@ COPY gradle gradle
 COPY build.gradle settings.gradle ./
 COPY Auth/build.gradle Auth/build.gradle
 COPY Account/build.gradle Account/build.gradle
-COPY Transaction/build.gradle Transaction/build.gradle
 COPY Notification/build.gradle Notification/build.gradle
-COPY Report/build.gradle Report/build.gradle
 COPY Audit/build.gradle Audit/build.gradle
 COPY Audit/src Audit/src
 RUN chmod +x gradlew && ./gradlew :Audit:bootJar --no-daemon -x test

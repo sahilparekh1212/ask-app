@@ -10,10 +10,8 @@ scalable Gradle subproject.
 |----------------|------|----------------|------------------------------------------------------|
 | Auth           | 8085 | `Auth`         | Google OAuth2 login, issues/refreshes JWTs, JWKS     |
 | Account        | 8081 | `Account`      | Account CRUD                                          |
-| Transaction    | 8082 | `Transaction`  | Transaction CRUD                                      |
 | Audit          | 8083 | `Audit`        | Audit-log create/read/delete (immutable)             |
 | Notification   | 8084 | `Notification` | Notification CRUD                                     |
-| Report         | 8086 | `Report`       | Spring Batch report generation + CRUD                |
 
 All services share: JWT resource-server security, Swagger/OpenAPI docs, structured
 logging, a global exception handler, an actuator health endpoint, and the rate
@@ -54,10 +52,8 @@ in-memory H2 database — no external database required to get started.
 
 # Then, in separate terminals:
 ./gradlew :Account:bootRun
-./gradlew :Transaction:bootRun
 ./gradlew :Audit:bootRun
 ./gradlew :Notification:bootRun
-./gradlew :Report:bootRun
 ```
 
 To run a service under a non-default profile:
@@ -93,10 +89,8 @@ Each service exposes the H2 web console. With the service running, open:
 | Service      | H2 console URL                       | JDBC URL                    |
 |--------------|--------------------------------------|-----------------------------|
 | Account      | http://localhost:8081/h2-console     | `jdbc:h2:mem:accountdb`     |
-| Transaction  | http://localhost:8082/h2-console     | `jdbc:h2:mem:transactiondb` |
 | Audit        | http://localhost:8083/h2-console     | `jdbc:h2:mem:auditdb`       |
 | Notification | http://localhost:8084/h2-console     | `jdbc:h2:mem:notificationdb`|
-| Report       | http://localhost:8086/h2-console     | `jdbc:h2:mem:reportdb`      |
 
 Login with user `sa`, blank password, and the JDBC URL above. (In-memory data is
 reset on each restart.)
@@ -274,10 +268,8 @@ docker build -f Account/Dockerfile -t <registry>/ai-sandbox/account-service:late
 # 4. Apply each service's manifests
 oc apply -f openshift/auth/
 oc apply -f openshift/account/
-oc apply -f openshift/transaction/
 oc apply -f openshift/audit/
 oc apply -f openshift/notification/
-oc apply -f openshift/report/
 
 # 5. Observability stack (Prometheus scrapes the services, Grafana reads Prometheus + Loki)
 oc apply -f openshift/monitoring/prometheus/
