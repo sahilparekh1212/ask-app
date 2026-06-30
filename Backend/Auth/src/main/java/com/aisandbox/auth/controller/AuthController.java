@@ -11,6 +11,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -18,6 +19,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 @RestController
@@ -86,8 +88,12 @@ public class AuthController {
 			});
 	}
 
+	// /auth/me is a header-versioning sample (vs Audit's URI versioning): the URL stays the
+	// same and the X-API-Version request header selects the response shape. Absent or
+	// "X-API-Version: 1" gets v1; "X-API-Version: 2" gets the enriched v2 body.
+
 	@GetMapping("/me")
-	@Operation(summary = "Return the authenticated user's claims from the JWT")
+	@Operation(summary = "v1 (default): the authenticated user's claims from the JWT")
 	public ResponseEntity<Map<String, Object>> me(JwtAuthenticationToken principal) {
 		Map<String, Object> claims = principal.getToken().getClaims();
 		return ResponseEntity.ok(Map.of(
@@ -95,6 +101,20 @@ public class AuthController {
 			"email", claims.getOrDefault("email", ""),
 			"name", claims.getOrDefault("name", "")
 		));
+	}
+
+	@GetMapping(value = "/me", headers = "X-API-Version=2")
+	@Operation(summary = "v2 (X-API-Version: 2): same fields plus the token's issued/expiry times")
+	public ResponseEntity<Map<String, Object>> meV2(JwtAuthenticationToken principal) {
+		Jwt token = principal.getToken();
+		Map<String, Object> claims = token.getClaims();
+		Map<String, Object> body = new LinkedHashMap<>();
+		body.put("userId", claims.getOrDefault("sub", ""));
+		body.put("email", claims.getOrDefault("email", ""));
+		body.put("name", claims.getOrDefault("name", ""));
+		body.put("issuedAt", token.getIssuedAt());
+		body.put("expiresAt", token.getExpiresAt());
+		return ResponseEntity.ok(body);
 	}
 
 	@PostMapping("/logout")

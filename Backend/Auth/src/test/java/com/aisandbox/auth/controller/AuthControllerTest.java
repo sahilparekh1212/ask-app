@@ -116,6 +116,30 @@ class AuthControllerTest {
 	}
 
 	@Test
+	void meV2_addsTokenIssuedAndExpiryTimesToTheClaims() {
+		Instant issuedAt = Instant.now();
+		Instant expiresAt = issuedAt.plusSeconds(1800);
+		Jwt jwt = Jwt.withTokenValue("token-value")
+			.header("alg", "RS256")
+			.claim("sub", "user-1")
+			.claim("email", "user1@example.com")
+			.claim("name", "User One")
+			.issuedAt(issuedAt)
+			.expiresAt(expiresAt)
+			.build();
+
+		ResponseEntity<Map<String, Object>> response = controller.meV2(new JwtAuthenticationToken(jwt));
+
+		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+		assertThat(response.getBody())
+			.containsEntry("userId", "user-1")
+			.containsEntry("email", "user1@example.com")
+			.containsEntry("name", "User One")
+			.containsEntry("issuedAt", issuedAt)
+			.containsEntry("expiresAt", expiresAt);
+	}
+
+	@Test
 	void me_defaultsMissingClaimsToEmptyString() {
 		Jwt jwt = Jwt.withTokenValue("token-value")
 			.header("alg", "RS256")
