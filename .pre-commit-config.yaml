@@ -1,14 +1,38 @@
-# Pre-commit hooks (must live at the git repo root). Install once:
+# Source of truth for hygiene/secret/commit-message hooks. ENFORCEMENT HAPPENS IN GITHUB
+# ACTIONS, not locally: .github/workflows/lint.yml runs `pre-commit run --all-files` plus a
+# per-commit conventional-commit check on every PR and push to main. The heavy build/test/
+# coverage gates run in .github/workflows/backend-ci.yml.
+#
+# Local install is OPTIONAL (this repo prefers CI enforcement). If you do want the same
+# checks before pushing:
 #   python -m pre_commit install
-# Then gitleaks scans staged changes on every commit and blocks anything secret-like.
-# Scan the whole repo on demand:  python -m pre_commit run --all-files
+#   python -m pre_commit install --hook-type commit-msg
+# Run them by hand anytime:  python -m pre_commit run --all-files
 repos:
+  # --- Secret scanning (commit) --------------------------------------------------------
   - repo: https://github.com/gitleaks/gitleaks
     rev: v8.21.2
     hooks:
       - id: gitleaks
 
+  # --- Generic hygiene + safety (commit) -----------------------------------------------
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0
     hooks:
       - id: detect-private-key
+      - id: check-yaml
+        args: [--allow-multiple-documents] # k8s/OpenShift manifests are multi-doc
+      - id: check-json
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+      - id: check-merge-conflict
+      - id: check-added-large-files
+
+  # --- Conventional commit message lint (commit-msg) -----------------------------------
+  # Blocks messages that don't start with feat:/fix:/chore:/... — would have caught the
+  # mangled "eat(audit)" message.
+  - repo: https://github.com/compilerla/conventional-pre-commit
+    rev: v3.6.0
+    hooks:
+      - id: conventional-pre-commit
+        stages: [commit-msg]

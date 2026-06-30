@@ -1,0 +1,61 @@
+name: Lint
+
+# Repo-wide hygiene, secret scanning and commit-message linting — enforced in GitHub
+# Actions, not via local git hooks. These reuse .pre-commit-config.yaml as the single
+# source of truth, so `pre-commit run` here runs the same hooks a contributor could
+# optionally run locally.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  pre-commit:
+    name: pre-commit (hygiene + secrets)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # full history so gitleaks can scan everything
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      # Runs every default-stage hook in .pre-commit-config.yaml across all files:
+      # gitleaks, detect-private-key, check-yaml/json, end-of-file-fixer,
+      # trailing-whitespace, check-merge-conflict, check-added-large-files.
+      - uses: pre-commit/action@v3.0.1
+
+  commit-lint:
+    name: Conventional commit messages
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install pre-commit
+        run: pip install pre-commit
+
+      # The conventional-pre-commit hook is a commit-msg-stage hook, so it isn't covered
+      # by `pre-commit run --all-files`. Lint every commit introduced by this PR instead.
+      - name: Lint each commit in the PR
+        run: |
+          base='${{ github.event.pull_request.base.sha }}'
+          head='${{ github.event.pull_request.head.sha }}'
+          status=0
+          for sha in $(git rev-list "$base..$head"); do
+            git log -1 --format=%B "$sha" > "$RUNNER_TEMP/msg"
+            echo "::group::$sha $(git log -1 --format=%s "$sha")"
+            pre-commit run conventional-pre-commit \
+              --hook-stage commit-msg \
+              --commit-msg-filename "$RUNNER_TEMP/msg" || status=1
+            echo "::endgroup::"
+          done
+          exit $status

@@ -1,15 +1,40 @@
 plugins {
 	id 'org.springframework.boot' version '3.4.4' apply false
 	id 'io.spring.dependency-management' version '1.1.7' apply false
+	id 'com.diffplug.spotless' version '6.25.0' apply false
 }
 
 subprojects {
 	apply plugin: 'java'
+	apply plugin: 'jacoco'
+	apply plugin: 'com.diffplug.spotless'
 	apply plugin: 'org.springframework.boot'
 	apply plugin: 'io.spring.dependency-management'
 
+	// Low-churn formatting gate: keeps imports clean and whitespace tidy without imposing a
+	// full reformat (the codebase indents with tabs, which these steps preserve).
+	spotless {
+		java {
+			target 'src/**/*.java'
+			removeUnusedImports()
+			trimTrailingWhitespace()
+			endWithNewline()
+		}
+	}
+
 	group = 'com.aisandbox'
 	version = '0.0.1-SNAPSHOT'
+
+	// Keep build output out of the OneDrive-synced working tree. OneDrive grabs file handles
+	// on build/**/*.class mid-sync, so Gradle's clean/recompile fails with "Unable to delete
+	// directory". Redirect each module's build dir to a non-synced location (LOCALAPPDATA on
+	// Windows), overridable via AI_SANDBOX_BUILD_DIR. In CI/Docker (neither var set) it falls
+	// back to the in-tree default, so container builds are unaffected.
+	def buildHome = System.getenv('AI_SANDBOX_BUILD_DIR') ?:
+		(System.getenv('LOCALAPPDATA') ? "${System.getenv('LOCALAPPDATA')}/ai-sandbox-build" : null)
+	if (buildHome != null) {
+		layout.buildDirectory = file("${buildHome}/${project.name}")
+	}
 
 	java {
 		sourceCompatibility = '17'
@@ -36,5 +61,37 @@ subprojects {
 
 	tasks.named('test') {
 		useJUnitPlatform()
+		// Coverage data is collected on every test run; the report/verification read it.
+		finalizedBy tasks.named('jacocoTestReport')
+	}
+
+	tasks.named('jacocoTestReport') {
+		dependsOn tasks.named('test')
+		reports {
+			xml.required = true
+			html.required = true
+		}
+	}
+
+	// Fails the build / CI when line coverage drops below 90%. Excluded:
+	//  - *Application: the @SpringBootApplication main() only hands off to
+	//    SpringApplication.run and isn't meaningfully unit-testable.
+	//  - *LoadTestSecurityConfig: CI-only (LOADTEST profile) infra, never active under test.
+	tasks.named('jacocoTestCoverageVerification') {
+		dependsOn tasks.named('test')
+		violationRules {
+			rule {
+				excludes = ['*Application', '*LoadTestSecurityConfig']
+				limit {
+					counter = 'LINE'
+					minimum = 0.90
+				}
+			}
+		}
+	}
+
+	// `gradle check` now also enforces the coverage gate.
+	tasks.named('check') {
+		dependsOn tasks.named('jacocoTestCoverageVerification')
 	}
 }

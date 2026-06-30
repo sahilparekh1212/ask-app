@@ -8,12 +8,18 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 
-// Active in every profile except LOADTEST, which swaps in an auth-free chain
-// (LoadTestSecurityConfig) so the CI load generator can exercise the real endpoints.
+/**
+ * Security for the {@code LOADTEST} profile ONLY: authentication is disabled so the k6 load
+ * generator in CI can hit the real endpoints without minting JWTs against the Auth service.
+ *
+ * <p>This is selected exclusively by {@code SPRING_PROFILES_ACTIVE=...,LOADTEST}, which is set
+ * only in the load-test CI job — never in DEV/SIT/UAT/PROD. The production-shaped
+ * {@link SecurityConfig} (JWT-authenticated) is active in every other profile.
+ */
 @Configuration
 @EnableWebSecurity
-@Profile("!LOADTEST")
-public class SecurityConfig {
+@Profile("LOADTEST")
+public class LoadTestSecurityConfig {
 
 	@Bean
 	public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -21,11 +27,7 @@ public class SecurityConfig {
 			.csrf(csrf -> csrf.disable())
 			.sessionManagement(session -> session
 				.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-			.authorizeHttpRequests(auth -> auth
-				.requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**", "/actuator/**").permitAll()
-				.anyRequest().authenticated()
-			)
-			.oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> {}));
+			.authorizeHttpRequests(auth -> auth.anyRequest().permitAll());
 		return http.build();
 	}
 

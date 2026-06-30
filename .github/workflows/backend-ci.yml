@@ -1,6 +1,11 @@
 name: Backend CI
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - 'Backend/**'
+      - '.github/workflows/backend-ci.yml'
   pull_request:
     paths:
       - 'Backend/**'
@@ -8,8 +13,63 @@ on:
 
 jobs:
   build-test:
-    name: Build & test
+    name: Build, test & coverage
     runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # full history so diff-cover can compare against the PR base
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      # Same gates that used to run as pre-push hooks, now enforced for everyone on the PR.
+      # On the Linux runner neither AI_SANDBOX_BUILD_DIR nor LOCALAPPDATA is set, so Gradle
+      # uses the in-tree build/ dir (see Backend/build.gradle) and the report paths below hold.
+      - name: Check Java formatting (Spotless)
+        working-directory: Backend
+        run: ./gradlew spotlessCheck
+
+      - name: Compile main + test sources
+        working-directory: Backend
+        run: ./gradlew compileJava compileTestJava
+
+      - name: Run tests + JaCoCo report
+        working-directory: Backend
+        run: ./gradlew test jacocoTestReport
+
+      - name: Enforce 90% line coverage
+        working-directory: Backend
+        run: ./gradlew jacocoTestCoverageVerification
+
+      - name: Enforce coverage on changed lines (diff-cover)
+        if: github.event_name == 'pull_request' # needs a PR base to diff against
+        run: |
+          python3 -m pip install --quiet diff_cover
+          git fetch --no-tags --depth=1 origin "${{ github.base_ref }}:refs/remotes/origin/${{ github.base_ref }}"
+          diff-cover \
+            Backend/Audit/build/reports/jacoco/test/jacocoTestReport.xml \
+            Backend/Auth/build/reports/jacoco/test/jacocoTestReport.xml \
+            --src-roots Backend/Audit/src/main/java Backend/Auth/src/main/java \
+            --compare-branch "origin/${{ github.base_ref }}" \
+            --fail-under 90
+
+      - name: Upload coverage reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jacoco-reports
+          path: Backend/*/build/reports/jacoco/test/html
+          if-no-files-found: ignore
+
+  load-test:
+    name: Load test (k6)
+    runs-on: ubuntu-latest
+    needs: build-test # only load-test code that already passed the build/test gate
     steps:
       - uses: actions/checkout@v4
 
@@ -20,18 +80,55 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
-      - name: Build and test
+      - uses: grafana/setup-k6-action@v1
+
+      - name: Build Audit boot jar
         working-directory: Backend
-        run: ./gradlew build test
+        run: ./gradlew :Audit:bootJar
 
-  gitleaks:
-    name: Gitleaks secret scan
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
+      # The Audit endpoints are JWT-authenticated in every real profile; the LOADTEST profile
+      # swaps in an auth-free security chain (LoadTestSecurityConfig) so k6 can hit them
+      # directly. It is NEVER enabled outside this job.
+      - name: Throughput load test (rate limiter off)
+        run: |
+          JAR=$(ls Backend/Audit/build/libs/*.jar | grep -v plain | head -1)
+          SPRING_PROFILES_ACTIVE=LOCAL,LOADTEST RATELIMIT_ENABLED=false \
+            java -jar "$JAR" > audit-throughput.log 2>&1 &
+          APP_PID=$!
+          echo "Waiting for Audit to become healthy..."
+          for i in $(seq 1 60); do
+            curl -sf http://localhost:8083/actuator/health >/dev/null && { echo "healthy"; break; }
+            kill -0 "$APP_PID" 2>/dev/null || { echo "app exited early"; cat audit-throughput.log; exit 1; }
+            sleep 2
+          done
+          k6 run Backend/load-test/search-stats.js
+          status=$?
+          kill "$APP_PID" 2>/dev/null || true
+          exit $status
+
+      - name: Rate-limit behaviour test (rate limiter on)
+        run: |
+          JAR=$(ls Backend/Audit/build/libs/*.jar | grep -v plain | head -1)
+          SPRING_PROFILES_ACTIVE=LOCAL,LOADTEST \
+            java -jar "$JAR" > audit-ratelimit.log 2>&1 &
+          APP_PID=$!
+          for i in $(seq 1 60); do
+            curl -sf http://localhost:8083/actuator/health >/dev/null && break
+            kill -0 "$APP_PID" 2>/dev/null || { echo "app exited early"; cat audit-ratelimit.log; exit 1; }
+            sleep 2
+          done
+          k6 run Backend/load-test/rate-limit.js
+          status=$?
+          kill "$APP_PID" 2>/dev/null || true
+          exit $status
+
+      - name: Upload load-test app logs
+        if: always()
+        uses: actions/upload-artifact@v4
         with:
-          fetch-depth: 0
+          name: load-test-app-logs
+          path: audit-*.log
+          if-no-files-found: ignore
 
-      - uses: gitleaks/gitleaks-action@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  # Secret scanning, file hygiene and commit-message linting run repo-wide in the
+  # Lint workflow (.github/workflows/lint.yml), so they are not duplicated here.
