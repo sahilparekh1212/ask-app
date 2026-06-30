@@ -1,5 +1,6 @@
 package com.aisandbox.auth.controller;
 
+import com.aisandbox.auth.model.LoginRequest;
 import com.aisandbox.auth.model.RefreshRequest;
 import com.aisandbox.auth.model.TokenResponse;
 import com.aisandbox.auth.service.TokenService;
@@ -7,6 +8,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
@@ -25,10 +27,48 @@ public class AuthController {
 
 	private static final Logger log = LoggerFactory.getLogger(AuthController.class);
 
-	private final TokenService tokenService;
+	// Identity minted for the shared demo account (kept distinct from any real Google user).
+	private static final String DEMO_USER_ID = "demo-user";
+	private static final String DEMO_EMAIL = "demo@aisandbox.dev";
+	private static final String DEMO_NAME = "Demo User";
 
-	public AuthController(TokenService tokenService) {
+	private final TokenService tokenService;
+	private final boolean demoEnabled;
+	private final String demoUsername;
+	private final String demoPassword;
+
+	public AuthController(TokenService tokenService,
+			@Value("${auth.demo.enabled:true}") boolean demoEnabled,
+			@Value("${auth.demo.username:demo}") String demoUsername,
+			@Value("${auth.demo.password:demo}") String demoPassword) {
 		this.tokenService = tokenService;
+		this.demoEnabled = demoEnabled;
+		this.demoUsername = demoUsername;
+		this.demoPassword = demoPassword;
+	}
+
+	/**
+	 * Demo username/password login for recruiters: with the defaults, username and password are
+	 * both {@code demo}. On a match it issues the very same access/refresh JWTs as the Google
+	 * OAuth flow, so the rest of the system is exercised identically. Disable in a real
+	 * deployment with {@code auth.demo.enabled=false}.
+	 */
+	@PostMapping("/login")
+	@Operation(summary = "Demo username/password login (recruiter test account) — issues the same JWT as Google sign-in")
+	public ResponseEntity<TokenResponse> login(@RequestBody LoginRequest request) {
+		if (!demoEnabled) {
+			return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+		}
+		boolean credentialsMatch = request != null
+			&& demoUsername.equals(request.username())
+			&& demoPassword.equals(request.password());
+		if (!credentialsMatch) {
+			log.warn("Demo login rejected for username={}", request == null ? null : request.username());
+			return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+		}
+		TokenResponse tokens = tokenService.generateTokens(DEMO_USER_ID, DEMO_EMAIL, DEMO_NAME);
+		log.info("Issued demo tokens for the recruiter test account");
+		return ResponseEntity.ok(tokens);
 	}
 
 	@PostMapping("/refresh")

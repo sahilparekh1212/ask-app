@@ -1,5 +1,6 @@
 package com.aisandbox.auth.controller;
 
+import com.aisandbox.auth.model.LoginRequest;
 import com.aisandbox.auth.model.RefreshRequest;
 import com.aisandbox.auth.model.TokenResponse;
 import com.aisandbox.auth.service.TokenService;
@@ -29,7 +30,37 @@ class AuthControllerTest {
 	@BeforeEach
 	void setUp() {
 		tokenService = mock(TokenService.class);
-		controller = new AuthController(tokenService);
+		controller = new AuthController(tokenService, true, "demo", "demo");
+	}
+
+	@Test
+	void login_issuesTokensForTheDemoCredentials() {
+		TokenResponse tokens = new TokenResponse("access", "refresh", 1800L);
+		when(tokenService.generateTokens("demo-user", "demo@aisandbox.dev", "Demo User")).thenReturn(tokens);
+
+		ResponseEntity<TokenResponse> response = controller.login(new LoginRequest("demo", "demo"));
+
+		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+		assertThat(response.getBody()).isEqualTo(tokens);
+	}
+
+	@Test
+	void login_returns401ForWrongCredentials() {
+		ResponseEntity<TokenResponse> response = controller.login(new LoginRequest("demo", "wrong"));
+
+		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+		assertThat(response.getBody()).isNull();
+		verify(tokenService, never()).generateTokens(any(), any(), any());
+	}
+
+	@Test
+	void login_returns404WhenDemoLoginIsDisabled() {
+		AuthController disabled = new AuthController(tokenService, false, "demo", "demo");
+
+		ResponseEntity<TokenResponse> response = disabled.login(new LoginRequest("demo", "demo"));
+
+		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+		verify(tokenService, never()).generateTokens(any(), any(), any());
 	}
 
 	@Test

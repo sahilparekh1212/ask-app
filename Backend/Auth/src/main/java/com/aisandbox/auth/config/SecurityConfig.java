@@ -26,6 +26,7 @@ public class SecurityConfig {
 				.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 			.authorizeHttpRequests(auth -> auth
 				.requestMatchers(
+					"/auth/login",
 					"/auth/refresh",
 					"/auth/logout",
 					"/.well-known/jwks.json",
