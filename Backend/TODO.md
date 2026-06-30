@@ -72,16 +72,21 @@ needs.
 Previously the only backend "vulnerability check" was secret scanning (gitleaks +
 detect-private-key in `lint.yml`). Now added:
 - [x] **Dependabot** — `.github/dependabot.yml` (gradle + github-actions ecosystems, weekly).
-      Raises security alerts and opens update PRs for vulnerable dependencies. _Note: enable
-      Dependabot alerts/security updates in repo Settings → Code security if not already on._
+      Raises security alerts and opens update PRs for vulnerable dependencies.
 - [x] **CodeQL SAST** — `.github/workflows/codeql.yml` (java-kotlin, manual build) on PR/push
       to `main` + weekly; results land in the Security tab.
 - [x] **Trivy CVE scan** — `trivy` job in `backend-ci.yml`: builds the boot jars, scans bundled
       deps, uploads SARIF to the Security tab, and fails on fixable HIGH/CRITICAL CVEs.
-- [ ] **Follow-ups:** (a) promote `Trivy CVE scan` / `CodeQL` to *required* branch-protection
-      checks once you've confirmed they pass (left non-required for now so a newly-published CVE
-      doesn't block all merges); (b) extend Trivy to scan the built `Audit`/`Auth` Docker images,
-      not just the jars.
+- [ ] **Enable Dependabot alerts + security updates in the GitHub UI.** The committed
+      `dependabot.yml` only schedules version-update PRs; the vulnerability *alerts* and
+      auto security-update PRs are a separate repo toggle: Settings → Code security →
+      enable "Dependabot alerts" and "Dependabot security updates". (Not configurable in code.)
+- [ ] **Promote `CodeQL` and `Trivy CVE scan` to required branch-protection checks.** Currently
+      they run but don't block merges (left non-required so a newly-published CVE doesn't lock all
+      merges). After confirming a first green run, add both contexts to the `main` protection rule
+      via `gh api` / Settings → Branches.
+- [ ] **Extend Trivy to the Docker images.** Today it scans the boot-jar dependencies only; also
+      build and scan the `Audit`/`Auth` images to catch base-image/OS CVEs.
 
 ## Medium impact
 
