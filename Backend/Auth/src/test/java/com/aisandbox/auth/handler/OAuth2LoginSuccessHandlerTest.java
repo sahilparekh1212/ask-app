@@ -1,5 +1,6 @@
 package com.aisandbox.auth.handler;
 
+import com.aisandbox.auth.event.AuditEventPublisher;
 import com.aisandbox.auth.model.TokenResponse;
 import com.aisandbox.auth.service.TokenService;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -22,7 +23,9 @@ class OAuth2LoginSuccessHandlerTest {
 	@Test
 	void writesIssuedTokensAsJsonAndDerivesClaimsFromThePrincipal() throws Exception {
 		TokenService tokenService = mock(TokenService.class);
-		OAuth2LoginSuccessHandler handler = new OAuth2LoginSuccessHandler(tokenService, new ObjectMapper());
+		AuditEventPublisher auditEventPublisher = mock(AuditEventPublisher.class);
+		OAuth2LoginSuccessHandler handler =
+			new OAuth2LoginSuccessHandler(tokenService, new ObjectMapper(), auditEventPublisher);
 
 		OAuth2User user = mock(OAuth2User.class);
 		when(user.getAttribute("sub")).thenReturn("user-1");
@@ -42,6 +45,7 @@ class OAuth2LoginSuccessHandlerTest {
 		handler.onAuthenticationSuccess(request, response, authentication);
 
 		verify(tokenService).generateTokens("user-1", "eve@example.com", "Eve");
+		verify(auditEventPublisher).publish("User", "LOGIN", "user-1");
 		verify(response).setStatus(HttpServletResponse.SC_OK);
 		verify(response).setContentType("application/json");
 		assertThat(body.toString())

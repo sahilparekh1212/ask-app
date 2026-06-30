@@ -11,4 +11,7 @@ public interface AuditLogRepository
 
 	/** Active (not soft-deleted) audit logs. */
 	List<AuditLog> findByDeletedFalse();
+
+	/** True if an event with this id was already consumed — backs idempotent Kafka consumption. */
+	boolean existsByEventId(String eventId);
 }

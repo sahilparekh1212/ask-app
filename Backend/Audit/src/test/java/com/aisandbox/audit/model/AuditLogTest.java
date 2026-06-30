@@ -33,6 +33,16 @@ class AuditLogTest {
 	}
 
 	@Test
+	void eventIdGetterAndSetterRoundTrip() {
+		AuditLog log = new AuditLog("User", "CREATE", "details");
+
+		assertThat(log.getEventId()).isNull();
+		log.setEventId("evt-9");
+
+		assertThat(log.getEventId()).isEqualTo("evt-9");
+	}
+
+	@Test
 	void inheritedAuditingFieldsAreNullUntilPersisted() {
 		AuditLog log = new AuditLog("User", "CREATE", "details");
 

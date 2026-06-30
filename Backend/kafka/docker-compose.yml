@@ -1,0 +1,40 @@
+# Local Kafka for the event-driven audit pipeline (Auth produces, Audit consumes).
+# Redpanda is a single-binary, Kafka-API-compatible broker — no ZooKeeper needed.
+#
+#   docker compose -f Backend/kafka/docker-compose.yml up -d
+#
+# Then run the services pointed at the broker's host listener:
+#   KAFKA_BOOTSTRAP_SERVERS=localhost:19092 ./gradlew :Audit:bootRun
+#   KAFKA_BOOTSTRAP_SERVERS=localhost:19092 ./gradlew :Auth:bootRun
+# Console (topics, messages, consumer groups, the audit.events.DLT dead-letter topic): http://localhost:8080
+services:
+  redpanda:
+    image: redpandadata/redpanda:v24.2.7
+    container_name: aisandbox-redpanda
+    command:
+      - redpanda
+      - start
+      - --mode=dev-container
+      - --smp=1
+      - --default-log-level=info
+      # Two listeners: 'internal' for in-network clients (the console), 'external' for host apps.
+      - --kafka-addr=internal://0.0.0.0:9092,external://0.0.0.0:19092
+      - --advertise-kafka-addr=internal://redpanda:9092,external://localhost:19092
+    ports:
+      - "19092:19092" # host -> broker (set KAFKA_BOOTSTRAP_SERVERS=localhost:19092)
+      - "9644:9644"   # admin API
+    healthcheck:
+      test: ["CMD-SHELL", "rpk cluster health | grep -q 'Healthy:.*true'"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  console:
+    image: redpandadata/console:v2.7.2
+    container_name: aisandbox-redpanda-console
+    depends_on:
+      - redpanda
+    ports:
+      - "8080:8080"
+    environment:
+      KAFKA_BROKERS: redpanda:9092

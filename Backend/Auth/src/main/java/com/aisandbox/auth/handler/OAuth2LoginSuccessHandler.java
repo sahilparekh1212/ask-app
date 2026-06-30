@@ -1,5 +1,6 @@
 package com.aisandbox.auth.handler;
 
+import com.aisandbox.auth.event.AuditEventPublisher;
 import com.aisandbox.auth.model.TokenResponse;
 import com.aisandbox.auth.service.TokenService;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -21,10 +22,13 @@ public class OAuth2LoginSuccessHandler implements AuthenticationSuccessHandler {
 
 	private final TokenService tokenService;
 	private final ObjectMapper objectMapper;
+	private final AuditEventPublisher auditEventPublisher;
 
-	public OAuth2LoginSuccessHandler(TokenService tokenService, ObjectMapper objectMapper) {
+	public OAuth2LoginSuccessHandler(TokenService tokenService, ObjectMapper objectMapper,
+			AuditEventPublisher auditEventPublisher) {
 		this.tokenService = tokenService;
 		this.objectMapper = objectMapper;
+		this.auditEventPublisher = auditEventPublisher;
 	}
 
 	@Override
@@ -36,6 +40,7 @@ public class OAuth2LoginSuccessHandler implements AuthenticationSuccessHandler {
 		String name = user.getAttribute("name");
 
 		TokenResponse tokens = tokenService.generateTokens(userId, email, name);
+		auditEventPublisher.publish("User", "LOGIN", userId);
 		log.info("Issued tokens for user email={}", email);
 
 		response.setContentType("application/json");

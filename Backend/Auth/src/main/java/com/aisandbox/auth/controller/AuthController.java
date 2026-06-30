@@ -1,5 +1,6 @@
 package com.aisandbox.auth.controller;
 
+import com.aisandbox.auth.event.AuditEventPublisher;
 import com.aisandbox.auth.model.LoginRequest;
 import com.aisandbox.auth.model.RefreshRequest;
 import com.aisandbox.auth.model.TokenResponse;
@@ -35,15 +36,17 @@ public class AuthController {
 	private static final String DEMO_NAME = "Demo User";
 
 	private final TokenService tokenService;
+	private final AuditEventPublisher auditEventPublisher;
 	private final boolean demoEnabled;
 	private final String demoUsername;
 	private final String demoPassword;
 
-	public AuthController(TokenService tokenService,
+	public AuthController(TokenService tokenService, AuditEventPublisher auditEventPublisher,
 			@Value("${auth.demo.enabled:true}") boolean demoEnabled,
 			@Value("${auth.demo.username:demo}") String demoUsername,
 			@Value("${auth.demo.password:demo}") String demoPassword) {
 		this.tokenService = tokenService;
+		this.auditEventPublisher = auditEventPublisher;
 		this.demoEnabled = demoEnabled;
 		this.demoUsername = demoUsername;
 		this.demoPassword = demoPassword;
@@ -69,6 +72,7 @@ public class AuthController {
 			return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
 		}
 		TokenResponse tokens = tokenService.generateTokens(DEMO_USER_ID, DEMO_EMAIL, DEMO_NAME);
+		auditEventPublisher.publish("User", "LOGIN", DEMO_USER_ID);
 		log.info("Issued demo tokens for the recruiter test account");
 		return ResponseEntity.ok(tokens);
 	}
@@ -79,6 +83,7 @@ public class AuthController {
 		return tokenService.consumeRefreshToken(request.refreshToken())
 			.map(userId -> {
 				TokenResponse tokens = tokenService.generateTokens(userId, null, null);
+				auditEventPublisher.publish("User", "TOKEN_REFRESH", userId);
 				log.info("Refreshed access token for userId={}", userId);
 				return ResponseEntity.ok(tokens);
 			})
@@ -121,6 +126,7 @@ public class AuthController {
 	@Operation(summary = "Revoke a refresh token")
 	public ResponseEntity<Void> logout(@RequestBody RefreshRequest request) {
 		tokenService.revokeRefreshToken(request.refreshToken());
+		auditEventPublisher.publish("User", "LOGOUT", null);
 		return ResponseEntity.noContent().build();
 	}
 

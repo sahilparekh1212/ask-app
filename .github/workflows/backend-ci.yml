@@ -92,7 +92,7 @@ jobs:
       - name: Throughput load test (rate limiter off)
         run: |
           JAR=$(ls Backend/Audit/build/libs/*.jar | grep -v plain | head -1)
-          SPRING_PROFILES_ACTIVE=LOCAL,LOADTEST RATELIMIT_ENABLED=false \
+          SPRING_PROFILES_ACTIVE=LOCAL,LOADTEST RATELIMIT_ENABLED=false SPRING_KAFKA_LISTENER_AUTO_STARTUP=false \
             java -jar "$JAR" > audit-throughput.log 2>&1 &
           APP_PID=$!
           echo "Waiting for Audit to become healthy..."
@@ -109,7 +109,7 @@ jobs:
       - name: Rate-limit behaviour test (rate limiter on)
         run: |
           JAR=$(ls Backend/Audit/build/libs/*.jar | grep -v plain | head -1)
-          SPRING_PROFILES_ACTIVE=LOCAL,LOADTEST \
+          SPRING_PROFILES_ACTIVE=LOCAL,LOADTEST SPRING_KAFKA_LISTENER_AUTO_STARTUP=false \
             java -jar "$JAR" > audit-ratelimit.log 2>&1 &
           APP_PID=$!
           for i in $(seq 1 60); do

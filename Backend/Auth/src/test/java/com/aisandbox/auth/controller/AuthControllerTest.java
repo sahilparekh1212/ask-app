@@ -1,5 +1,6 @@
 package com.aisandbox.auth.controller;
 
+import com.aisandbox.auth.event.AuditEventPublisher;
 import com.aisandbox.auth.model.LoginRequest;
 import com.aisandbox.auth.model.RefreshRequest;
 import com.aisandbox.auth.model.TokenResponse;
@@ -25,16 +26,18 @@ import static org.mockito.Mockito.when;
 class AuthControllerTest {
 
 	private TokenService tokenService;
+	private AuditEventPublisher auditEventPublisher;
 	private AuthController controller;
 
 	@BeforeEach
 	void setUp() {
 		tokenService = mock(TokenService.class);
-		controller = new AuthController(tokenService, true, "demo", "demo");
+		auditEventPublisher = mock(AuditEventPublisher.class);
+		controller = new AuthController(tokenService, auditEventPublisher, true, "demo", "demo");
 	}
 
 	@Test
-	void login_issuesTokensForTheDemoCredentials() {
+	void login_issuesTokensAndPublishesALoginEvent() {
 		TokenResponse tokens = new TokenResponse("access", "refresh", 1800L);
 		when(tokenService.generateTokens("demo-user", "demo@aisandbox.dev", "Demo User")).thenReturn(tokens);
 
@@ -42,6 +45,7 @@ class AuthControllerTest {
 
 		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
 		assertThat(response.getBody()).isEqualTo(tokens);
+		verify(auditEventPublisher).publish("User", "LOGIN", "demo-user");
 	}
 
 	@Test
@@ -55,7 +59,7 @@ class AuthControllerTest {
 
 	@Test
 	void login_returns404WhenDemoLoginIsDisabled() {
-		AuthController disabled = new AuthController(tokenService, false, "demo", "demo");
+		AuthController disabled = new AuthController(tokenService, auditEventPublisher, false, "demo", "demo");
 
 		ResponseEntity<TokenResponse> response = disabled.login(new LoginRequest("demo", "demo"));
 
@@ -73,6 +77,7 @@ class AuthControllerTest {
 
 		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
 		assertThat(response.getBody()).isEqualTo(newTokens);
+		verify(auditEventPublisher).publish("User", "TOKEN_REFRESH", "user-1");
 	}
 
 	@Test
@@ -92,6 +97,7 @@ class AuthControllerTest {
 
 		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
 		verify(tokenService).revokeRefreshToken("some-refresh-token");
+		verify(auditEventPublisher).publish("User", "LOGOUT", null);
 	}
 
 	@Test
