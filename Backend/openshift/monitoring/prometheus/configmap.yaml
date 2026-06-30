@@ -14,5 +14,4 @@ data:
         static_configs:
           - targets:
               - audit-service:8083
-              - notification-service:8084
               - auth-service:8085

@@ -10,7 +10,7 @@ scalable Gradle subproject.
 |----------------|------|----------------|------------------------------------------------------|
 | Auth           | 8085 | `Auth`         | Google OAuth2 login, issues/refreshes JWTs, JWKS     |
 | Audit          | 8083 | `Audit`        | Audit-log create/read/delete (immutable)             |
-| Notification   | 8084 | `Notification` | Notification CRUD                                     |
+| Survey         | 8084 | `Survey`       | Survey CRUD                                          |
 
 All services share: JWT resource-server security, Swagger/OpenAPI docs, structured
 logging, a global exception handler, an actuator health endpoint, and the rate
@@ -51,7 +51,7 @@ in-memory H2 database — no external database required to get started.
 
 # Then, in separate terminals:
 ./gradlew :Audit:bootRun
-./gradlew :Notification:bootRun
+./gradlew :Survey:bootRun
 ```
 
 To run a service under a non-default profile:
@@ -87,7 +87,7 @@ Each service exposes the H2 web console. With the service running, open:
 | Service      | H2 console URL                       | JDBC URL                    |
 |--------------|--------------------------------------|-----------------------------|
 | Audit        | http://localhost:8083/h2-console     | `jdbc:h2:mem:auditdb`       |
-| Notification | http://localhost:8084/h2-console     | `jdbc:h2:mem:notificationdb`|
+| Survey       | http://localhost:8084/h2-console     | `jdbc:h2:mem:surveydb`      |
 
 Login with user `sa`, blank password, and the JDBC URL above. (In-memory data is
 reset on each restart.)
@@ -265,7 +265,7 @@ docker build -f Audit/Dockerfile -t <registry>/ai-sandbox/audit-service:latest .
 # 4. Apply each service's manifests
 oc apply -f openshift/auth/
 oc apply -f openshift/audit/
-oc apply -f openshift/notification/
+oc apply -f openshift/survey/
 
 # 5. Observability stack (Prometheus scrapes the services, Grafana reads Prometheus + Loki)
 oc apply -f openshift/monitoring/prometheus/

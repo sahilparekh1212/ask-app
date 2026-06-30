@@ -1,6 +1,5 @@
 rootProject.name = 'backend'
 
 include 'Audit'
-include 'Notification'
 include 'Auth'
 
