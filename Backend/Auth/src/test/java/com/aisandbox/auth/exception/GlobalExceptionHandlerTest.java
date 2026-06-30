@@ -6,8 +6,10 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.MDC;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.util.Map;
 
@@ -48,6 +50,18 @@ class GlobalExceptionHandlerTest {
 		assertThat(response.getBody())
 			.containsEntry("status", 429)
 			.containsEntry("error", "Too Many Requests");
+	}
+
+	@Test
+	void handleNoResource_returns404ForUnknownPaths() {
+		NoResourceFoundException ex = new NoResourceFoundException(HttpMethod.GET, "/auth/nope");
+
+		ResponseEntity<Map<String, Object>> response = handler.handleNoResource(ex);
+
+		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+		assertThat(response.getBody())
+			.containsEntry("status", 404)
+			.containsEntry("error", "Not Found");
 	}
 
 	@Test

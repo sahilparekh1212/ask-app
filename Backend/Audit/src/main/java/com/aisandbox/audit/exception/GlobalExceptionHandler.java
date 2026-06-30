@@ -10,6 +10,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.time.Instant;
 import java.util.Arrays;
@@ -29,6 +30,16 @@ public class GlobalExceptionHandler {
 
 	@ExceptionHandler(ResourceNotFoundException.class)
 	public ResponseEntity<Map<String, Object>> handleNotFound(ResourceNotFoundException ex) {
+		logException(ex);
+		return ResponseEntity.status(HttpStatus.NOT_FOUND).body(errorBody(404, "Not Found", ex));
+	}
+
+	/**
+	 * Unknown route / missing static resource. Without this, the catch-all below would turn a
+	 * mistyped or unversioned URL into a misleading 500 instead of a 404.
+	 */
+	@ExceptionHandler(NoResourceFoundException.class)
+	public ResponseEntity<Map<String, Object>> handleNoResource(NoResourceFoundException ex) {
 		logException(ex);
 		return ResponseEntity.status(HttpStatus.NOT_FOUND).body(errorBody(404, "Not Found", ex));
 	}
