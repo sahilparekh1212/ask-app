@@ -1,12 +1,17 @@
 package com.aisandbox.audit.ratelimit;
 
+import com.aisandbox.audit.exception.GlobalExceptionHandler;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.TestingAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
+
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -96,5 +101,21 @@ class RateLimitInterceptorTest {
 		interceptor.afterCompletion(request, mock(HttpServletResponse.class), new Object(), null);
 
 		verify(registry, never()).complete(org.mockito.ArgumentMatchers.any());
+	}
+
+	@Test
+	void errorDuringASupersededRequestIsMappedTo429NotA500() {
+		// A superseded request whose worker thread was interrupted mid-work can throw a generic
+		// exception; the handler must surface that as 429 (graceful shedding), not a 500.
+		ActiveRequest mine = new ActiveRequest("alice|POST|/api/v1/audit-logs", Thread.currentThread());
+		mine.discard();
+		Thread.interrupted(); // clear the interrupt discard() raised
+		DiscardContext.set(mine);
+		GlobalExceptionHandler handler = new GlobalExceptionHandler(properties);
+
+		ResponseEntity<Map<String, Object>> response = handler.handleAll(new RuntimeException("interrupted mid-save"));
+
+		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS);
+		assertThat(response.getBody()).containsEntry("status", 429);
 	}
 }

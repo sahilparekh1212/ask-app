@@ -1,5 +1,7 @@
 package com.aisandbox.auth.exception;
 
+import com.aisandbox.auth.ratelimit.ActiveRequest;
+import com.aisandbox.auth.ratelimit.DiscardContext;
 import com.aisandbox.auth.ratelimit.RateLimitProperties;
 import com.aisandbox.auth.ratelimit.RequestDiscardedException;
 import org.slf4j.Logger;
@@ -59,6 +61,13 @@ public class GlobalExceptionHandler {
 
 	@ExceptionHandler(Exception.class)
 	public ResponseEntity<Map<String, Object>> handleAll(Exception ex) {
+		// A superseded (rate-limited) request can fail mid-work because the "newest wins" limiter
+		// interrupted its worker thread (e.g. during the DB write). Surface that as a 429 like any
+		// other discard, not a misleading 500.
+		ActiveRequest current = DiscardContext.current();
+		if (current != null && current.isDiscarded()) {
+			return handleDiscarded(new RequestDiscardedException(current.getKey()));
+		}
 		logException(ex);
 		return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorBody(500, "Internal Server Error", ex));
 	}
