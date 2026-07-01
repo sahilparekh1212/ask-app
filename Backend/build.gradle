@@ -49,7 +49,7 @@ subprojects {
 		implementation 'org.springframework.boot:spring-boot-starter-web'
 		implementation 'org.springframework.boot:spring-boot-starter-security'
 		implementation 'org.springframework.boot:spring-boot-starter-oauth2-resource-server'
-		implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.9'
+		implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:3.0.3'
 		implementation 'org.springframework.boot:spring-boot-starter-actuator'
 		// Prometheus metrics scrape endpoint at /actuator/prometheus
 		implementation 'io.micrometer:micrometer-registry-prometheus'
