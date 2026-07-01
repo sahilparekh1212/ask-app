@@ -46,6 +46,24 @@
       "targets": [
         { "expr": "{app=~\".+-service\"}" }
       ]
+    },
+    {
+      "title": "Latency p95 / p99 by endpoint",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "description": "Per-endpoint request latency from http_server_requests histogram buckets (requires management.metrics.distribution.percentiles-histogram.http.server.requests=true).",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 16 },
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le, application, uri) (rate(http_server_requests_seconds_bucket[5m])))",
+          "legendFormat": "p95 {{application}} {{uri}}"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum by (le, application, uri) (rate(http_server_requests_seconds_bucket[5m])))",
+          "legendFormat": "p99 {{application}} {{uri}}"
+        }
+      ]
     }
   ],
   "schemaVersion": 39,
