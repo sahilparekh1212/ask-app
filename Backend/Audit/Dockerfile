@@ -6,8 +6,9 @@ WORKDIR /workspace
 COPY gradlew gradlew
 COPY gradle gradle
 COPY build.gradle settings.gradle ./
+# Sibling module build files so Gradle can resolve the multi-project graph (settings.gradle
+# includes Audit + Auth). Survey was removed from the project — do not COPY it.
 COPY Auth/build.gradle Auth/build.gradle
-COPY Survey/build.gradle Survey/build.gradle
 COPY Audit/build.gradle Audit/build.gradle
 COPY Audit/src Audit/src
 RUN chmod +x gradlew && ./gradlew :Audit:bootJar --no-daemon -x test
