@@ -45,9 +45,13 @@ needs.
 - [ ] **Top-level `docker-compose`.** Only `Backend/monitoring/docker-compose.yml` exists
       (observability only) and there's no real DB. Add a root compose: Postgres + Auth + Audit +
       UI + Prometheus/Grafana/Loki so a reviewer can `docker compose up` and see the whole system.
-- [ ] **DB migrations (Flyway/Liquibase).** PROD runs `ddl-auto=validate` with no migration
-      tool, so the schema — including the new audit indexes — is never created outside dev.
-      Add Flyway (baseline + index migration) to demo credibly against Postgres.
+- [x] **DB migrations with Liquibase — implemented (Audit).** Added `liquibase-core` and a
+      baseline changelog at the default path (`db/changelog/db.changelog-master.yaml`) that
+      creates the `audit_logs` table + all three indexes (incl. the unique `idx_audit_event_id`);
+      Hibernate now runs `ddl-auto=none` in every profile so Liquibase owns the schema (previously
+      PROD `validate` had no schema to validate against). Verified on H2 via the `@DataJpaTest` /
+      embedded-Kafka tests and a running-app smoke (insert works with `ddl-auto=none`). Auth has no
+      DB, so N/A there. Follow-up: run it against a real Postgres (DEV/PROD) once one is wired.
 - [ ] **Demo data seeding.** Seed audit rows on startup (dev-profile `CommandLineRunner` or a
       compose init) so the dashboard isn't empty on first load.
 
@@ -99,9 +103,11 @@ detect-private-key in `lint.yml`). Now added:
 
 - [ ] **No ADRs or design-tradeoff docs.** README explains "what" well but never "why" — e.g. why `ConcurrentHashMap` over Redis for rate limiting/refresh tokens, why RSA over HMAC for JWT signing, why H2 over Testcontainers for tests. Add a short `docs/adr/` with 3–4 real decisions and alternatives considered.
 - [ ] **Auth refresh-token store is in-memory only.** `TokenService.java` explicitly comments it as a placeholder — tokens vanish on restart and don't work across replicas. Same issue applies to the ephemeral RSA keypair generated when no `AUTH_RSA_PRIVATE_KEY` env var is supplied. Replace with Redis/DB-backed storage, or at minimum document this as a known limitation.
+- [ ] **Make the services horizontally scalable, then add scaling rules.** HPA manifests already exist (`openshift/audit/hpa.yaml`, `openshift/auth/hpa.yaml`), but scaling past one replica is currently unsafe: the refresh-token store and rate limiter are in-memory `ConcurrentHashMap`s and Auth's RSA signing key is ephemeral per-pod (see the in-memory-token-store item above), so a second replica breaks refresh + JWT validation. Prerequisite: externalize that state to Redis (shared token store, shared rate-limit counters, shared/managed signing key). Then tune HPA thresholds (CPU/mem, min/max replicas) and size the DB layer (HikariCP pool now; read replicas/partitioning later — premature at current data volume).
 - [ ] **Auth refresh flow drops claims on rotation.** `AuthController.refresh()` calls `generateTokens(userId, null, null)`, losing email/name on refresh — minor logic bug worth fixing alongside the token tests.
 - [ ] **Observability is configured but unproven end-to-end.** Prometheus/Grafana/Loki wiring is real (working PromQL/LogQL panels, not a template) but there's no evidence it was run against real traffic. Capture a dashboard screenshot from an actual load test and include it in the README.
 - [x] **Per-endpoint latency (p95/p99) now visible.** Enabled `management.metrics.distribution.percentiles-histogram.http.server.requests=true` in both services (emits `http_server_requests_seconds_bucket`) and added a "Latency p95/p99 by endpoint" panel to `monitoring/grafana/dashboards/aisandbox-overview.json` (`histogram_quantile` over the buckets). Response time was already partly observable (avg+max via Micrometer, `durationMs` in `AuditInterceptor` logs, k6 p95 at load). Still worth capturing a screenshot from a real load run (ties to the observability item above).
+- [ ] **Add distributed tracing (OpenTelemetry) — the missing third observability pillar.** Metrics (Prometheus) and logs (Loki) exist but there are no traces. Add Micrometer Tracing + the OTel/OTLP bridge to both services and propagate trace context through the `audit.events` Kafka messages, so a single request can be followed across the Auth → Kafka → Audit async flow. Export to an OTel collector / Tempo (viewable in Grafana next to the existing panels). Highest-value observability add now that there's a real multi-service event flow.
 - [ ] **OpenShift manifests use `emptyDir`, no PVCs.** README already flags this, but if the project is framed as "production-ready" elsewhere this undercuts credibility — either add a PVC variant or state the limitation explicitly.
 - [ ] **Minor security smells in Auth:** no `@Valid`/`@NotBlank` on `RefreshRequest`; no CORS policy configured anywhere; `MdcLoggingFilter.extractSubFromJwt()` does a naive unverified base64 substring search for logging purposes (not an auth bypass, but fragile/non-idiomatic — should use a JSON parser at minimum).
 
