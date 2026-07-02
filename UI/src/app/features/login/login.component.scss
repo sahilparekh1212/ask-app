@@ -1,0 +1,82 @@
+.login {
+  max-width: 360px;
+  margin: 2rem auto;
+
+  form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+
+    label {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+      font-size: 0.9rem;
+      color: #374151;
+    }
+
+    input,
+    select {
+      padding: 0.5rem;
+      border: 1px solid #d1d5db;
+      border-radius: 6px;
+      font-size: 0.95rem;
+    }
+  }
+
+  button {
+    padding: 0.55rem 0.75rem;
+    border: none;
+    border-radius: 6px;
+    font-size: 0.95rem;
+    cursor: pointer;
+
+    &[type='submit'] {
+      background: #2563eb;
+      color: #fff;
+
+      &:disabled {
+        background: #93c5fd;
+        cursor: not-allowed;
+      }
+    }
+
+    &.google {
+      width: 100%;
+      background: #fff;
+      border: 1px solid #d1d5db;
+      color: #374151;
+    }
+  }
+
+  .error {
+    color: #b91c1c;
+    font-size: 0.85rem;
+    margin: 0;
+  }
+
+  .divider {
+    display: flex;
+    align-items: center;
+    text-align: center;
+    color: #9ca3af;
+    margin: 1rem 0;
+
+    span {
+      padding: 0 0.5rem;
+    }
+
+    &::before,
+    &::after {
+      content: '';
+      flex: 1;
+      border-bottom: 1px solid #e5e7eb;
+    }
+  }
+
+  .hint {
+    font-size: 0.8rem;
+    color: #6b7280;
+    margin-top: 1rem;
+  }
+}

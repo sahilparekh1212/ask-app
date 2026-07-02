@@ -1,0 +1,38 @@
+<section class="login">
+  <h1>Sign in</h1>
+
+  <form [formGroup]="form" (ngSubmit)="submit()">
+    <label>
+      Username
+      <input type="text" formControlName="username" autocomplete="username" />
+    </label>
+    <label>
+      Password
+      <input type="password" formControlName="password" autocomplete="current-password" />
+    </label>
+    <label>
+      Role
+      <select formControlName="role">
+        <option value="ROLE_USER">ROLE_USER</option>
+        <option value="ROLE_ADMIN">ROLE_ADMIN</option>
+      </select>
+    </label>
+
+    @if (error()) {
+      <p class="error" role="alert">{{ error() }}</p>
+    }
+
+    <button type="submit" [disabled]="form.invalid || submitting()">
+      {{ submitting() ? 'Signing in…' : 'Demo login' }}
+    </button>
+  </form>
+
+  <div class="divider"><span>or</span></div>
+
+  <button type="button" class="google" (click)="loginWithGoogle()">Sign in with Google</button>
+
+  <p class="hint">
+    Demo account: <code>demo</code> / <code>demo</code>. Pick ROLE_ADMIN to exercise admin-gated
+    actions.
+  </p>
+</section>
