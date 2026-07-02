@@ -1,0 +1,46 @@
+name: Frontend CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'UI/**'
+      - '.github/workflows/frontend-ci.yml'
+  pull_request:
+    paths:
+      - 'UI/**'
+      - '.github/workflows/frontend-ci.yml'
+
+defaults:
+  run:
+    working-directory: UI
+
+jobs:
+  build-test:
+    name: Lint, build & test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: UI/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Prettier format check
+        run: npm run format:check
+
+      - name: ESLint
+        run: npm run lint
+
+      - name: Production build
+        run: npm run build -- --configuration production
+
+      # ubuntu-latest ships Chrome; the karma.conf.js ChromeHeadlessNoSandbox launcher runs it
+      # headless with --no-sandbox (required on the hosted runner).
+      - name: Unit tests (headless)
+        run: npm run test:ci

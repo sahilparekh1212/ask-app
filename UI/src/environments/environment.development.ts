@@ -1,0 +1,9 @@
+/**
+ * Local dev: call the two services directly on their own ports. Both enable CORS for the Angular
+ * dev server origin (http://localhost:4200) via CORS_ALLOWED_ORIGINS — see the backend README.
+ */
+export const environment = {
+  production: false,
+  authApiUrl: 'http://localhost:8085',
+  auditApiUrl: 'http://localhost:8083',
+};
