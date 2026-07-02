@@ -56,7 +56,10 @@ jobs:
         if: github.event_name == 'pull_request' # needs a PR base to diff against
         run: |
           python3 -m pip install --quiet diff_cover
-          git fetch --no-tags --depth=1 origin "${{ github.base_ref }}:refs/remotes/origin/${{ github.base_ref }}"
+          # Full fetch (no --depth): a shallow depth-1 fetch of the base leaves no reachable merge
+          # base once the PR branched before the base's current tip, so diff-cover's
+          # `origin/BASE...HEAD` fails with "no merge base". checkout uses fetch-depth: 0 already.
+          git fetch --no-tags origin "${{ github.base_ref }}:refs/remotes/origin/${{ github.base_ref }}"
           diff-cover \
             Backend/Audit/build/reports/jacoco/test/jacocoTestReport.xml \
             Backend/Auth/build/reports/jacoco/test/jacocoTestReport.xml \
