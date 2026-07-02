@@ -18,6 +18,9 @@ COPY Auth/src Auth/src
 RUN chmod +x gradlew && ./gradlew :Auth:bootJar --no-daemon -x test
 
 FROM eclipse-temurin:25-jre-alpine
+# Patch Alpine OS packages beyond what the base tag shipped (the base-image CVEs Trivy flags —
+# e.g. p11-kit-trust — are fixed in newer apk packages before the temurin image is rebuilt).
+RUN apk --no-cache upgrade
 WORKDIR /app
 COPY --from=builder /workspace/Auth/build/libs/*.jar app.jar
 # OpenShift runs containers as an arbitrary UID in the root group
