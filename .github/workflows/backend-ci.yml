@@ -5,13 +5,17 @@ on:
     branches: [main]
     paths:
       - 'Backend/**'
-      # Any CI/automation change (workflows, dependabot config, action bumps) must run the full
-      # suite too — a required check that never triggers leaves the PR permanently un-mergeable.
+      # These jobs are required branch-protection checks. A required check that never triggers
+      # leaves a PR permanently un-mergeable, so this must also fire on any CI/automation change
+      # (.github/**) and on frontend-only PRs (UI/**) — even though the backend is unchanged, the
+      # required contexts still have to report green.
       - '.github/**'
+      - 'UI/**'
   pull_request:
     paths:
       - 'Backend/**'
       - '.github/**'
+      - 'UI/**'
 
 jobs:
   build-test:

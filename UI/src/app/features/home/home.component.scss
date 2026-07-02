@@ -1,0 +1,39 @@
+.home {
+  h1 {
+    margin-bottom: 0.25rem;
+  }
+
+  .lead {
+    color: #4b5563;
+    max-width: 60ch;
+    line-height: 1.5;
+  }
+
+  .cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 1rem;
+    margin-top: 1.5rem;
+
+    article {
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 1rem 1.25rem;
+
+      h2 {
+        margin-top: 0;
+        font-size: 1.1rem;
+      }
+
+      p {
+        color: #4b5563;
+        line-height: 1.45;
+      }
+
+      a {
+        color: #2563eb;
+        text-decoration: none;
+      }
+    }
+  }
+}

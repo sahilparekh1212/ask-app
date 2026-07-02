@@ -23,10 +23,15 @@ repos:
       - id: check-yaml
         args: [--allow-multiple-documents] # k8s/OpenShift manifests are multi-doc
       - id: check-json
+        # Angular's tsconfig*.json and .vscode/*.json are JSONC (comments + trailing commas),
+        # which this strict JSON parser rejects — exclude them, not real JSON.
+        exclude: '^UI/(\.vscode/.*|tsconfig.*)\.json$'
       - id: end-of-file-fixer
       - id: trailing-whitespace
       - id: check-merge-conflict
       - id: check-added-large-files
+        # npm/gradle lockfiles legitimately exceed the 500 KB default (UI/package-lock.json ~640 KB).
+        args: [--maxkb=1024]
 
   # --- Conventional commit message lint (commit-msg) -----------------------------------
   # Blocks messages that don't start with feat:/fix:/chore:/... — would have caught the

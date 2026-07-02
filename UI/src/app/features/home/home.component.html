@@ -1,0 +1,25 @@
+<section class="home">
+  <h1>AI-Sandbox</h1>
+  <p class="lead">
+    A production-shaped Spring Boot backend — Google OAuth2 → JWT auth, an event-driven audit trail
+    over Kafka, rate limiting, and a full observability stack — with this Angular SPA as its client.
+  </p>
+
+  <div class="cards">
+    <article>
+      <h2>Auth</h2>
+      <p>
+        Google sign-in and a demo login issue RSA-signed JWTs; the SPA attaches them as Bearer
+        tokens and silently refreshes.
+      </p>
+    </article>
+    <article>
+      <h2>Audit</h2>
+      <p>
+        Every login/refresh/logout is published to Kafka and persisted; browse it as a paginated,
+        filterable table with stats.
+      </p>
+      <a routerLink="/audit">Open the audit dashboard →</a>
+    </article>
+  </div>
+</section>

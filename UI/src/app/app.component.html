@@ -1,0 +1,11 @@
+<header class="app-header">
+  <a class="brand" routerLink="/">{{ title }}</a>
+  <nav>
+    <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">Home</a>
+    <a routerLink="/audit" routerLinkActive="active">Audit</a>
+  </nav>
+</header>
+
+<main class="app-main">
+  <router-outlet />
+</main>
