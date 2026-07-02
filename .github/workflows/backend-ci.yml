@@ -25,7 +25,7 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v6
 
       # Same gates that used to run as pre-push hooks, now enforced for everyone on the PR.
       # On the Linux runner neither AI_SANDBOX_BUILD_DIR nor LOCALAPPDATA is set, so Gradle
@@ -78,7 +78,7 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v6
 
       - uses: grafana/setup-k6-action@v1
 
@@ -144,7 +144,7 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v6
 
       # Boot jars bundle their dependencies, which is what Trivy's jar analyzer scans for CVEs.
       - name: Build boot jars
