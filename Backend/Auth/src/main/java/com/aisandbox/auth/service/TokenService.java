@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -26,26 +27,30 @@ public class TokenService {
 		this.jwtEncoder = jwtEncoder;
 	}
 
-	public TokenResponse generateTokens(String userId, String email, String name) {
-		String accessToken = buildAccessToken(userId, email, name);
+	public TokenResponse generateTokens(String userId, String email, String name, String role) {
+		String accessToken = buildAccessToken(userId, email, name, role);
 		String refreshToken = UUID.randomUUID().toString();
-		refreshTokenStore.put(refreshToken, new RefreshTokenEntry(userId, Instant.now().plus(REFRESH_TOKEN_TTL)));
+		refreshTokenStore.put(refreshToken,
+			new RefreshTokenEntry(userId, email, name, role, Instant.now().plus(REFRESH_TOKEN_TTL)));
 		return new TokenResponse(accessToken, refreshToken, ACCESS_TOKEN_TTL.getSeconds());
 	}
 
-	public Optional<String> consumeRefreshToken(String refreshToken) {
+	/** Claims carried by a refresh token, restored onto the access token minted from it. */
+	public record RefreshClaims(String userId, String email, String name, String role) {}
+
+	public Optional<RefreshClaims> consumeRefreshToken(String refreshToken) {
 		RefreshTokenEntry entry = refreshTokenStore.remove(refreshToken);
 		if (entry == null || entry.expiresAt().isBefore(Instant.now())) {
 			return Optional.empty();
 		}
-		return Optional.of(entry.userId());
+		return Optional.of(new RefreshClaims(entry.userId(), entry.email(), entry.name(), entry.role()));
 	}
 
 	public void revokeRefreshToken(String refreshToken) {
 		refreshTokenStore.remove(refreshToken);
 	}
 
-	private String buildAccessToken(String userId, String email, String name) {
+	private String buildAccessToken(String userId, String email, String name, String role) {
 		Instant now = Instant.now();
 		JwtClaimsSet.Builder claims = JwtClaimsSet.builder()
 			.issuer("aisandbox-auth")
@@ -54,9 +59,12 @@ public class TokenService {
 			.subject(userId);
 		if (email != null) claims.claim("email", email);
 		if (name != null) claims.claim("name", name);
+		// A single-element array so resource servers can map it straight onto Spring Security's
+		// collection-shaped authorities claim (see Audit's JwtAuthenticationConverter).
+		claims.claim("roles", List.of(role));
 		return jwtEncoder.encode(JwtEncoderParameters.from(claims.build())).getTokenValue();
 	}
 
-	private record RefreshTokenEntry(String userId, Instant expiresAt) {}
+	private record RefreshTokenEntry(String userId, String email, String name, String role, Instant expiresAt) {}
 
 }
