@@ -1,5 +1,6 @@
-# Auth service can scale horizontally once AUTH_RSA_PRIVATE_KEY is set from the Secret,
-# ensuring all pods sign tokens with the same stable RSA key.
+# Auth scales horizontally: all pods sign with the shared AUTH_RSA_PRIVATE_KEY (from the Secret)
+# and share the Redis-backed refresh-token store (AUTH_REFRESH_TOKEN_STORE=redis), so refresh and
+# JWT validation work regardless of which pod a request lands on. See ADR-0007.
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
@@ -10,7 +11,7 @@ spec:
     apiVersion: apps/v1
     kind: Deployment
     name: auth-service
-  minReplicas: 1
+  minReplicas: 2
   maxReplicas: 3
   metrics:
     - type: Resource

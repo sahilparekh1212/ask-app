@@ -1,0 +1,44 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis
+  namespace: ai-sandbox
+  labels:
+    app: redis
+spec:
+  # Single replica: refresh tokens are short-lived and re-mintable, so this is a shared cache, not
+  # a source of truth. Redis itself is therefore still a SPOF — Redis Sentinel or a managed HA
+  # Redis is the next step (tracked under the "no SPOF" half of the statelessness TODO item).
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis
+  template:
+    metadata:
+      labels:
+        app: redis
+    spec:
+      containers:
+        - name: redis
+          image: redis:7-alpine
+          # No persistence — tokens are re-mintable, so run purely in-memory.
+          args: ["redis-server", "--save", "", "--appendonly", "no"]
+          ports:
+            - containerPort: 6379
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "50m"
+            limits:
+              memory: "128Mi"
+              cpu: "200m"
+          livenessProbe:
+            tcpSocket:
+              port: 6379
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          readinessProbe:
+            exec:
+              command: ["redis-cli", "ping"]
+            initialDelaySeconds: 5
+            periodSeconds: 10

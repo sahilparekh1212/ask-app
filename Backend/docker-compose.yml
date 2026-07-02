@@ -114,6 +114,20 @@ services:
       - loki
       - tempo
 
+  redis:
+    image: redis:7-alpine
+    container_name: aisandbox-redis
+    # Refresh tokens are short-lived and re-mintable, so no persistence is needed — run purely
+    # in-memory (disable RDB snapshots and the AOF) for a lean shared store.
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
   auth:
     build:
       context: .
@@ -127,6 +141,10 @@ services:
       CORS_ALLOWED_ORIGINS: http://localhost:4200
       # Where a successful Google login redirects with the issued tokens (see OAuth2LoginSuccessHandler).
       FRONTEND_URL: http://localhost:4200
+      # Shared refresh-token store so Auth is stateless and `docker compose up --scale auth=2`
+      # keeps refresh working across both replicas (see ADR-0007).
+      AUTH_REFRESH_TOKEN_STORE: redis
+      REDIS_HOST: redis
       # Real Google sign-in is opt-in — pass these through from the host env if set; the demo
       # login (see the header comment above) works without them.
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
@@ -138,6 +156,8 @@ services:
         condition: service_healthy
       tempo:
         condition: service_started
+      redis:
+        condition: service_healthy
 
   audit:
     build:

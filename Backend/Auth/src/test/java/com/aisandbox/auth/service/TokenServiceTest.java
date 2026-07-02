@@ -47,7 +47,7 @@ class TokenServiceTest {
 			.build();
 		JWKSource<SecurityContext> jwkSource = new ImmutableJWKSet<>(new JWKSet(rsaKey));
 
-		tokenService = new TokenService(new NimbusJwtEncoder(jwkSource));
+		tokenService = new TokenService(new NimbusJwtEncoder(jwkSource), new InMemoryRefreshTokenStore());
 		jwtDecoder = NimbusJwtDecoder.withPublicKey((RSAPublicKey) keyPair.getPublic()).build();
 	}
 

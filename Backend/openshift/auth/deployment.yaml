@@ -6,7 +6,10 @@ metadata:
   labels:
     app: auth-service
 spec:
-  replicas: 1
+  # ≥2 replicas now that Auth is stateless: the refresh-token store is externalized to Redis
+  # (AUTH_REFRESH_TOKEN_STORE=redis) and all pods sign with the shared AUTH_RSA_PRIVATE_KEY, so a
+  # token issued by one pod is honored by any other. HPA (min 2 / max 3) scales from here.
+  replicas: 2
   selector:
     matchLabels:
       app: auth-service

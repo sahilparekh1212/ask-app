@@ -1,6 +1,10 @@
 # ADR-0002: In-memory store for rate limiting & refresh tokens over Redis
 
-**Status:** Accepted (with a known, tracked expiry condition)
+**Status:** Partially superseded by [ADR-0007](0007-redis-refresh-token-store-for-statelessness.md).
+The refresh-token store has since been externalized to Redis (behind `auth.refresh-token.store`, so
+in-memory remains the dev/test default); the rate limiter's per-pod design is unchanged and — as
+ADR-0007 explains — is *correctly* per-pod (it interrupts local worker threads, so there is no
+cross-pod state to externalize). The reasoning below stands as the original context.
 
 ## Context
 

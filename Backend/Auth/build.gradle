@@ -4,4 +4,7 @@ dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-oauth2-client'
 	implementation 'org.springframework.kafka:spring-kafka'
 	implementation 'org.springframework.boot:spring-boot-starter-validation'
+	// Shared, cross-replica refresh-token store (auth.refresh-token.store=redis — see ADR-0007).
+	// Lettuce connects lazily, so this is inert under the default in-memory store.
+	implementation 'org.springframework.boot:spring-boot-starter-data-redis'
 }

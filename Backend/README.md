@@ -19,8 +19,9 @@ All services share: JWT resource-server security, Swagger/OpenAPI docs, structur
 logging, a global exception handler, an actuator health endpoint, and the rate
 limiter described below.
 
-Non-obvious design tradeoffs (why RSA over HMAC, why in-memory over Redis for now, why H2
-in tests, why Liquibase owns the schema) are written up in [`docs/adr/`](docs/adr/README.md).
+Non-obvious design tradeoffs (why RSA over HMAC, why the refresh-token store moved to Redis to make
+Auth stateless — and why the rate limiter stays per-pod, why H2 in tests, why Liquibase owns the
+schema) are written up in [`docs/adr/`](docs/adr/README.md).
 
 ---
 
@@ -338,11 +339,14 @@ oc apply -f openshift/auth/secret.yaml
 docker build -f Audit/Dockerfile -t <registry>/ai-sandbox/audit-service:latest .
 # ...repeat per service, then push
 
-# 4. Apply each service's manifests
+# 4. Shared Redis (Auth's refresh-token store — required before Auth scales past one replica)
+oc apply -f openshift/redis/
+
+# 5. Apply each service's manifests (both run 2 replicas by default; see HPA below)
 oc apply -f openshift/auth/
 oc apply -f openshift/audit/
 
-# 5. Observability stack (Prometheus scrapes the services, Grafana reads Prometheus + Loki)
+# 6. Observability stack (Prometheus scrapes the services, Grafana reads Prometheus + Loki)
 oc apply -f openshift/monitoring/prometheus/
 oc apply -f openshift/monitoring/loki/
 oc apply -f openshift/monitoring/grafana/
@@ -362,9 +366,14 @@ Scale a service manually at any time:
 oc scale deployment audit-service --replicas=3 -n ai-sandbox
 ```
 
-> **Auth + scaling:** set `AUTH_RSA_PRIVATE_KEY` (in your `openshift/auth/secret.yaml`) so
-> every Auth replica signs JWTs with the same key. Without it each pod generates an
-> ephemeral key and tokens fail validation across replicas/restarts.
+> **Auth + scaling:** Auth is stateless and ships at 2 replicas. Two things make that safe, both
+> already wired in the manifests: (1) `AUTH_REFRESH_TOKEN_STORE=redis` + `REDIS_HOST=redis`
+> (in `openshift/auth/configmap.yaml`) point every pod at the shared Redis so a refresh token
+> issued by one pod is honored by another; (2) `AUTH_RSA_PRIVATE_KEY` (which you set in
+> `openshift/auth/secret.yaml`) makes every pod sign JWTs with the same key. Miss the key and each
+> pod generates an ephemeral one and tokens fail validation across replicas; miss Redis (or leave
+> the store `in-memory`) and refresh silently fails on whichever pod didn't mint the token. See
+> [ADR-0007](docs/adr/0007-redis-refresh-token-store-for-statelessness.md).
 
 ---
 

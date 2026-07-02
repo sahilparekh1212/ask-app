@@ -11,7 +11,6 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 public class TokenService {
@@ -20,17 +19,19 @@ public class TokenService {
 	private static final Duration REFRESH_TOKEN_TTL = Duration.ofDays(7);
 
 	private final JwtEncoder jwtEncoder;
-	// Placeholder in-memory store — replace with Redis or DB in production
-	private final ConcurrentHashMap<String, RefreshTokenEntry> refreshTokenStore = new ConcurrentHashMap<>();
+	// In-memory (single replica) or Redis (shared across replicas), selected by
+	// auth.refresh-token.store — see RefreshTokenStore / ADR-0007.
+	private final RefreshTokenStore refreshTokenStore;
 
-	public TokenService(JwtEncoder jwtEncoder) {
+	public TokenService(JwtEncoder jwtEncoder, RefreshTokenStore refreshTokenStore) {
 		this.jwtEncoder = jwtEncoder;
+		this.refreshTokenStore = refreshTokenStore;
 	}
 
 	public TokenResponse generateTokens(String userId, String email, String name, String role) {
 		String accessToken = buildAccessToken(userId, email, name, role);
 		String refreshToken = UUID.randomUUID().toString();
-		refreshTokenStore.put(refreshToken,
+		refreshTokenStore.store(refreshToken,
 			new RefreshTokenEntry(userId, email, name, role, Instant.now().plus(REFRESH_TOKEN_TTL)));
 		return new TokenResponse(accessToken, refreshToken, ACCESS_TOKEN_TTL.getSeconds());
 	}
@@ -39,15 +40,12 @@ public class TokenService {
 	public record RefreshClaims(String userId, String email, String name, String role) {}
 
 	public Optional<RefreshClaims> consumeRefreshToken(String refreshToken) {
-		RefreshTokenEntry entry = refreshTokenStore.remove(refreshToken);
-		if (entry == null || entry.expiresAt().isBefore(Instant.now())) {
-			return Optional.empty();
-		}
-		return Optional.of(new RefreshClaims(entry.userId(), entry.email(), entry.name(), entry.role()));
+		return refreshTokenStore.consume(refreshToken)
+			.map(entry -> new RefreshClaims(entry.userId(), entry.email(), entry.name(), entry.role()));
 	}
 
 	public void revokeRefreshToken(String refreshToken) {
-		refreshTokenStore.remove(refreshToken);
+		refreshTokenStore.revoke(refreshToken);
 	}
 
 	private String buildAccessToken(String userId, String email, String name, String role) {
@@ -64,7 +62,5 @@ public class TokenService {
 		claims.claim("roles", List.of(role));
 		return jwtEncoder.encode(JwtEncoderParameters.from(claims.build())).getTokenValue();
 	}
-
-	private record RefreshTokenEntry(String userId, String email, String name, String role, Instant expiresAt) {}
 
 }

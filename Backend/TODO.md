@@ -213,10 +213,13 @@ detect-private-key in `lint.yml`). Now added:
       limiting/refresh tokens (with the multi-replica consequence spelled out), H2 over
       Testcontainers for tests, and Liquibase over Hibernate `ddl-auto` for schema ownership.
       Linked from the root README.
-- [x] **Auth refresh-token store is in-memory only — documented as a known limitation (not fixed).**
-      This item explicitly allows either replacing the store or documenting the limitation; went
-      with documentation, since standing up Redis is a real infra decision that shouldn't happen
-      as a drive-by TODO sweep. [`docs/adr/0002`](docs/adr/0002-in-memory-rate-limit-and-refresh-store.md)
+- [x] **Auth refresh-token store is in-memory only — since externalized to Redis.** This item
+      allowed either replacing the store or documenting the limitation; originally documented it
+      (below), then later actually replaced it under the statelessness item — see
+      [ADR-0007](docs/adr/0007-redis-refresh-token-store-for-statelessness.md) and the
+      `RefreshTokenStore`/`RedisRefreshTokenStore` in Auth. The in-memory store remains the dev/test
+      default; Redis is opt-in via `auth.refresh-token.store=redis`. Original documentation writeup:
+      [`docs/adr/0002`](docs/adr/0002-in-memory-rate-limit-and-refresh-store.md)
       covers why `ConcurrentHashMap` was chosen, what breaks past one replica (both the refresh-token
       store and the rate limiter — the *effective* rate limit becomes replicas × configured limit,
       not the configured limit), and that nothing survives a restart. Also fixed a stale claim in
@@ -226,7 +229,23 @@ detect-private-key in `lint.yml`). Now added:
       atomic per key, so it's now corrected to say Redis is needed for *cross-replica* visibility,
       not to fix a single-process race that doesn't exist. The ephemeral-RSA-keypair half of this
       item is covered by the same ADR (ADR-0001) and the existing code comment in `JwtConfig`.
-- [ ] **Make services stateless, remove single points of failure, then handle load & scale.** HPA manifests exist (`openshift/audit/hpa.yaml`, `openshift/auth/hpa.yaml`), but scaling past one replica is unsafe today: the refresh-token store and rate limiter are in-memory `ConcurrentHashMap`s and Auth's RSA signing key is ephemeral per-pod (see the in-memory-token-store item), so a second replica breaks refresh + JWT validation. There are also SPOFs — single-replica broker (Redpanda dev-container), single DB, in-memory state. Work: (1) **stateless** — externalize state to Redis (shared token store, rate-limit counters, managed signing key); (2) **no SPOF** — run ≥2 replicas of each service + a multi-broker Kafka + DB HA/replica; (3) **load & scale** — tune HPA (CPU/mem, min/max replicas), size the DB layer (HikariCP pool now; read replicas/partitioning later), and prove it with the existing k6 load test.
+- [~] **Make services stateless, remove single points of failure, then handle load & scale.**
+      Sub-part (1) **stateless — DONE** (see [ADR-0007](docs/adr/0007-redis-refresh-token-store-for-statelessness.md)):
+      the refresh-token store is externalized to Redis behind `auth.refresh-token.store`
+      (`RefreshTokenStore` interface; `RedisRefreshTokenStore` uses atomic `GETDEL` for single-use
+      *across* replicas + key TTL; `InMemoryRefreshTokenStore` stays the dev/test default). The RSA
+      signing key was already shareable via `AUTH_RSA_PRIVATE_KEY` (ADR-0001/`JwtConfig`). The
+      "rate limiter" needed no change — it's a per-pod thread-interrupt dedup guard, not a counter,
+      so it's *correctly* process-local (ADR-0007 explains why, and corrects ADR-0002's "limit ×
+      replicas" framing). Auth + Audit deployments and HPAs now run **≥2 replicas** (`openshift/`),
+      with a Redis Deployment/Service added and a `redis` service wired into `docker-compose.yml`
+      (`docker compose up --scale auth=2` now keeps refresh working). Verified: `./gradlew
+      :Auth:check` green (new stores unit-tested incl. the atomic-consume path; 90% coverage gate
+      held). Sub-parts still open, all **infra-blocked** (need a live cluster/Docker, none here):
+      (2) **no SPOF** — Redis is single-replica (Sentinel/managed HA next), Kafka is a single-broker
+      Redpanda dev container (multi-broker next), Postgres is single (read-replica/HA next);
+      (3) **load & scale proof** — the k6 scripts pass single-instance, but running them against a
+      2-replica stack to prove refresh survives a pod bounce needs the stack actually up.
 - [x] **Handle concurrency explicitly — refresh-token race verified, not a bug.** The TODO here
       previously claimed "refresh-token consumption isn't guaranteed single-use under a race" —
       checked, and that's not actually true: `ConcurrentHashMap.remove(key)` is atomic per key, so

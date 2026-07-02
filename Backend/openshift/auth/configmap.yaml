@@ -12,3 +12,9 @@ data:
   SPRINGDOC_API_DOCS_PATH: /v3/api-docs
   SPRINGDOC_SWAGGER_UI_PATH: /swagger-ui.html
   MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health
+  # Shared refresh-token store so Auth can run >1 replica (see ADR-0007). REDIS_HOST is the
+  # in-cluster Service name (openshift/redis/). AUTH_RSA_PRIVATE_KEY (from auth-secret) must also
+  # be set so every replica signs with the same key.
+  AUTH_REFRESH_TOKEN_STORE: redis
+  REDIS_HOST: redis
+  REDIS_PORT: "6379"
