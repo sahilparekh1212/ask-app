@@ -11,6 +11,21 @@ updates:
     labels: ["dependencies", "backend"]
     commit-message:
       prefix: "build" # conventional-commit prefix so the commit-lint check passes
+    groups:
+      # Bundle all non-major backend bumps into ONE weekly PR instead of one-per-dependency,
+      # which is what flooded the PR list on first enablement. Majors are excluded so a single
+      # breaking upgrade can't block the whole safe batch — they still arrive individually.
+      backend-minor-patch:
+        applies-to: version-updates
+        update-types: ["minor", "patch"]
+    ignore:
+      # Major framework upgrades are deliberate migrations with breaking changes, not drive-by
+      # bumps — they consistently fail the build (see the closed Spring Boot 4.x / springdoc 3.x
+      # PRs). Track them manually rather than as auto-opened, perpetually-red PRs.
+      - dependency-name: "org.springframework.boot"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "org.springdoc:springdoc-openapi-starter-webmvc-ui"
+        update-types: ["version-update:semver-major"]
 
   # The GitHub Actions used across the workflows.
   - package-ecosystem: github-actions
@@ -20,3 +35,9 @@ updates:
     labels: ["dependencies", "ci"]
     commit-message:
       prefix: "ci"
+    groups:
+      # One PR for all GitHub Actions bumps (majors included — action majors are low-risk and
+      # easy to verify together).
+      github-actions:
+        applies-to: version-updates
+        patterns: ["*"]

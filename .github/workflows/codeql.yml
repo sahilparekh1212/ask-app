@@ -6,12 +6,14 @@ on:
     branches: [main]
     paths:
       - 'Backend/**'
-      - '.github/workflows/codeql.yml'
+      # See backend-ci.yml: broadened to .github/** so this required check reports on any CI/
+      # automation change, otherwise such PRs can never satisfy branch protection.
+      - '.github/**'
   pull_request:
     branches: [main]
     paths:
       - 'Backend/**'
-      - '.github/workflows/codeql.yml'
+      - '.github/**'
   schedule:
     - cron: '0 6 * * 1' # weekly, so newly-published rules catch existing code
 

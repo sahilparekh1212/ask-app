@@ -5,11 +5,13 @@ on:
     branches: [main]
     paths:
       - 'Backend/**'
-      - '.github/workflows/backend-ci.yml'
+      # Any CI/automation change (workflows, dependabot config, action bumps) must run the full
+      # suite too — a required check that never triggers leaves the PR permanently un-mergeable.
+      - '.github/**'
   pull_request:
     paths:
       - 'Backend/**'
-      - '.github/workflows/backend-ci.yml'
+      - '.github/**'
 
 jobs:
   build-test:
