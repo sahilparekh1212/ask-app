@@ -3,13 +3,13 @@ import { provideRouter } from '@angular/router';
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
 
 import { routes } from './app.routes';
+import { authInterceptor } from './core/auth/auth.interceptor';
 
 export const appConfig: ApplicationConfig = {
   providers: [
     provideZoneChangeDetection({ eventCoalescing: true }),
     provideRouter(routes),
-    // Interceptors are registered here; the auth (Bearer + refresh) interceptor lands in a
-    // follow-up slice.
-    provideHttpClient(withInterceptors([])),
+    // authInterceptor attaches the Bearer token and does silent refresh-on-401.
+    provideHttpClient(withInterceptors([authInterceptor])),
   ],
 };

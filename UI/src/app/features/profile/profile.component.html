@@ -1,0 +1,19 @@
+<section class="profile">
+  <h1>Your profile</h1>
+
+  @if (profile(); as p) {
+    <dl>
+      <dt>User ID</dt>
+      <dd>{{ p.userId }}</dd>
+      <dt>Email</dt>
+      <dd>{{ p.email || '—' }}</dd>
+      <dt>Name</dt>
+      <dd>{{ p.name || '—' }}</dd>
+    </dl>
+    <button type="button" (click)="logout()">Log out</button>
+  } @else if (error()) {
+    <p class="error" role="alert">{{ error() }}</p>
+  } @else {
+    <p>Loading…</p>
+  }
+</section>
