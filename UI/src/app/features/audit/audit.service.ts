@@ -1,0 +1,42 @@
+import { Injectable, inject } from '@angular/core';
+import { HttpClient, HttpParams } from '@angular/common/http';
+import { Observable } from 'rxjs';
+import { environment } from '../../../environments/environment';
+import {
+  AuditLog,
+  AuditLogFilter,
+  AuditLogStats,
+  PageRequest,
+  PagedResponse,
+} from './audit.models';
+
+/** Calls the Audit service's paginated search and aggregation endpoints. */
+@Injectable({ providedIn: 'root' })
+export class AuditService {
+  private readonly http = inject(HttpClient);
+  private readonly base = `${environment.auditApiUrl}/api/v1/audit-logs`;
+
+  search(filter: AuditLogFilter, page: PageRequest): Observable<PagedResponse<AuditLog>> {
+    const params = this.filterParams(filter)
+      .set('page', page.page)
+      .set('size', page.size)
+      .set('sort', page.sort);
+    return this.http.get<PagedResponse<AuditLog>>(`${this.base}/search`, { params });
+  }
+
+  stats(filter: AuditLogFilter): Observable<AuditLogStats> {
+    return this.http.get<AuditLogStats>(`${this.base}/stats`, {
+      params: this.filterParams(filter),
+    });
+  }
+
+  private filterParams(filter: AuditLogFilter): HttpParams {
+    let params = new HttpParams();
+    if (filter.entityType) params = params.set('entityType', filter.entityType);
+    if (filter.action) params = params.set('action', filter.action);
+    if (filter.from) params = params.set('from', filter.from);
+    if (filter.to) params = params.set('to', filter.to);
+    if (filter.includeDeleted) params = params.set('includeDeleted', true);
+    return params;
+  }
+}

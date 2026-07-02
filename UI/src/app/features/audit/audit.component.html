@@ -1,0 +1,104 @@
+<section class="audit">
+  <h1>Audit log</h1>
+
+  <form class="filters" [formGroup]="filterForm" (ngSubmit)="applyFilters()">
+    <label
+      >Entity type <input type="text" formControlName="entityType" placeholder="e.g. User"
+    /></label>
+    <label>Action <input type="text" formControlName="action" placeholder="e.g. LOGIN" /></label>
+    <label>From <input type="datetime-local" formControlName="from" /></label>
+    <label>To <input type="datetime-local" formControlName="to" /></label>
+    <label class="checkbox"
+      ><input type="checkbox" formControlName="includeDeleted" /> Include deleted</label
+    >
+    <button type="submit">Apply filters</button>
+  </form>
+
+  @if (stats(); as s) {
+    <div class="stats">
+      <p class="total">{{ s.total }} matching entries</p>
+      <div class="charts">
+        <div class="chart">
+          <h3>By action</h3>
+          @for (bucket of s.byAction; track bucket.key) {
+            <div class="bar-row">
+              <span class="label">{{ bucket.key }}</span>
+              <span class="bar"
+                ><span class="fill" [style.width]="barWidth(bucket.count, maxActionCount())"></span
+              ></span>
+              <span class="count">{{ bucket.count }}</span>
+            </div>
+          }
+        </div>
+        <div class="chart">
+          <h3>By entity type</h3>
+          @for (bucket of s.byEntityType; track bucket.key) {
+            <div class="bar-row">
+              <span class="label">{{ bucket.key }}</span>
+              <span class="bar"
+                ><span class="fill" [style.width]="barWidth(bucket.count, maxEntityCount())"></span
+              ></span>
+              <span class="count">{{ bucket.count }}</span>
+            </div>
+          }
+        </div>
+      </div>
+    </div>
+  }
+
+  @if (error()) {
+    <p class="error" role="alert">{{ error() }}</p>
+  }
+
+  <table>
+    <thead>
+      <tr>
+        <th class="sortable" (click)="sortBy('createdAt')">
+          Time
+          @if (sortField() === 'createdAt') {
+            <span>{{ sortDir() === 'asc' ? '▲' : '▼' }}</span>
+          }
+        </th>
+        <th class="sortable" (click)="sortBy('entityType')">
+          Entity
+          @if (sortField() === 'entityType') {
+            <span>{{ sortDir() === 'asc' ? '▲' : '▼' }}</span>
+          }
+        </th>
+        <th class="sortable" (click)="sortBy('action')">
+          Action
+          @if (sortField() === 'action') {
+            <span>{{ sortDir() === 'asc' ? '▲' : '▼' }}</span>
+          }
+        </th>
+        <th>Details</th>
+      </tr>
+    </thead>
+    <tbody>
+      @for (row of result()?.content ?? []; track row.id) {
+        <tr>
+          <td>{{ row.createdAt | date: 'medium' }}</td>
+          <td>{{ row.entityType }}</td>
+          <td>{{ row.action }}</td>
+          <td>{{ row.details || '—' }}</td>
+        </tr>
+      } @empty {
+        <tr>
+          <td colspan="4" class="empty">
+            {{ loading() ? 'Loading…' : 'No audit entries match.' }}
+          </td>
+        </tr>
+      }
+    </tbody>
+  </table>
+
+  @if (result(); as r) {
+    <div class="pager">
+      <button type="button" (click)="goToPage(r.page - 1)" [disabled]="r.page === 0">
+        Previous
+      </button>
+      <span>Page {{ r.page + 1 }} of {{ r.totalPages || 1 }} · {{ r.totalElements }} total</span>
+      <button type="button" (click)="goToPage(r.page + 1)" [disabled]="r.last">Next</button>
+    </div>
+  }
+</section>
