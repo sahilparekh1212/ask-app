@@ -1,7 +1,11 @@
 package com.aisandbox.audit.exception;
 
-import com.aisandbox.audit.ratelimit.RateLimitProperties;
-import com.aisandbox.audit.ratelimit.RequestDiscardedException;
+import com.aisandbox.common.ratelimit.ActiveRequestRegistry;
+import com.aisandbox.common.ratelimit.RateLimitInterceptor;
+import com.aisandbox.common.ratelimit.RateLimitProperties;
+import com.aisandbox.common.ratelimit.RequestDiscardedException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.MDC;
@@ -9,11 +13,14 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 class GlobalExceptionHandlerTest {
 
@@ -65,6 +72,17 @@ class GlobalExceptionHandlerTest {
 	}
 
 	@Test
+	void handleAccessDenied_returns403NotAServerError() {
+		ResponseEntity<Map<String, Object>> response = handler.handleAccessDenied(new AccessDeniedException("nope"));
+
+		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+		assertThat(response.getBody())
+			.containsEntry("status", 403)
+			.containsEntry("error", "Forbidden")
+			.containsEntry("message", "nope");
+	}
+
+	@Test
 	void handleAll_returns500AndBlankMessageAndRequestIdWhenAbsent() {
 		ResponseEntity<Map<String, Object>> response = handler.handleAll(new RuntimeException());
 
@@ -73,5 +91,30 @@ class GlobalExceptionHandlerTest {
 			.containsEntry("status", 500)
 			.containsEntry("message", "")
 			.containsEntry("requestId", "");
+	}
+
+	@Test
+	void handleAll_returns429NotA500WhenTheCurrentRequestWasSuperseded() throws Exception {
+		// A superseded request whose worker thread was interrupted mid-work can throw a generic
+		// exception; the handler must surface that as 429 (graceful shedding), not a 500. Drive
+		// this through the real RateLimitInterceptor/ActiveRequestRegistry (public API) rather
+		// than reaching into common.ratelimit's package-private internals from this package.
+		ActiveRequestRegistry registry = new ActiveRequestRegistry();
+		RateLimitInterceptor interceptor = new RateLimitInterceptor(registry, properties);
+		HttpServletRequest request = mock(HttpServletRequest.class);
+		when(request.getMethod()).thenReturn("POST");
+		when(request.getRequestURI()).thenReturn("/api/v1/audit-logs");
+		try {
+			interceptor.preHandle(request, mock(HttpServletResponse.class), new Object());
+			registry.register("anonymous|POST|/api/v1/audit-logs"); // supersedes and discards the request above
+			Thread.interrupted(); // clear the interrupt discard() raised; not under test
+
+			ResponseEntity<Map<String, Object>> response = handler.handleAll(new RuntimeException("interrupted mid-save"));
+
+			assertThat(response.getStatusCode()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS);
+			assertThat(response.getBody()).containsEntry("status", 429);
+		} finally {
+			interceptor.afterCompletion(request, mock(HttpServletResponse.class), new Object(), null);
+		}
 	}
 }

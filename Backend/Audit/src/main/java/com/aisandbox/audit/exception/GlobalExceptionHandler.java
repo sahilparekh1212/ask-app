@@ -1,15 +1,16 @@
 package com.aisandbox.audit.exception;
 
-import com.aisandbox.audit.ratelimit.ActiveRequest;
-import com.aisandbox.audit.ratelimit.DiscardContext;
-import com.aisandbox.audit.ratelimit.RateLimitProperties;
-import com.aisandbox.audit.ratelimit.RequestDiscardedException;
+import com.aisandbox.common.ratelimit.ActiveRequest;
+import com.aisandbox.common.ratelimit.DiscardContext;
+import com.aisandbox.common.ratelimit.RateLimitProperties;
+import com.aisandbox.common.ratelimit.RequestDiscardedException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
@@ -57,6 +58,18 @@ public class GlobalExceptionHandler {
 		return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
 			.header(HttpHeaders.RETRY_AFTER, String.valueOf(retryAfter))
 			.body(errorBody(429, "Too Many Requests", ex));
+	}
+
+	/**
+	 * A {@code @PreAuthorize} check failed (e.g. deleting an audit log without {@code ROLE_ADMIN}).
+	 * Without this, it falls into the catch-all below and comes back as a misleading 500 instead
+	 * of 403 — Spring Security's own {@code ExceptionTranslationFilter} never gets a chance to
+	 * convert it, since {@code DispatcherServlet} resolves it via this advice first.
+	 */
+	@ExceptionHandler(AccessDeniedException.class)
+	public ResponseEntity<Map<String, Object>> handleAccessDenied(AccessDeniedException ex) {
+		logException(ex);
+		return ResponseEntity.status(HttpStatus.FORBIDDEN).body(errorBody(403, "Forbidden", ex));
 	}
 
 	@ExceptionHandler(Exception.class)

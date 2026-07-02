@@ -61,7 +61,7 @@ class AuditLogControllerTest {
 	@Test
 	void findAll_includesSoftDeletedWhenRequested() {
 		AuditLog deleted = new AuditLog("User", "DELETE", "details");
-		deleted.setDeleted(true);
+		deleted.markDeleted();
 		when(repository.findAll()).thenReturn(List.of(deleted));
 
 		List<AuditLog> result = controller.findAll(true);

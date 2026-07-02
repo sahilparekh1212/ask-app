@@ -17,6 +17,7 @@ import org.springframework.data.web.PageableDefault;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -105,12 +106,13 @@ public class AuditLogController {
 
 	@DeleteMapping("/{id}")
 	@ResponseStatus(HttpStatus.NO_CONTENT)
-	@Operation(summary = "Delete an audit log entry")
+	@PreAuthorize("hasRole('ADMIN')")
+	@Operation(summary = "Delete an audit log entry (admin only)")
 	public void delete(@PathVariable Long id) {
 		txExecutor.run(() -> {
 			AuditLog auditLog = auditLogRepository.findById(id)
 				.orElseThrow(() -> new ResourceNotFoundException("Audit log not found: " + id));
-			auditLog.setDeleted(true);
+			auditLog.markDeleted();
 			auditLogRepository.save(auditLog);
 			return null;
 		});
