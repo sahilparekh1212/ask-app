@@ -3,6 +3,7 @@ package com.aisandbox.auth.controller;
 import com.aisandbox.auth.event.AuditEventPublisher;
 import com.aisandbox.auth.model.LoginRequest;
 import com.aisandbox.auth.model.RefreshRequest;
+import com.aisandbox.auth.model.Roles;
 import com.aisandbox.auth.model.TokenResponse;
 import com.aisandbox.auth.service.TokenService;
 import org.junit.jupiter.api.BeforeEach;
@@ -39,9 +40,10 @@ class AuthControllerTest {
 	@Test
 	void login_issuesTokensAndPublishesALoginEvent() {
 		TokenResponse tokens = new TokenResponse("access", "refresh", 1800L);
-		when(tokenService.generateTokens("demo-user", "demo@aisandbox.dev", "Demo User")).thenReturn(tokens);
+		when(tokenService.generateTokens("demo-user", "demo@aisandbox.dev", "Demo User", Roles.ROLE_USER))
+			.thenReturn(tokens);
 
-		ResponseEntity<TokenResponse> response = controller.login(new LoginRequest("demo", "demo"));
+		ResponseEntity<TokenResponse> response = controller.login(new LoginRequest("demo", "demo", null));
 
 		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
 		assertThat(response.getBody()).isEqualTo(tokens);
@@ -49,29 +51,44 @@ class AuthControllerTest {
 	}
 
 	@Test
+	void login_mintsTheRequestedRoleWhenGiven() {
+		TokenResponse tokens = new TokenResponse("access", "refresh", 1800L);
+		when(tokenService.generateTokens("demo-user", "demo@aisandbox.dev", "Demo User", Roles.ROLE_ADMIN))
+			.thenReturn(tokens);
+
+		ResponseEntity<TokenResponse> response = controller.login(new LoginRequest("demo", "demo", Roles.ROLE_ADMIN));
+
+		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+		verify(tokenService).generateTokens("demo-user", "demo@aisandbox.dev", "Demo User", Roles.ROLE_ADMIN);
+	}
+
+	@Test
 	void login_returns401ForWrongCredentials() {
-		ResponseEntity<TokenResponse> response = controller.login(new LoginRequest("demo", "wrong"));
+		ResponseEntity<TokenResponse> response = controller.login(new LoginRequest("demo", "wrong", null));
 
 		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
 		assertThat(response.getBody()).isNull();
-		verify(tokenService, never()).generateTokens(any(), any(), any());
+		verify(tokenService, never()).generateTokens(any(), any(), any(), any());
 	}
 
 	@Test
 	void login_returns404WhenDemoLoginIsDisabled() {
 		AuthController disabled = new AuthController(tokenService, auditEventPublisher, false, "demo", "demo");
 
-		ResponseEntity<TokenResponse> response = disabled.login(new LoginRequest("demo", "demo"));
+		ResponseEntity<TokenResponse> response = disabled.login(new LoginRequest("demo", "demo", null));
 
 		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
-		verify(tokenService, never()).generateTokens(any(), any(), any());
+		verify(tokenService, never()).generateTokens(any(), any(), any(), any());
 	}
 
 	@Test
 	void refresh_returnsNewTokensWhenRefreshTokenIsValid() {
 		TokenResponse newTokens = new TokenResponse("new-access-token", "new-refresh-token", 1800L);
-		when(tokenService.consumeRefreshToken("valid-refresh-token")).thenReturn(Optional.of("user-1"));
-		when(tokenService.generateTokens("user-1", null, null)).thenReturn(newTokens);
+		TokenService.RefreshClaims claims = new TokenService.RefreshClaims(
+			"user-1", "user1@example.com", "User One", Roles.ROLE_ADMIN);
+		when(tokenService.consumeRefreshToken("valid-refresh-token")).thenReturn(Optional.of(claims));
+		when(tokenService.generateTokens("user-1", "user1@example.com", "User One", Roles.ROLE_ADMIN))
+			.thenReturn(newTokens);
 
 		ResponseEntity<TokenResponse> response = controller.refresh(new RefreshRequest("valid-refresh-token"));
 
@@ -88,7 +105,7 @@ class AuthControllerTest {
 
 		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
 		assertThat(response.getBody()).isNull();
-		verify(tokenService, never()).generateTokens(any(), any(), any());
+		verify(tokenService, never()).generateTokens(any(), any(), any(), any());
 	}
 
 	@Test

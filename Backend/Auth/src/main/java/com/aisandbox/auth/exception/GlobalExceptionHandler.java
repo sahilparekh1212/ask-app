@@ -1,15 +1,16 @@
 package com.aisandbox.auth.exception;
 
-import com.aisandbox.auth.ratelimit.ActiveRequest;
-import com.aisandbox.auth.ratelimit.DiscardContext;
-import com.aisandbox.auth.ratelimit.RateLimitProperties;
-import com.aisandbox.auth.ratelimit.RequestDiscardedException;
+import com.aisandbox.common.ratelimit.ActiveRequest;
+import com.aisandbox.common.ratelimit.DiscardContext;
+import com.aisandbox.common.ratelimit.RateLimitProperties;
+import com.aisandbox.common.ratelimit.RequestDiscardedException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
@@ -59,6 +60,16 @@ public class GlobalExceptionHandler {
 			.body(errorBody(429, "Too Many Requests", ex));
 	}
 
+	/** A {@code @Valid}-annotated {@code @RequestBody} failed constraint validation (e.g. a blank refresh token). */
+	@ExceptionHandler(MethodArgumentNotValidException.class)
+	public ResponseEntity<Map<String, Object>> handleValidation(MethodArgumentNotValidException ex) {
+		logException(ex);
+		String message = ex.getBindingResult().getFieldErrors().stream()
+			.map(fe -> fe.getField() + " " + fe.getDefaultMessage())
+			.collect(Collectors.joining("; "));
+		return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorBody(400, "Bad Request", message));
+	}
+
 	@ExceptionHandler(Exception.class)
 	public ResponseEntity<Map<String, Object>> handleAll(Exception ex) {
 		// A superseded (rate-limited) request can fail mid-work because the "newest wins" limiter
@@ -82,11 +93,15 @@ public class GlobalExceptionHandler {
 	}
 
 	private Map<String, Object> errorBody(int status, String error, Exception ex) {
+		return errorBody(status, error, ex.getMessage());
+	}
+
+	private Map<String, Object> errorBody(int status, String error, String message) {
 		return Map.of(
 			"timestamp", Instant.now().toString(),
 			"status", status,
 			"error", error,
-			"message", ex.getMessage() != null ? ex.getMessage() : "",
+			"message", message != null ? message : "",
 			"requestId", MDC.get("requestId") != null ? MDC.get("requestId") : ""
 		);
 	}

@@ -1,5 +1,7 @@
 package com.aisandbox.auth.logging;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -22,6 +24,8 @@ public class MdcLoggingFilter extends OncePerRequestFilter {
 
 	/** Correlation UUID supplied by the UI; we honour it and generate one only if absent. */
 	public static final String REQUEST_ID_HEADER = "X-Request-Id";
+
+	private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
 	@Override
 	protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
@@ -55,21 +59,23 @@ public class MdcLoggingFilter extends OncePerRequestFilter {
 		return "anonymous";
 	}
 
+	/**
+	 * Parsed for logging correlation only — this is not signature-verified, so it must never be
+	 * used for an authorization decision (the resource-server filter already validates the token
+	 * before this claim would matter).
+	 */
 	private String extractSubFromJwt(String token) {
 		try {
 			String[] parts = token.split("\\.");
-			if (parts.length == 3) {
-				byte[] decoded = Base64.getUrlDecoder().decode(parts[1]);
-				String payload = new String(decoded);
-				int idx = payload.indexOf("\"sub\":\"");
-				if (idx >= 0) {
-					int start = idx + 7;
-					int end = payload.indexOf("\"", start);
-					if (end > start) return payload.substring(start, end);
-				}
+			if (parts.length != 3) {
+				return "anonymous";
 			}
-		} catch (Exception ignored) {}
-		return "anonymous";
+			byte[] decoded = Base64.getUrlDecoder().decode(parts[1]);
+			JsonNode sub = OBJECT_MAPPER.readTree(decoded).get("sub");
+			return sub != null && sub.isTextual() ? sub.asText() : "anonymous";
+		} catch (Exception ignored) {
+			return "anonymous";
+		}
 	}
 
 	private String extractLastTwoParts(String uri) {

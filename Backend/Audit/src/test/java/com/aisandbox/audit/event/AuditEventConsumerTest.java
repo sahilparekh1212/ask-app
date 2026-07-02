@@ -2,6 +2,7 @@ package com.aisandbox.audit.event;
 
 import com.aisandbox.audit.model.AuditLog;
 import com.aisandbox.audit.repository.AuditLogRepository;
+import com.aisandbox.common.event.AuditEvent;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 

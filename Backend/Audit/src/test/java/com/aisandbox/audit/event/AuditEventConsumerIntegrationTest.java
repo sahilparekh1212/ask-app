@@ -1,6 +1,7 @@
 package com.aisandbox.audit.event;
 
 import com.aisandbox.audit.repository.AuditLogRepository;
+import com.aisandbox.common.event.AuditEvent;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -34,9 +35,9 @@ import static org.awaitility.Awaitility.await;
 	"spring.kafka.producer.value-serializer=org.springframework.kafka.support.serializer.JsonSerializer",
 	"spring.kafka.consumer.key-deserializer=org.apache.kafka.common.serialization.StringDeserializer",
 	"spring.kafka.consumer.value-deserializer=org.springframework.kafka.support.serializer.JsonDeserializer",
-	"spring.kafka.consumer.properties.spring.json.value.default.type=com.aisandbox.audit.event.AuditEvent",
+	"spring.kafka.consumer.properties.spring.json.value.default.type=com.aisandbox.common.event.AuditEvent",
 	"spring.kafka.consumer.properties.spring.json.use.type.headers=false",
-	"spring.kafka.consumer.properties.spring.json.trusted.packages=com.aisandbox.audit.event"
+	"spring.kafka.consumer.properties.spring.json.trusted.packages=com.aisandbox.common.event"
 })
 @EmbeddedKafka(partitions = 1, topics = "audit.events", bootstrapServersProperty = "spring.kafka.bootstrap-servers")
 class AuditEventConsumerIntegrationTest {

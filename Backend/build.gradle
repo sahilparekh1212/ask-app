@@ -55,6 +55,12 @@ subprojects {
 		implementation 'io.micrometer:micrometer-registry-prometheus'
 		// Ships logs to Grafana Loki via a logback appender (active in DEV/SIT/UAT/PROD)
 		implementation 'com.github.loki4j:loki-logback-appender:1.5.2'
+		// Distributed tracing: Micrometer's OTel bridge + an OTLP exporter, activated by
+		// management.otlp.tracing.endpoint (see application.properties). Also what lets Spring
+		// for Apache Kafka propagate trace context through audit.events when
+		// spring.kafka.template/listener.observation-enabled=true.
+		implementation 'io.micrometer:micrometer-tracing-bridge-otel'
+		implementation 'io.opentelemetry:opentelemetry-exporter-otlp'
 		testImplementation 'org.springframework.boot:spring-boot-starter-test'
 		testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 	}

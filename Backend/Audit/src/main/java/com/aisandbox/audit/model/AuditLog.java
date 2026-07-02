@@ -1,5 +1,7 @@
 package com.aisandbox.audit.model;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -56,10 +58,18 @@ public class AuditLog extends AuditableEntity {
 	protected AuditLog() {
 	}
 
-	public AuditLog(String entityType, String action, String details) {
+	@JsonCreator
+	public AuditLog(@JsonProperty("entityType") String entityType, @JsonProperty("action") String action,
+			@JsonProperty("details") String details) {
+		this(entityType, action, details, null);
+	}
+
+	/** Used by {@code AuditEventConsumer} to stamp the source Kafka event id at creation time. */
+	public AuditLog(String entityType, String action, String details, String eventId) {
 		this.entityType = entityType;
 		this.action = action;
 		this.details = details;
+		this.eventId = eventId;
 	}
 
 	public Long getId() {
@@ -70,40 +80,25 @@ public class AuditLog extends AuditableEntity {
 		return entityType;
 	}
 
-	public void setEntityType(String entityType) {
-		this.entityType = entityType;
-	}
-
 	public String getAction() {
 		return action;
-	}
-
-	public void setAction(String action) {
-		this.action = action;
 	}
 
 	public String getDetails() {
 		return details;
 	}
 
-	public void setDetails(String details) {
-		this.details = details;
-	}
-
 	public boolean isDeleted() {
 		return deleted;
 	}
 
-	public void setDeleted(boolean deleted) {
-		this.deleted = deleted;
+	/** One-way transition: soft-delete is the only mutation this entity allows post-creation. */
+	public void markDeleted() {
+		this.deleted = true;
 	}
 
 	public String getEventId() {
 		return eventId;
-	}
-
-	public void setEventId(String eventId) {
-		this.eventId = eventId;
 	}
 
 	// createdAt / updatedAt / createdByRequestId are inherited from AuditableEntity.

@@ -9,6 +9,9 @@ COPY build.gradle settings.gradle ./
 # Stub other modules so Gradle can resolve the project graph without their sources.
 # Survey was removed from the project — do not COPY it.
 COPY Audit/build.gradle Audit/build.gradle
+# common is a real compile-time dependency of Auth (AuditEvent + ratelimit/), not just a stub.
+COPY common/build.gradle common/build.gradle
+COPY common/src common/src
 # Full source only for this service
 COPY Auth/build.gradle Auth/build.gradle
 COPY Auth/src Auth/src

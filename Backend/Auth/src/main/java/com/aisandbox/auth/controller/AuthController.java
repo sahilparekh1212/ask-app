@@ -3,10 +3,12 @@ package com.aisandbox.auth.controller;
 import com.aisandbox.auth.event.AuditEventPublisher;
 import com.aisandbox.auth.model.LoginRequest;
 import com.aisandbox.auth.model.RefreshRequest;
+import com.aisandbox.auth.model.Roles;
 import com.aisandbox.auth.model.TokenResponse;
 import com.aisandbox.auth.service.TokenService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -59,8 +61,9 @@ public class AuthController {
 	 * deployment with {@code auth.demo.enabled=false}.
 	 */
 	@PostMapping("/login")
-	@Operation(summary = "Demo username/password login (recruiter test account) — issues the same JWT as Google sign-in")
-	public ResponseEntity<TokenResponse> login(@RequestBody LoginRequest request) {
+	@Operation(summary = "Demo username/password login (recruiter test account) — issues the same JWT as Google sign-in. "
+		+ "Optionally set \"role\":\"ROLE_ADMIN\" in the request body to test admin-gated endpoints.")
+	public ResponseEntity<TokenResponse> login(@Valid @RequestBody LoginRequest request) {
 		if (!demoEnabled) {
 			return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
 		}
@@ -71,20 +74,22 @@ public class AuthController {
 			log.warn("Demo login rejected for username={}", request == null ? null : request.username());
 			return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
 		}
-		TokenResponse tokens = tokenService.generateTokens(DEMO_USER_ID, DEMO_EMAIL, DEMO_NAME);
+		String role = request.role() != null && !request.role().isBlank() ? request.role() : Roles.ROLE_USER;
+		TokenResponse tokens = tokenService.generateTokens(DEMO_USER_ID, DEMO_EMAIL, DEMO_NAME, role);
 		auditEventPublisher.publish("User", "LOGIN", DEMO_USER_ID);
-		log.info("Issued demo tokens for the recruiter test account");
+		log.info("Issued demo tokens for the recruiter test account with role={}", role);
 		return ResponseEntity.ok(tokens);
 	}
 
 	@PostMapping("/refresh")
 	@Operation(summary = "Exchange a refresh token for a new access token (30 min TTL)")
-	public ResponseEntity<TokenResponse> refresh(@RequestBody RefreshRequest request) {
+	public ResponseEntity<TokenResponse> refresh(@Valid @RequestBody RefreshRequest request) {
 		return tokenService.consumeRefreshToken(request.refreshToken())
-			.map(userId -> {
-				TokenResponse tokens = tokenService.generateTokens(userId, null, null);
-				auditEventPublisher.publish("User", "TOKEN_REFRESH", userId);
-				log.info("Refreshed access token for userId={}", userId);
+			.map(claims -> {
+				TokenResponse tokens = tokenService.generateTokens(
+					claims.userId(), claims.email(), claims.name(), claims.role());
+				auditEventPublisher.publish("User", "TOKEN_REFRESH", claims.userId());
+				log.info("Refreshed access token for userId={}", claims.userId());
 				return ResponseEntity.ok(tokens);
 			})
 			.orElseGet(() -> {
@@ -124,7 +129,7 @@ public class AuthController {
 
 	@PostMapping("/logout")
 	@Operation(summary = "Revoke a refresh token")
-	public ResponseEntity<Void> logout(@RequestBody RefreshRequest request) {
+	public ResponseEntity<Void> logout(@Valid @RequestBody RefreshRequest request) {
 		tokenService.revokeRefreshToken(request.refreshToken());
 		auditEventPublisher.publish("User", "LOGOUT", null);
 		return ResponseEntity.noContent().build();

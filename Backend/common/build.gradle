@@ -1,0 +1,9 @@
+// A plain shared library (not a runnable service): the AuditEvent Kafka message contract and
+// the ratelimit/ package used identically by Audit and Auth. No main class, so the Spring Boot
+// plugin's executable bootJar is disabled in favor of a normal library jar.
+bootJar {
+	enabled = false
+}
+jar {
+	enabled = true
+}

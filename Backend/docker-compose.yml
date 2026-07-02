@@ -1,0 +1,172 @@
+# One-command way to run the whole system: Postgres, Kafka (Redpanda), Auth, Audit, and the
+# observability stack (Prometheus/Grafana/Loki/Tempo). There's no UI yet (see TODO.md), so it's
+# not included here.
+#
+#   docker compose up --build
+#
+# First build takes a few minutes — each service's multi-stage Dockerfile runs a full Gradle
+# build with no layer caching for Gradle's own cache. Once up:
+#   Auth Swagger:      http://localhost:8085/swagger-ui.html
+#   Audit Swagger:     http://localhost:8083/swagger-ui.html
+#   Grafana:           http://localhost:3000            (admin / admin)
+#   Redpanda console:  http://localhost:8080
+#   Postgres:          localhost:5432                    (audit / audit, db "auditdb")
+#
+# Try it without any Google OAuth setup: POST http://localhost:8085/auth/login with
+# {"username":"demo","password":"demo"} issues a JWT good against both services. To use real
+# Google sign-in instead, export GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET before starting.
+#
+# Narrower alternatives for a smaller local loop: kafka/docker-compose.yml (just Redpanda) and
+# monitoring/docker-compose.yml (just Prometheus/Loki/Grafana) — this file inlines both rather
+# than composing them so it stays a single, predictable `docker compose up`.
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: aisandbox-postgres
+    environment:
+      POSTGRES_DB: auditdb
+      POSTGRES_USER: audit
+      POSTGRES_PASSWORD: audit
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U audit -d auditdb"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redpanda:
+    image: redpandadata/redpanda:v24.2.7
+    container_name: aisandbox-redpanda
+    command:
+      - redpanda
+      - start
+      - --mode=dev-container
+      - --smp=1
+      - --default-log-level=info
+      # Two listeners: 'internal' for in-network clients (Auth/Audit/console), 'external' for the host.
+      - --kafka-addr=internal://0.0.0.0:9092,external://0.0.0.0:19092
+      - --advertise-kafka-addr=internal://redpanda:9092,external://localhost:19092
+    ports:
+      - "19092:19092" # host -> broker
+      - "9644:9644"   # admin API
+    healthcheck:
+      test: ["CMD-SHELL", "rpk cluster health | grep -q 'Healthy:.*true'"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  redpanda-console:
+    image: redpandadata/console:v2.7.2
+    container_name: aisandbox-redpanda-console
+    depends_on:
+      - redpanda
+    ports:
+      - "8080:8080"
+    environment:
+      KAFKA_BROKERS: redpanda:9092
+
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    container_name: aisandbox-prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"
+
+  loki:
+    image: grafana/loki:3.1.1
+    container_name: aisandbox-loki
+    command: -config.file=/etc/loki/loki-config.yaml
+    volumes:
+      - ./monitoring/loki/loki-config.yaml:/etc/loki/loki-config.yaml:ro
+    ports:
+      - "3100:3100"
+
+  tempo:
+    image: grafana/tempo:2.6.1
+    container_name: aisandbox-tempo
+    command: -config.file=/etc/tempo/tempo.yaml
+    volumes:
+      - ./monitoring/tempo/tempo.yaml:/etc/tempo/tempo.yaml:ro
+    ports:
+      - "3200:3200"   # Tempo query API (Grafana datasource)
+      - "4318:4318"   # OTLP HTTP receiver (management.otlp.tracing.endpoint)
+
+  grafana:
+    image: grafana/grafana:11.2.0
+    container_name: aisandbox-grafana
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+      - loki
+      - tempo
+
+  auth:
+    build:
+      context: .
+      dockerfile: Auth/Dockerfile
+    container_name: aisandbox-auth
+    environment:
+      SPRING_PROFILES_ACTIVE: DEV
+      KAFKA_BOOTSTRAP_SERVERS: redpanda:9092
+      LOKI_URL: http://loki:3100/loki/api/v1/push
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://tempo:4318/v1/traces
+      CORS_ALLOWED_ORIGINS: http://localhost:4200
+      # Where a successful Google login redirects with the issued tokens (see OAuth2LoginSuccessHandler).
+      FRONTEND_URL: http://localhost:4200
+      # Real Google sign-in is opt-in — pass these through from the host env if set; the demo
+      # login (see the header comment above) works without them.
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+    ports:
+      - "8085:8085"
+    depends_on:
+      redpanda:
+        condition: service_healthy
+      tempo:
+        condition: service_started
+
+  audit:
+    build:
+      context: .
+      dockerfile: Audit/Dockerfile
+    container_name: aisandbox-audit
+    environment:
+      SPRING_PROFILES_ACTIVE: DEV
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/auditdb
+      SPRING_DATASOURCE_USERNAME: audit
+      SPRING_DATASOURCE_PASSWORD: audit
+      KAFKA_BOOTSTRAP_SERVERS: redpanda:9092
+      LOKI_URL: http://loki:3100/loki/api/v1/push
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://tempo:4318/v1/traces
+      CORS_ALLOWED_ORIGINS: http://localhost:4200
+      # Auth's JWKS endpoint, so Audit can verify JWTs Auth issued. DEV's own default assumes a
+      # host named "auth-service"; this compose file's service is named "auth", so it's overridden.
+      AUTH_JWK_SET_URI: http://auth:8085/.well-known/jwks.json
+    ports:
+      - "8083:8083"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redpanda:
+        condition: service_healthy
+      tempo:
+        condition: service_started
+      auth:
+        condition: service_started
+
+volumes:
+  postgres-data:

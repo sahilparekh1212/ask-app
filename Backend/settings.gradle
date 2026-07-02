@@ -1,4 +1,5 @@
 rootProject.name = 'backend'
 
+include 'common'
 include 'Audit'
 include 'Auth'

@@ -1,7 +1,7 @@
 package com.aisandbox.auth.config;
 
 import com.aisandbox.auth.audit.AuditInterceptor;
-import com.aisandbox.auth.ratelimit.RateLimitInterceptor;
+import com.aisandbox.common.ratelimit.RateLimitInterceptor;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;

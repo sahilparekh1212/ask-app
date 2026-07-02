@@ -1,4 +1,4 @@
-# Auto-provisions Prometheus + Loki datasources into Grafana on startup.
+# Auto-provisions Prometheus + Loki + Tempo datasources into Grafana on startup.
 apiVersion: 1
 
 datasources:
@@ -14,3 +14,19 @@ datasources:
     type: loki
     access: proxy
     url: http://loki:3100
+
+  - name: Tempo
+    uid: Tempo
+    type: tempo
+    access: proxy
+    url: http://tempo:3200
+    jsonData:
+      # Lets a trace panel in Explore jump straight to the matching log lines in Loki, searching
+      # for the trace ID as plain text — Micrometer Tracing puts traceId/spanId into every log
+      # line's MDC automatically once tracing is active (see the traceId=/spanId= fields added to
+      # logback-spring.xml's patterns), so a substring search is enough; no custom tag mapping
+      # needed since nothing else stamps spans with an app-specific correlation key.
+      tracesToLogsV2:
+        datasourceUid: Loki
+        filterByTraceID: true
+        filterBySpanID: false

@@ -1,5 +1,6 @@
 package com.aisandbox.auth.event;
 
+import com.aisandbox.common.event.AuditEvent;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.kafka.core.KafkaTemplate;

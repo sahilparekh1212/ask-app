@@ -18,28 +18,27 @@ class AuditLogTest {
 	}
 
 	@Test
-	void settersMutateEveryField() {
+	void markDeletedIsAOneWayTransition() {
 		AuditLog log = new AuditLog("User", "CREATE", "details");
 
-		log.setEntityType("Order");
-		log.setAction("UPDATE");
-		log.setDetails("changed");
-		log.setDeleted(true);
+		assertThat(log.isDeleted()).isFalse();
+		log.markDeleted();
 
-		assertThat(log.getEntityType()).isEqualTo("Order");
-		assertThat(log.getAction()).isEqualTo("UPDATE");
-		assertThat(log.getDetails()).isEqualTo("changed");
 		assertThat(log.isDeleted()).isTrue();
 	}
 
 	@Test
-	void eventIdGetterAndSetterRoundTrip() {
+	void fourArgConstructorStampsTheSourceEventId() {
+		AuditLog log = new AuditLog("User", "CREATE", "details", "evt-9");
+
+		assertThat(log.getEventId()).isEqualTo("evt-9");
+	}
+
+	@Test
+	void threeArgConstructorLeavesEventIdNull() {
 		AuditLog log = new AuditLog("User", "CREATE", "details");
 
 		assertThat(log.getEventId()).isNull();
-		log.setEventId("evt-9");
-
-		assertThat(log.getEventId()).isEqualTo("evt-9");
 	}
 
 	@Test

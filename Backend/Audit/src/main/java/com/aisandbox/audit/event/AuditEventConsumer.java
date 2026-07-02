@@ -2,6 +2,7 @@ package com.aisandbox.audit.event;
 
 import com.aisandbox.audit.model.AuditLog;
 import com.aisandbox.audit.repository.AuditLogRepository;
+import com.aisandbox.common.event.AuditEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.kafka.annotation.KafkaListener;
@@ -34,8 +35,7 @@ public class AuditEventConsumer {
 			log.debug("Skipping already-processed audit event id={}", event.eventId());
 			return;
 		}
-		AuditLog auditLog = new AuditLog(event.entityType(), event.action(), event.details());
-		auditLog.setEventId(event.eventId());
+		AuditLog auditLog = new AuditLog(event.entityType(), event.action(), event.details(), event.eventId());
 		repository.save(auditLog);
 		log.info("Persisted audit log from event id={} action={}", event.eventId(), event.action());
 	}

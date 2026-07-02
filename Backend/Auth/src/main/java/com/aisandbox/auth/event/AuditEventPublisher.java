@@ -1,5 +1,6 @@
 package com.aisandbox.auth.event;
 
+import com.aisandbox.common.event.AuditEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.kafka.core.KafkaTemplate;

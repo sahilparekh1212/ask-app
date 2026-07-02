@@ -1,9 +1,17 @@
 dependencies {
+	// Shared AuditEvent Kafka contract + the ratelimit/ package (see Backend/common).
+	implementation project(':common')
 	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
 	implementation 'org.springframework.kafka:spring-kafka'
 	// Liquibase owns the DB schema (db/changelog); Hibernate runs with ddl-auto=none.
 	implementation 'org.liquibase:liquibase-core'
 	runtimeOnly 'com.h2database:h2'
+	// DEV/SIT/UAT/PROD point SPRING_DATASOURCE_URL at a real Postgres (see the root
+	// docker-compose.yml and README's "External database" section) — LOCAL/tests still use H2.
+	runtimeOnly 'org.postgresql:postgresql'
 	// Embedded (in-JVM) Kafka broker for the consumer integration test — no Docker needed.
 	testImplementation 'org.springframework.kafka:spring-kafka-test'
+	// Lets MockMvc tests inject a mock authenticated JWT (with chosen authorities) without a
+	// real Auth service/JWKS endpoint — used to verify @PreAuthorize role gating.
+	testImplementation 'org.springframework.security:spring-security-test'
 }

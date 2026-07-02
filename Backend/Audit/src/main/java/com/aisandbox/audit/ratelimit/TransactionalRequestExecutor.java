@@ -1,5 +1,7 @@
 package com.aisandbox.audit.ratelimit;
 
+import com.aisandbox.common.ratelimit.DiscardContext;
+import com.aisandbox.common.ratelimit.RequestDiscardedException;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 

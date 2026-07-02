@@ -7,6 +7,10 @@ metadata:
     app: loki
 spec:
   replicas: 1
+  # RollingUpdate would try to schedule the new pod before the old one releases its ReadWriteOnce
+  # PVC mount — Recreate avoids that hang for this single-replica, PVC-backed deployment.
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: loki
@@ -39,4 +43,5 @@ spec:
           configMap:
             name: loki-config
         - name: data
-          emptyDir: {}
+          persistentVolumeClaim:
+            claimName: loki-data

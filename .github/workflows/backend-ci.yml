@@ -173,6 +173,7 @@ jobs:
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: trivy-results.sarif
+          category: trivy-jars
 
       # Gate: fail on fixable HIGH/CRITICAL CVEs in dependencies.
       - name: Trivy scan → gate
@@ -184,6 +185,53 @@ jobs:
           severity: HIGH,CRITICAL
           ignore-unfixed: true
           exit-code: '1'
+
+      # Build the actual deployable images so Trivy's image analyzer can also catch base-image/OS
+      # CVEs (e.g. in eclipse-temurin:17-jre-alpine) — the jar scan above only covers bundled
+      # dependencies, not the OS layer. Each Dockerfile's COPY paths are relative to Backend/ (its
+      # own header comment's "repo root" means Backend/, not the actual git root one level up), so
+      # this must run with Backend/ as both the working directory and the build context.
+      - name: Build Docker images
+        working-directory: Backend
+        run: |
+          docker build -f Audit/Dockerfile -t audit-service:ci .
+          docker build -f Auth/Dockerfile -t auth-service:ci .
+
+      # Report-only for now (this job is a required branch-protection check — see TODO.md): confirm
+      # a green run against the current base images before adding exit-code: '1' here too.
+      - name: Trivy scan Audit image → SARIF (report)
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: image
+          image-ref: audit-service:ci
+          format: sarif
+          output: trivy-audit-image.sarif
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+
+      - name: Trivy scan Auth image → SARIF (report)
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: image
+          image-ref: auth-service:ci
+          format: sarif
+          output: trivy-auth-image.sarif
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+
+      - name: Upload Trivy Audit image SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-audit-image.sarif
+          category: trivy-audit-image
+
+      - name: Upload Trivy Auth image SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-auth-image.sarif
+          category: trivy-auth-image
 
   # Secret scanning, file hygiene and commit-message linting run repo-wide in the
   # Lint workflow (.github/workflows/lint.yml). CodeQL SAST runs in codeql.yml, and

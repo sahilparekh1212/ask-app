@@ -39,7 +39,7 @@ class AuditLogServiceIntegrationTest {
 		repository.save(new AuditLog("User", "UPDATE", "u3"));
 		repository.save(new AuditLog("Order", "CREATE", "o1"));
 		AuditLog removed = new AuditLog("Order", "DELETE", "o2");
-		removed.setDeleted(true);
+		removed.markDeleted();
 		repository.save(removed);
 		repository.flush();
 	}
