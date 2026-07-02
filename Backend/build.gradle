@@ -1,5 +1,5 @@
 plugins {
-	id 'org.springframework.boot' version '3.4.4' apply false
+	id 'org.springframework.boot' version '3.5.16' apply false
 	id 'io.spring.dependency-management' version '1.1.7' apply false
 	id 'com.diffplug.spotless' version '8.8.0' apply false
 }
@@ -49,7 +49,7 @@ subprojects {
 		implementation 'org.springframework.boot:spring-boot-starter-web'
 		implementation 'org.springframework.boot:spring-boot-starter-security'
 		implementation 'org.springframework.boot:spring-boot-starter-oauth2-resource-server'
-		implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.9'
+		implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.17'
 		implementation 'org.springframework.boot:spring-boot-starter-actuator'
 		// Prometheus metrics scrape endpoint at /actuator/prometheus
 		implementation 'io.micrometer:micrometer-registry-prometheus'
