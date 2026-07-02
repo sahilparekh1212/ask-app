@@ -1,7 +1,7 @@
 # Build context: repo root
 # docker build -f Auth/Dockerfile -t auth-service:latest .
 
-FROM eclipse-temurin:17-jdk-alpine AS builder
+FROM eclipse-temurin:25-jdk-alpine AS builder
 WORKDIR /workspace
 COPY gradlew gradlew
 COPY gradle gradle
@@ -17,7 +17,7 @@ COPY Auth/build.gradle Auth/build.gradle
 COPY Auth/src Auth/src
 RUN chmod +x gradlew && ./gradlew :Auth:bootJar --no-daemon -x test
 
-FROM eclipse-temurin:17-jre-alpine
+FROM eclipse-temurin:25-jre-alpine
 WORKDIR /app
 COPY --from=builder /workspace/Auth/build/libs/*.jar app.jar
 # OpenShift runs containers as an arbitrary UID in the root group

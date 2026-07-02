@@ -1,7 +1,7 @@
 # Build context: repo root
 # docker build -f Audit/Dockerfile -t audit-service:latest .
 
-FROM eclipse-temurin:17-jdk-alpine AS builder
+FROM eclipse-temurin:25-jdk-alpine AS builder
 WORKDIR /workspace
 COPY gradlew gradlew
 COPY gradle gradle
@@ -16,7 +16,7 @@ COPY Audit/build.gradle Audit/build.gradle
 COPY Audit/src Audit/src
 RUN chmod +x gradlew && ./gradlew :Audit:bootJar --no-daemon -x test
 
-FROM eclipse-temurin:17-jre-alpine
+FROM eclipse-temurin:25-jre-alpine
 WORKDIR /app
 COPY --from=builder /workspace/Audit/build/libs/*.jar app.jar
 RUN chgrp -R 0 /app && chmod -R g=u /app
