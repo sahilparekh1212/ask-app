@@ -17,6 +17,9 @@ COPY Audit/src Audit/src
 RUN chmod +x gradlew && ./gradlew :Audit:bootJar --no-daemon -x test
 
 FROM eclipse-temurin:25-jre-alpine
+# Patch Alpine OS packages beyond what the base tag shipped (the base-image CVEs Trivy flags —
+# e.g. p11-kit-trust — are fixed in newer apk packages before the temurin image is rebuilt).
+RUN apk --no-cache upgrade
 WORKDIR /app
 COPY --from=builder /workspace/Audit/build/libs/*.jar app.jar
 RUN chgrp -R 0 /app && chmod -R g=u /app
