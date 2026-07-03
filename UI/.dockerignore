@@ -1,0 +1,9 @@
+# Keep the build context to sources only — node_modules is restored by npm ci inside the build
+# stage, and a host-OS node_modules leaking in would poison platform-specific binaries anyway.
+node_modules
+dist
+.angular
+coverage
+.git
+Dockerfile
+.dockerignore

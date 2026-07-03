@@ -31,11 +31,24 @@ needs.
       filter form (entityType/action/date range), and by-action/by-entityType stats as
       dependency-free CSS bar charts, against `/api/v1/audit-logs/search` + `/stats`. Contract
       matched to the backend DTOs (`PagedResponse` envelope, `AuditLogStats`).
-- [~] **Frontend CI + container.** CI done: a `Frontend CI` workflow (format check, lint, prod
+- [x] **Frontend CI + container — done.** CI: a `Frontend CI` workflow (format check, lint, prod
       build, headless unit tests) on `UI/**`, plus the backend required-check path filters broadened
-      to `UI/**` so UI-only PRs are mergeable. Still open: an **nginx container** for the UI + a UI
-      service in the compose stack, and (optional) making Frontend CI a required branch-protection
-      check.
+      to `UI/**` so UI-only PRs are mergeable. Container: `UI/Dockerfile` (multi-stage — `npm ci` +
+      prod build on node 22 matching Frontend CI, then `nginx:1.28-alpine` serving
+      `dist/ai-sandbox-ui/browser`) with `UI/nginx.conf` doing the two jobs the production
+      `environment.ts` was already designed around: SPA fallback (`try_files … /index.html`) and
+      same-origin reverse proxies `/auth-api/` → `auth:8085` / `/audit-api/` → `audit:8083`, so the
+      browser never needs CORS on this path. Hashed bundles get immutable cache headers,
+      `index.html` gets `no-cache`. A `ui` service in `Backend/docker-compose.yml` publishes it on
+      host `:4200` — the origin `CORS_ALLOWED_ORIGINS`/`FRONTEND_URL` already assumed — so demo
+      login + audit dashboard work end-to-end out of one `docker compose up --build`. One honest
+      caveat documented in the compose file: opt-in *Google* sign-in navigates through the proxy,
+      so its Spring-derived `redirect_uri` won't match the direct-`:8085` Google-console setup —
+      demo login is the in-container path. The "(optional) make Frontend CI a required
+      branch-protection check" tail was deliberately not done: `Frontend CI` only triggers on
+      `UI/**`, so making it required would leave backend-only PRs permanently un-mergeable unless
+      its path filters were broadened to everything (the same asymmetry the backend checks solved
+      in reverse) — noting it here instead of half-doing it.
 
 ### Backend seams the UI depends on (do these before/with the UI)
 - [x] **CORS — implemented.** Both services now configure CORS in `SecurityConfig` via

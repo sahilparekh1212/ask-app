@@ -1,11 +1,11 @@
-# One-command way to run the whole system: Postgres, Kafka (Redpanda), Auth, Audit, and the
-# observability stack (Prometheus/Grafana/Loki/Tempo). There's no UI yet (see TODO.md), so it's
-# not included here.
+# One-command way to run the whole system: the Angular UI, Postgres, Kafka (Redpanda), Auth,
+# Audit, and the observability stack (Prometheus/Grafana/Loki/Tempo).
 #
 #   docker compose up --build
 #
 # First build takes a few minutes — each service's multi-stage Dockerfile runs a full Gradle
 # build with no layer caching for Gradle's own cache. Once up:
+#   UI:                http://localhost:4200            (demo login: demo / demo)
 #   Auth Swagger:      http://localhost:8085/swagger-ui.html
 #   Audit Swagger:     http://localhost:8083/swagger-ui.html
 #   Grafana:           http://localhost:3000            (admin / admin)
@@ -158,6 +158,27 @@ services:
         condition: service_started
       redis:
         condition: service_healthy
+
+  # The SPA, served by nginx on the host port the rest of this file already assumes for the
+  # frontend origin (CORS_ALLOWED_ORIGINS / FRONTEND_URL both say http://localhost:4200). The
+  # production bundle calls same-origin /auth-api and /audit-api paths, which nginx proxies to
+  # auth/audit inside the network (see UI/nginx.conf) — so browser → API needs no CORS at all.
+  # Demo login (demo/demo) works end-to-end out of the box. Caveat: the opt-in *Google* sign-in
+  # navigates through the /auth-api proxy, so Spring derives the OAuth redirect_uri from the
+  # proxied request — registering http://localhost:8085's callback in the Google console (the
+  # direct, documented setup) won't match through this path; use the demo login here, or hit
+  # Auth directly on :8085 for the real-IdP flow.
+  ui:
+    build:
+      context: ../UI
+    container_name: aisandbox-ui
+    ports:
+      - "4200:80"
+    depends_on:
+      auth:
+        condition: service_started
+      audit:
+        condition: service_started
 
   audit:
     build:
