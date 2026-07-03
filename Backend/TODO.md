@@ -1,5 +1,48 @@
 # TODO — Interview-readiness punch list (Fullstack Engineer)
 
+## Open roadmap (prioritized)
+
+### Feature: "LLM Chat" — ask the app about itself
+- [ ] **LLM Chat feature.** A chat page in the SPA where a user asks questions about the
+      application ("what does the audit service do?", "how do I sign in?", "what actions were
+      most frequent today?") and an LLM answers, grounded on the app's own docs (README, ADRs)
+      and — optionally, phase 2 — read-only *aggregate* data via the existing `/stats` endpoint.
+      Architecture: a thin **server-side proxy endpoint** (new `Assistant` controller; the SPA
+      never talks to the LLM provider directly) calling the Claude API (Messages API;
+      `claude-sonnet-5`, or `claude-haiku-4-5` for cost) with the docs as context; API key lives
+      in server env/secret only. **Sensitive-data guardrails are a hard requirement:**
+      (1) the proxy never forwards `Authorization` headers, JWTs, or cookies to the provider;
+      (2) inbound messages are screened server-side before the provider call — reject/redact
+      token-shaped strings (JWT `eyJ…` patterns), credential keywords, and PII patterns (emails,
+      card-like numbers), returning a "can't help with credentials/personal data" message rather
+      than forwarding; (3) tool/data access is allowlisted to *aggregate* endpoints only — the
+      assistant can see counts by action/entityType, never raw audit rows (whose `details` may
+      carry user identifiers); (4) retrieved/tool content is treated as data, not instructions
+      (prompt-injection posture documented); (5) chat requests are rate-limited per user (reuse
+      the ratelimit module) and logged with the same redaction rules. Document the data-flow
+      (what can/cannot reach the provider) in an ADR — that writeup is itself interview material.
+
+### CI/CD roadmap (highest interview value for a fullstack role, in order)
+- [ ] **Playwright E2E suite against the compose stack.** The biggest remaining gap: nothing
+      exercises browser → nginx → Auth → Kafka → Audit → Postgres as one system. CI job:
+      `docker compose up`, wait for health, then Playwright logs in via the demo form, filters
+      the audit table, adds demo logs, asserts rows/stats. This is the "how do you know the whole
+      thing works?" answer.
+- [ ] **API contract gate (openapi-diff).** Generate each service's OpenAPI spec in CI and fail
+      the PR on breaking changes vs `main`'s spec. Demonstrates treating the UI↔API seam as a
+      versioned contract (Pact is the heavier alternative; openapi-diff is 80% of the story for
+      20% of the effort — and the repo already URI/header-versions its APIs, so this completes
+      that narrative).
+- [ ] **CD: versioned images to GHCR on merge to `main`.** Build once, tag SemVer + git SHA,
+      push to GitHub Container Registry; compose gets a variant that pulls instead of builds.
+      Closes the "CI but no CD" gap and makes release engineering a first-class talking point.
+- [ ] **Mutation testing (PIT), report-only first.** The sophisticated answer to "is 90% line
+      coverage meaningful?" — prove the tests fail when the code is mutated, not merely execute
+      it. Start report-only (like the Trivy image scans did) and gate once the baseline is known.
+- [ ] **SBOM (syft) + image signing (cosign).** Cheap to bolt onto the existing Trivy jobs;
+      "SBOM/SLSA/provenance" is the current supply-chain vocabulary that distinguishes senior
+      candidates, and this repo already has the scanning half of that story.
+
 Findings
 
 ## Fullstack readiness — Angular microfrontend (ACTIVE FOCUS)
