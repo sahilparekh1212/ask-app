@@ -206,8 +206,9 @@ jobs:
           docker build -f Audit/Dockerfile -t audit-service:ci .
           docker build -f Auth/Dockerfile -t auth-service:ci .
 
-      # Report-only for now (this job is a required branch-protection check — see TODO.md): confirm
-      # a green run against the current base images before adding exit-code: '1' here too.
+      # SARIF reports land in the Security tab (all severities — trivy-action doesn't apply the
+      # severity filter to SARIF output unless limit-severities-for-sarif is set); the gate steps
+      # below fail the job on fixable HIGH/CRITICAL only, same contract as the jar gate above.
       - name: Trivy scan Audit image → SARIF (report)
         uses: aquasecurity/trivy-action@v0.36.0
         with:
@@ -241,6 +242,29 @@ jobs:
         with:
           sarif_file: trivy-auth-image.sarif
           category: trivy-auth-image
+
+      # Gates: fail on fixable HIGH/CRITICAL CVEs in the images (OS layer + bundled jars).
+      # Separate steps from the SARIF reports so the Security tab keeps full visibility while
+      # the gate stays scoped to what the jar gate already enforces.
+      - name: Trivy scan Audit image → gate
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: image
+          image-ref: audit-service:ci
+          format: table
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'
+
+      - name: Trivy scan Auth image → gate
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: image
+          image-ref: auth-service:ci
+          format: table
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'
 
   # Secret scanning, file hygiene and commit-message linting run repo-wide in the
   # Lint workflow (.github/workflows/lint.yml). CodeQL SAST runs in codeql.yml, and

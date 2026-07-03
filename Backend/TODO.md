@@ -201,18 +201,23 @@ detect-private-key in `lint.yml`). Now added:
       confirmed green run on `main` ("Analyze (java-kotlin)" and "Trivy CVE scan" job names); added
       as required contexts via `gh api` alongside the existing four. A CVE finding or SAST alert on
       a PR now blocks merge instead of just landing in the Security tab.
-- [x] **Trivy extended to the Docker images — report-only pending a confirmed green run.** The
-      `trivy` job in `backend-ci.yml` now also `docker build`s both `Audit/Dockerfile` and
-      `Auth/Dockerfile` and scans each resulting image (not just the boot-jar dependencies), so
-      base-image/OS CVEs (e.g. in `eclipse-temurin:17-jre-alpine`) are caught too. Uploaded to the
-      Security tab under distinct SARIF categories (`trivy-audit-image`/`trivy-auth-image`, plus
-      `trivy-jars` on the existing jar scan, so the three uploads in one job don't overwrite each
-      other). Deliberately **not** wired to `exit-code: '1'` yet — this job is already a required
-      branch-protection check, and unlike the jar scan (already confirmed green), the image scan
-      has never run, so it could turn up an existing base-image CVE and lock out every PR on day
-      one. Not build-verified here (no Docker locally, same as the earlier Dockerfile fix) — once a
-      run on `main` is confirmed green, add `exit-code: '1'` to both new scan steps to make it a
-      real gate like the jar scan.
+- [x] **Trivy extended to the Docker images — now a real gate.** The `trivy` job in
+      `backend-ci.yml` `docker build`s both `Audit/Dockerfile` and `Auth/Dockerfile` and scans each
+      resulting image (not just the boot-jar dependencies), so base-image/OS CVEs (e.g. in
+      `eclipse-temurin:17-jre-alpine`) are caught too. Uploaded to the Security tab under distinct
+      SARIF categories (`trivy-audit-image`/`trivy-auth-image`, plus `trivy-jars` on the existing
+      jar scan, so the three uploads in one job don't overwrite each other). Initially shipped
+      report-only — this job is a required branch-protection check, and an existing base-image CVE
+      would have locked out every PR on day one. Once the image scans had a confirmed green run on
+      `main`, checked the precondition properly before flipping: the 4 open Security-tab alerts in
+      the image categories are all Trivy-severity MEDIUM (the SARIF report includes mediums because
+      trivy-action doesn't apply the severity filter to SARIF output by default), so a fixable-
+      HIGH/CRITICAL gate trips on nothing today. Added dedicated gate steps (`format: table`,
+      `severity: HIGH,CRITICAL`, `ignore-unfixed`, `exit-code: '1'`) per image, mirroring the jar
+      report+gate step split — deliberately *not* `exit-code` on the SARIF steps themselves, which
+      (per that same SARIF quirk) would have gated on the mediums too. The image builds themselves
+      are CI-verified green, which also retroactively confirms the earlier Dockerfile `COPY
+      Survey/` fix ("do a `docker build` once to confirm" — done, in CI).
 
 ## Medium impact
 
