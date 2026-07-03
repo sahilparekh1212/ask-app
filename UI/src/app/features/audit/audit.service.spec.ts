@@ -40,6 +40,14 @@ describe('AuditService', () => {
     req.flush({ total: 0, byAction: [], byEntityType: [] });
   });
 
+  it('posts the demo count to the demo endpoint', () => {
+    service.addDemoLogs(7).subscribe();
+    const req = httpMock.expectOne(`${base}/demo`);
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body).toEqual({ count: 7 });
+    req.flush({ created: 7 });
+  });
+
   it('sends the details substring filter and omits it when unset', () => {
     service
       .search({ details: 'report' }, { page: 0, size: 20, sort: 'createdAt,desc' })

@@ -46,6 +46,48 @@
     }
   }
 
+  .demo-tools {
+    display: flex;
+    align-items: flex-end;
+    gap: 0.75rem;
+    margin-bottom: 1.25rem;
+
+    label {
+      display: flex;
+      flex-direction: column;
+      gap: 0.2rem;
+      font-size: 0.8rem;
+      color: #374151;
+    }
+
+    input {
+      width: 6rem;
+      padding: 0.4rem;
+      border: 1px solid #d1d5db;
+      border-radius: 6px;
+    }
+
+    button {
+      padding: 0.45rem 0.9rem;
+      background: #fff;
+      color: #2563eb;
+      border: 1px solid #2563eb;
+      border-radius: 6px;
+      cursor: pointer;
+
+      &:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+    }
+
+    .note {
+      font-size: 0.85rem;
+      color: #4b5563;
+      padding-bottom: 0.45rem;
+    }
+  }
+
   .stats {
     background: #f9fafb;
     border: 1px solid #e5e7eb;

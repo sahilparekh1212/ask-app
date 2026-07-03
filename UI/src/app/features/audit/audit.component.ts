@@ -39,6 +39,11 @@ export class AuditComponent implements OnInit {
   readonly entityTypeOptions = signal<string[]>([]);
   readonly actionOptions = signal<string[]>([]);
 
+  // "Add demo logs" control — the rows are generated server-side; this only sends the count.
+  readonly demoCount = this.fb.nonNullable.control(10);
+  readonly demoBusy = signal(false);
+  readonly demoMessage = signal<string | null>(null);
+
   readonly page = signal(0);
   readonly size = signal(20);
   readonly sortField = signal<SortField>('createdAt');
@@ -56,6 +61,29 @@ export class AuditComponent implements OnInit {
   applyFilters(): void {
     this.page.set(0);
     this.reload();
+  }
+
+  addDemoLogs(): void {
+    const count = this.demoCount.value;
+    if (this.demoBusy() || count < 1 || count > 500) {
+      this.demoMessage.set(count < 1 || count > 500 ? 'Count must be between 1 and 500.' : null);
+      return;
+    }
+    this.demoBusy.set(true);
+    this.demoMessage.set(null);
+    this.audit.addDemoLogs(count).subscribe({
+      next: (res) => {
+        this.demoBusy.set(false);
+        this.demoMessage.set(`Added ${res.created} demo logs.`);
+        this.reload();
+      },
+      error: () => {
+        this.demoBusy.set(false);
+        this.demoMessage.set(
+          'Could not add demo logs — the demo endpoint only exists in LOCAL/DEV.',
+        );
+      },
+    });
   }
 
   sortBy(field: SortField): void {

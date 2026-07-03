@@ -85,6 +85,37 @@ describe('AuditComponent', () => {
     expect(component.actionOptions()).toEqual(['CREATE', 'LOGIN']);
   });
 
+  it('adds demo logs then reloads the table and stats', () => {
+    flushInitialLoad();
+    component.demoCount.setValue(5);
+    component.addDemoLogs();
+
+    const demo = httpMock.expectOne((r) => r.url === `${base}/demo`);
+    expect(demo.request.method).toBe('POST');
+    expect(demo.request.body).toEqual({ count: 5 });
+    demo.flush({ created: 5 });
+
+    // Success triggers a reload so the new rows appear immediately.
+    httpMock
+      .expectOne((r) => r.url === `${base}/search`)
+      .flush({ content: [], page: 0, size: 20, totalElements: 5, totalPages: 1, last: true });
+    httpMock
+      .expectOne((r) => r.url === `${base}/stats`)
+      .flush({ total: 5, byAction: [], byEntityType: [] });
+
+    expect(component.demoMessage()).toBe('Added 5 demo logs.');
+    expect(component.demoBusy()).toBeFalse();
+  });
+
+  it('rejects an out-of-range demo count without calling the backend', () => {
+    flushInitialLoad();
+    component.demoCount.setValue(0);
+    component.addDemoLogs();
+
+    expect(component.demoMessage()).toBe('Count must be between 1 and 500.');
+    // afterEach's httpMock.verify() would fail on any stray /demo request.
+  });
+
   it('sends the details filter as a query param when set', () => {
     flushInitialLoad();
     component.filterForm.patchValue({ details: '  sales report ' });

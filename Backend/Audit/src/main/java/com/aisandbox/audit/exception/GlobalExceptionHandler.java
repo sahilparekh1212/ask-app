@@ -11,6 +11,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
@@ -72,6 +73,20 @@ public class GlobalExceptionHandler {
 		return ResponseEntity.status(HttpStatus.FORBIDDEN).body(errorBody(403, "Forbidden", ex));
 	}
 
+	/**
+	 * A {@code @Valid}-annotated {@code @RequestBody} failed constraint validation (e.g. an
+	 * out-of-range demo-data count). Same handler Auth already has — without it, a validation
+	 * failure falls into the catch-all below and returns a misleading 500 instead of 400.
+	 */
+	@ExceptionHandler(MethodArgumentNotValidException.class)
+	public ResponseEntity<Map<String, Object>> handleValidation(MethodArgumentNotValidException ex) {
+		logException(ex);
+		String message = ex.getBindingResult().getFieldErrors().stream()
+			.map(fe -> fe.getField() + " " + fe.getDefaultMessage())
+			.collect(Collectors.joining("; "));
+		return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorBody(400, "Bad Request", message));
+	}
+
 	@ExceptionHandler(Exception.class)
 	public ResponseEntity<Map<String, Object>> handleAll(Exception ex) {
 		// A superseded (rate-limited) request can fail mid-work because the "newest wins" limiter
@@ -95,11 +110,15 @@ public class GlobalExceptionHandler {
 	}
 
 	private Map<String, Object> errorBody(int status, String error, Exception ex) {
+		return errorBody(status, error, ex.getMessage() != null ? ex.getMessage() : "");
+	}
+
+	private Map<String, Object> errorBody(int status, String error, String message) {
 		return Map.of(
 			"timestamp", Instant.now().toString(),
 			"status", status,
 			"error", error,
-			"message", ex.getMessage() != null ? ex.getMessage() : "",
+			"message", message,
 			"requestId", MDC.get("requestId") != null ? MDC.get("requestId") : ""
 		);
 	}

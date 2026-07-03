@@ -76,6 +76,22 @@ needs.
       (`margin-inline: calc(50% - 50vw)` + `overflow-x: clip` on body for the scrollbar-width
       overhang).
 
+- [x] **Demo-log generator — bulk-insert dummy rows on demand.** `POST /api/v1/audit-logs/demo`
+      with a validated `{"count": N}` body (1..500 — capped so a typo can't flood the table)
+      generates randomized-but-realistic rows server-side (`DemoDataGenerator`, same
+      entityType/action vocabulary as the startup seeder so generated rows blend in and exercise
+      the dropdowns/stats/details-search). Profile-gated to LOCAL/DEV like the seeder — the
+      controller bean doesn't exist in SIT/UAT/PROD, so the route 404s where dummy rows would
+      pollute a real audit trail. Runs through `TransactionalRequestExecutor` like every other
+      mutation on the API. UI: an "Add demo logs" count input + button on the audit screen that
+      posts and reloads table + stats. Fixing this surfaced (and closed) a real pre-existing gap:
+      Audit's `GlobalExceptionHandler` had **no `MethodArgumentNotValidException` handler** — Auth
+      got one in the "minor security smells" round, Audit never did, so any `@Valid` body failure
+      here 500'd instead of 400ing (the exact bug class fixed twice before). Added the handler +
+      an `errorBody(String)` overload, and a standalone-MockMvc test asserting out-of-range and
+      *missing* counts return 400, not 500 (a missing `count` deserializes to 0 and must fail
+      `@Min`, not silently insert zero rows).
+
 ### Backend seams the UI depends on (do these before/with the UI)
 - [x] **CORS — implemented.** Both services now configure CORS in `SecurityConfig` via
       `CORS_ALLOWED_ORIGINS` (default `http://localhost:4200`), so an Angular SPA on `:4200` can

@@ -43,6 +43,11 @@ export interface AuditLogFilter {
   includeDeleted?: boolean;
 }
 
+/** Result of POST /demo — how many generated rows were inserted. */
+export interface DemoDataResponse {
+  created: number;
+}
+
 /** Zero-based page request plus a Spring `sort=field,dir` selection. */
 export interface PageRequest {
   page: number;

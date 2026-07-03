@@ -6,6 +6,7 @@ import {
   AuditLog,
   AuditLogFilter,
   AuditLogStats,
+  DemoDataResponse,
   PageRequest,
   PagedResponse,
 } from './audit.models';
@@ -28,6 +29,11 @@ export class AuditService {
     return this.http.get<AuditLogStats>(`${this.base}/stats`, {
       params: this.filterParams(filter),
     });
+  }
+
+  /** Bulk-insert generated demo rows (backend endpoint exists in LOCAL/DEV only). */
+  addDemoLogs(count: number): Observable<DemoDataResponse> {
+    return this.http.post<DemoDataResponse>(`${this.base}/demo`, { count });
   }
 
   private filterParams(filter: AuditLogFilter): HttpParams {
