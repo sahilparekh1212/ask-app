@@ -83,6 +83,18 @@ class GlobalExceptionHandlerTest {
 	}
 
 	@Test
+	void handleAssistantUnavailable_returns503() {
+		ResponseEntity<Map<String, Object>> response = handler.handleAssistantUnavailable(
+			new com.aisandbox.audit.assistant.AssistantUnavailableException("no key"));
+
+		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
+		assertThat(response.getBody())
+			.containsEntry("status", 503)
+			.containsEntry("error", "Service Unavailable")
+			.containsEntry("message", "no key");
+	}
+
+	@Test
 	void handleAll_returns500AndBlankMessageAndRequestIdWhenAbsent() {
 		ResponseEntity<Map<String, Object>> response = handler.handleAll(new RuntimeException());
 

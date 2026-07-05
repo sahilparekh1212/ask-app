@@ -6,6 +6,7 @@ import com.anthropic.client.okhttp.AnthropicOkHttpClient;
 import com.anthropic.models.messages.Message;
 import com.anthropic.models.messages.MessageCreateParams;
 import com.anthropic.models.messages.ThinkingConfigAdaptive;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
@@ -28,6 +29,9 @@ public class AnthropicLlmClient implements LlmClient {
 	private final AssistantProperties properties;
 	private volatile AnthropicClient client;
 
+	// @Autowired disambiguates for Spring — with two constructors present, container wiring
+	// must use this one (the other exists only so tests can inject a mock SDK client).
+	@Autowired
 	public AnthropicLlmClient(AssistantProperties properties) {
 		this.properties = properties;
 	}
@@ -61,7 +65,9 @@ public class AnthropicLlmClient implements LlmClient {
 			.collect(Collectors.joining());
 	}
 
-	private AnthropicClient getClient() {
+	// Package-private so tests can cover the lazy build/memoization without a network call
+	// (constructing the OkHttp-backed client performs no I/O).
+	AnthropicClient getClient() {
 		AnthropicClient existing = client;
 		if (existing != null) {
 			return existing;
