@@ -6,7 +6,14 @@ dependencies {
 	// Liquibase owns the DB schema (db/changelog); Hibernate runs with ddl-auto=none.
 	implementation 'org.liquibase:liquibase-core'
 	// Official Anthropic SDK backing the LLM chat assistant proxy (see assistant/ package).
-	implementation 'com.anthropic:anthropic-java:2.34.0'
+	// The SDK's classic (javax) swagger-annotations jar defines the same io.swagger.v3.oas
+	// classes as springdoc's newer swagger-annotations-jakarta; when the older copy wins
+	// classloading, /v3/api-docs 500s with NoSuchMethodError on Schema.$dynamicRef(). The
+	// jakarta jar supplies every class the SDK's schema module reflects on, so exclude the
+	// duplicate rather than pinning versions.
+	implementation('com.anthropic:anthropic-java:2.34.0') {
+		exclude group: 'io.swagger.core.v3', module: 'swagger-annotations'
+	}
 	runtimeOnly 'com.h2database:h2'
 	// DEV/SIT/UAT/PROD point SPRING_DATASOURCE_URL at a real Postgres (see the root
 	// docker-compose.yml and README's "External database" section) — LOCAL/tests still use H2.
