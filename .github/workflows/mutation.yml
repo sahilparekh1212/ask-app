@@ -1,0 +1,58 @@
+name: Mutation testing
+
+# PIT mutation testing, report-only: mutates the bytecode and re-runs the unit tests; a mutant
+# the tests don't kill is line coverage without assertion strength. No mutationThreshold is set,
+# so the job only fails on real build/test errors, never on the score — the "gate once the
+# baseline is known" step comes later, deliberately (same rollout the Trivy image scans used).
+# Not a required branch-protection check.
+on:
+  pull_request:
+    paths:
+      - 'Backend/**/*.java'
+      - 'Backend/**/build.gradle'
+      - '.github/workflows/mutation.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'Backend/**/*.java'
+      - 'Backend/**/build.gradle'
+      - '.github/workflows/mutation.yml'
+  workflow_dispatch:
+
+jobs:
+  pitest:
+    name: PIT mutation testing (report-only)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v6
+
+      - name: Run PIT on all modules
+        working-directory: Backend
+        run: ./gradlew :common:pitest :Audit:pitest :Auth:pitest
+
+      - name: Mutation scores → job summary
+        run: |
+          {
+            echo "## Mutation testing (PIT)"
+            echo ""
+            echo "| Module | Mutants | Detected | Score |"
+            echo "|--------|--------:|---------:|------:|"
+            for m in common Audit Auth; do
+              python3 -c "import xml.etree.ElementTree as ET; ms = ET.parse('Backend/$m/build/reports/pitest/mutations.xml').getroot().findall('mutation'); d = sum(1 for x in ms if x.get('detected') == 'true'); print(f'| $m | {len(ms)} | {d} | {100 * d // len(ms)}% |')"
+            done
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload PIT reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: pitest-reports
+          path: Backend/*/build/reports/pitest
+          if-no-files-found: ignore

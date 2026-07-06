@@ -98,9 +98,20 @@
       file's `build:` sections still apply). `docs/deployment.md` §3/§7 flipped from planned to
       built for the publish half — deploy-to-a-live-env stays honestly `[planned]`, and one-time
       GHCR package visibility (public vs `docker login`) is called out in the override's header.
-- [ ] **Mutation testing (PIT), report-only first.** The sophisticated answer to "is 90% line
-      coverage meaningful?" — prove the tests fail when the code is mutated, not merely execute
-      it. Start report-only (like the Trivy image scans did) and gate once the baseline is known.
+- [x] **Mutation testing (PIT), report-only — implemented.** `info.solidsoft.pitest` 1.19.0
+      (1.15.0 fails on Gradle 9 — `reporting.baseDir` is gone) applied to all three modules from
+      the root `build.gradle`, deliberately **not** wired into `check`: no `mutationThreshold`,
+      so nothing gates yet — the same report-first/gate-later rollout the Trivy image scans used.
+      A `Mutation testing` workflow (`.github/workflows/mutation.yml`, PRs touching Java/Gradle
+      files + main + dispatch, not a required check) runs `pitest` on all modules, parses each
+      `mutations.xml` into a job-summary score table, and uploads the HTML reports. The heavy
+      Spring-context suites (`*IntegrationTest`, `*SecurityTest`) are excluded from PIT's runs —
+      under per-mutant re-execution they dominate wall-clock without adding mutant-killing power
+      over the focused unit tests (full local run: ~6.5 min for all three modules). **The
+      baseline is the point**: common 96% / Auth 80% / **Audit 70%** detected — against a uniform
+      90% *line* gate, exactly the "coverage executes code, assertions kill mutants" gap this
+      item predicted; the survivor report is the shortlist for tightening tests before any gate
+      is set. Numbers are from a real local run of every module, not projected.
 - [ ] **SBOM (syft) + image signing (cosign).** Cheap to bolt onto the existing Trivy jobs;
       "SBOM/SLSA/provenance" is the current supply-chain vocabulary that distinguishes senior
       candidates, and this repo already has the scanning half of that story.
