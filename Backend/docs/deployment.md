@@ -60,8 +60,18 @@ publishes them:
    the exact CI-built artifacts:
    `docker compose -f docker-compose.yml -f docker-compose.ghcr.yml up -d --no-build`
    (pin a build with `AI_SANDBOX_TAG=sha-<short>`).
-4. Supply chain **[planned]**: attach an SBOM (syft) and a cosign signature to each image;
-   verify the signature in the deploy step.
+4. Supply chain **[built]**: `cd.yml` signs every pushed digest with **cosign** (keyless — the
+   signature binds the image to the workflow's OIDC identity, recorded in the Rekor transparency
+   log; no key to store or rotate) and attaches a **syft** SPDX SBOM both as a workflow artifact
+   and as a signed cosign attestation on the image. Verify before deploying:
+   ```
+   cosign verify \
+     --certificate-identity-regexp 'https://github.com/sahilparekh1212/AI-Sandbox/\.github/workflows/cd\.yml@.*' \
+     --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+     ghcr.io/sahilparekh1212/ai-sandbox/<name>@<digest>
+   ```
+   Wiring that verification into an actual deploy step stays **[planned]** with the deploy half
+   of CD.
 
 ---
 

@@ -112,9 +112,22 @@
       90% *line* gate, exactly the "coverage executes code, assertions kill mutants" gap this
       item predicted; the survivor report is the shortlist for tightening tests before any gate
       is set. Numbers are from a real local run of every module, not projected.
-- [ ] **SBOM (syft) + image signing (cosign).** Cheap to bolt onto the existing Trivy jobs;
-      "SBOM/SLSA/provenance" is the current supply-chain vocabulary that distinguishes senior
-      candidates, and this repo already has the scanning half of that story.
+- [x] **SBOM (syft) + image signing (cosign) — implemented.** Bolted onto the CD workflow (the
+      publish point — signing CI-only throwaway images would prove nothing), not the Trivy jobs
+      this item originally guessed at: after each image pushes, `cosign sign` signs the exact
+      **digest** (`steps.push.outputs.digest`, not a mutable tag) **keyless** — `id-token: write`
+      gives the workflow an OIDC identity that becomes the signing cert, recorded in the public
+      Rekor transparency log, so there's no key to store, leak, or rotate; then
+      `anchore/sbom-action` (syft) generates an SPDX SBOM from the pushed image, uploaded as a
+      workflow artifact *and* attached to the image as a signed `cosign attest --type spdxjson`
+      attestation, so the dependency inventory travels with the artifact it describes. The
+      verify command (pinning `--certificate-identity-regexp` to this repo's `cd.yml` — the
+      identity check is what makes keyless signing mean something) is documented in the workflow
+      comment and `docs/deployment.md` §3.4, which flips to `[built]`; wiring verification into
+      an actual deploy step stays honestly `[planned]` alongside the deploy half of CD. Verified
+      like CD itself had to be: `cd.yml` only runs on push to `main`, so the signing/SBOM steps
+      can't execute on their own PR — the first post-merge run is the proof, watched and fixed
+      forward if red.
 
 ### Feature: "LLM Chat" — DONE
 - [x] **LLM Chat feature — implemented, with role-based data access.** New `assistant/` package

@@ -21,6 +21,7 @@ jobs:
     permissions:
       contents: read
       packages: write # push to GHCR
+      id-token: write # cosign keyless signing: the workflow's OIDC identity is the signer
     strategy:
       fail-fast: false
       matrix:
@@ -59,6 +60,7 @@ jobs:
             type=raw,value=0.1.${{ github.run_number }}
 
       - name: Build and push
+        id: push
         uses: docker/build-push-action@v6
         with:
           context: ${{ matrix.context }}
@@ -66,3 +68,31 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+
+      # Supply chain: sign the pushed digest and attach an SBOM as a signed attestation.
+      # Keyless — no key to store or rotate; the signature binds the image to THIS workflow's
+      # OIDC identity and lands in the public Rekor transparency log. Verify with:
+      #   cosign verify \
+      #     --certificate-identity-regexp 'https://github.com/sahilparekh1212/AI-Sandbox/\.github/workflows/cd\.yml@.*' \
+      #     --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+      #     ghcr.io/sahilparekh1212/ai-sandbox/<name>@<digest>
+      - name: Install cosign
+        uses: sigstore/cosign-installer@v3
+
+      - name: Sign image (cosign keyless)
+        run: cosign sign --yes "ghcr.io/${{ github.repository_owner }}/ai-sandbox/${{ matrix.name }}@${{ steps.push.outputs.digest }}"
+
+      # syft reads the pushed image (docker login creds from the step above) and emits SPDX.
+      - name: Generate SBOM (syft)
+        uses: anchore/sbom-action@v0
+        with:
+          image: ghcr.io/${{ github.repository_owner }}/ai-sandbox/${{ matrix.name }}@${{ steps.push.outputs.digest }}
+          format: spdx-json
+          output-file: sbom-${{ matrix.name }}.spdx.json
+          artifact-name: sbom-${{ matrix.name }}.spdx.json
+
+      - name: Attach SBOM attestation (cosign)
+        run: >-
+          cosign attest --yes --type spdxjson
+          --predicate "sbom-${{ matrix.name }}.spdx.json"
+          "ghcr.io/${{ github.repository_owner }}/ai-sandbox/${{ matrix.name }}@${{ steps.push.outputs.digest }}"
