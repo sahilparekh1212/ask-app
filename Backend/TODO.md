@@ -28,6 +28,16 @@
       nav/flip/shuffle); 90% coverage gate held. Reuse documented in the ADR-0009 addendum. Not
       run against the live Claude API here (no key) — same smoke path as the chat assistant.
 
+#### Frontend polish — header nav
+- [ ] **Nav tabs render with inconsistent alignment on load.** The five header tabs (Home, Audit,
+      Assistant, Flashcards, and Profile/Sign in) don't sit in a consistent position when the page
+      first loads — they appear staggered / shift. Give them uniform, stable placement so every
+      tab lines up the same way on every route and load.
+- [ ] **Reorder + restyle the header nav.** Move **Home** to the right of **Flashcards** (so the
+      primary feature tabs lead and Home follows), and move **Profile** to the far top-right as the
+      usual circular avatar icon (not a text link) — clicking it goes to the profile page (and,
+      when signed out, shows the Sign in affordance there instead).
+
 ### Ops roadmap
 - [x] **End-to-end deployment plan — written.** [`docs/deployment.md`](docs/deployment.md) walks
       the whole app from commit to running system: what we deploy, the environment/profile matrix,
