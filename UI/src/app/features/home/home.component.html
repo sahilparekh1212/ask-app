@@ -1,25 +1,57 @@
 <section class="home">
-  <h1>AI-Sandbox</h1>
-  <p class="lead">
-    A production-shaped Spring Boot backend — Google OAuth2 → JWT auth, an event-driven audit trail
-    over Kafka, rate limiting, and a full observability stack — with this Angular SPA as its client.
+  <header class="hero">
+    <h1>AI-Sandbox</h1>
+    <p class="lead">
+      A production-shaped backend engineering project: two Spring Boot microservices — Google OAuth2
+      → JWT auth and an event-driven audit trail over Kafka — with rate limiting, RBAC, a full
+      observability stack, and a guarded LLM assistant, fronted by this Angular SPA.
+    </p>
+    <p class="status">
+      Everything here runs locally with one <code>docker compose up --build</code>. The backend is
+      real and hardened; this SPA is its client.
+    </p>
+    <a class="repo" [href]="repoUrl" target="_blank" rel="noopener">View the source on GitHub →</a>
+  </header>
+
+  <h2 class="section-title">Tech stack</h2>
+  <div class="stack">
+    @for (group of stack; track group.area) {
+      <div class="stack-group">
+        <h3>{{ group.area }}</h3>
+        <ul class="chips">
+          @for (item of group.items; track item) {
+            <li>{{ item }}</li>
+          }
+        </ul>
+      </div>
+    }
+  </div>
+
+  <h2 class="section-title">Design decisions — the why &amp; how</h2>
+  <div class="decisions">
+    @for (d of decisions; track d.title) {
+      <article class="decision">
+        <h3>{{ d.title }}</h3>
+        <p><span class="tag">Why</span>{{ d.why }}</p>
+        <p><span class="tag">How</span>{{ d.how }}</p>
+      </article>
+    }
+  </div>
+  <p class="footnote">
+    Each of these is written up as an Architecture Decision Record in the repository's
+    <code>Backend/docs/adr/</code> — what was chosen, what else was considered, and the tradeoff.
   </p>
 
-  <div class="cards">
-    <article>
-      <h2>Auth</h2>
-      <p>
-        Google sign-in and a demo login issue RSA-signed JWTs; the SPA attaches them as Bearer
-        tokens and silently refreshes.
-      </p>
-    </article>
-    <article>
-      <h2>Audit</h2>
-      <p>
-        Every login/refresh/logout is published to Kafka and persisted; browse it as a paginated,
-        filterable table with stats.
-      </p>
-      <a routerLink="/audit">Open the audit dashboard →</a>
-    </article>
+  <h2 class="section-title">Features</h2>
+  <div class="features">
+    @for (f of features; track f.title) {
+      <article class="feature">
+        <h3>{{ f.title }}</h3>
+        <p>{{ f.blurb }}</p>
+        @if (f.link) {
+          <a [routerLink]="f.link.to">{{ f.link.label }}</a>
+        }
+      </article>
+    }
   </div>
 </section>
