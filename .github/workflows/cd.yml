@@ -1,0 +1,68 @@
+name: CD
+
+# Continuous delivery: every merge to main builds each deployable image once and pushes it to
+# GitHub Container Registry with three tags — a generated SemVer (0.1.<run>), the git SHA
+# (sha-<short>), and latest. Promotion between environments should happen by digest/tag, never
+# by rebuilding (see Backend/docs/deployment.md). Consumers pull via
+# Backend/docker-compose.ghcr.yml instead of building locally.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'Backend/**'
+      - 'UI/**'
+      - '.github/workflows/cd.yml'
+  workflow_dispatch:
+
+jobs:
+  build-push:
+    name: Build & push ${{ matrix.name }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write # push to GHCR
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Each backend Dockerfile's COPY paths treat Backend/ as the build context (their
+          # header's "repo root" means Backend/), matching the trivy job in backend-ci.yml.
+          - name: audit
+            context: Backend
+            dockerfile: Backend/Audit/Dockerfile
+          - name: auth
+            context: Backend
+            dockerfile: Backend/Auth/Dockerfile
+          - name: ui
+            context: UI
+            dockerfile: UI/Dockerfile
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Derive tags
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/ai-sandbox/${{ matrix.name }}
+          # 0.1.<run_number> is an honest CI-generated SemVer — monotonic per workflow run —
+          # until real release tags exist; sha-<short> pins a build to its exact commit.
+          tags: |
+            type=raw,value=latest
+            type=sha,prefix=sha-
+            type=raw,value=0.1.${{ github.run_number }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}

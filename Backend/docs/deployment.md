@@ -44,23 +44,24 @@ below are about promoting that beyond a laptop.
 
 ---
 
-## 3. Image registry — build once, promote by digest  [planned: GHCR CD]
+## 3. Image registry — build once, promote by digest  [built: GHCR CD]
 
-Today CI builds the boot jars and Docker images to **verify** them (and Trivy-scans them), but
-nothing publishes. The plan:
+CI builds the boot jars and Docker images to **verify** them (and Trivy-scans them), and CD
+publishes them:
 
-1. On merge to `main`, a `cd.yml` workflow builds each image once and tags it **SemVer +
-   git SHA** (e.g. `ghcr.io/<owner>/ai-sandbox/audit-service:1.4.0` and `:sha-<short>`), then
-   pushes to **GitHub Container Registry**.
-2. Deployments reference images **by digest** (`@sha256:…`), not `:latest`, so a rollout is
-   reproducible and a rollback is "point at the previous digest".
-3. The `docker-compose.yml` gets a `compose.pull.yml` override variant that `image:`-pulls the
-   published tags instead of `build:`-ing — reviewers run the exact CI-built artifacts.
+1. **[built]** On merge to `main`, the `CD` workflow (`.github/workflows/cd.yml`) builds each
+   image (audit, auth, ui) once and pushes it to **GitHub Container Registry** with three tags:
+   a generated SemVer (`0.1.<run>` — monotonic until real release tags exist), the git SHA
+   (`ghcr.io/<owner>/ai-sandbox/audit:sha-<short>`), and `latest`.
+2. **[env]** Deployments should reference images **by digest** (`@sha256:…`) or at least the
+   `sha-` tag, not `:latest`, so a rollout is reproducible and a rollback is "point at the
+   previous digest".
+3. **[built]** `docker-compose.ghcr.yml` is the pull-instead-of-build override — reviewers run
+   the exact CI-built artifacts:
+   `docker compose -f docker-compose.yml -f docker-compose.ghcr.yml up -d --no-build`
+   (pin a build with `AI_SANDBOX_TAG=sha-<short>`).
 4. Supply chain **[planned]**: attach an SBOM (syft) and a cosign signature to each image;
    verify the signature in the deploy step.
-
-Until CD lands, images are built and pushed manually (`docker build -f Audit/Dockerfile -t
-<registry>/…:<tag> .` from the repo root — the build context is the repo root for all three).
 
 ---
 
@@ -137,17 +138,19 @@ The SPA is served either as an nginx Deployment+Route, or as static assets on a 
  │        Frontend CI: lint+build+headless tests; commit-lint; pre-commit hygiene)
  │        required checks gate the merge (branch protection, PR-only on main)
  ▼
- main ─► CD [planned]: build+tag images (SemVer+SHA) ─► push GHCR ─► deploy DEV by digest
- │        └─ smoke check (health endpoints, one demo login) ─► promote to SIT/UAT
+ main ─► CD [publish built]: build+tag images (SemVer+SHA) ─► push GHCR ─► deploy DEV by digest
+ │        └─ smoke check (health endpoints, one demo login) ─► promote to SIT/UAT   [planned]
  ▼
- tag vX.Y.Z ─► deploy PROD by the tag's digest (manual approval gate)
+ tag vX.Y.Z ─► deploy PROD by the tag's digest (manual approval gate)               [planned]
 ```
 
 - **CI [built]** — every PR runs the full suite; four+ required contexts must pass, and `main`
   is PR-only (no direct pushes, admins included).
-- **CD [planned]** — merge to `main` publishes images and rolls DEV automatically; SIT/UAT/PROD
-  are digest promotions of the *same* image, gated by a manual approval for PROD. No rebuild
-  between environments — the artifact that passed CI is the artifact that ships.
+- **CD publish [built]** — merge to `main` publishes versioned images to GHCR (`cd.yml`); the
+  pull variant `docker-compose.ghcr.yml` runs them anywhere.
+- **CD deploy [planned]** — rolling DEV automatically and promoting SIT/UAT/PROD by digest
+  (manual approval for PROD) needs a live environment to deploy to. No rebuild between
+  environments — the artifact that passed CI is the artifact that ships.
 
 ---
 
@@ -195,7 +198,7 @@ real load run (the open observability item in the TODO).
 
 1. Provision Postgres, Kafka, Redis (managed/HA in prod).
 2. Create the namespace and all Secrets from the filled-in templates / secret manager.
-3. Publish images to GHCR (or build+push manually) and pin deployments to digests.
+3. Publish images to GHCR (any merge to `main` does via `cd.yml`) and pin deployments to digests.
 4. Apply `redis/` → `auth/` → `audit/` → `monitoring/`.
 5. Verify: `/actuator/health` green on both services; a demo login issues a JWT; an audit search
    returns rows; (if `ANTHROPIC_API_KEY` set) the assistant answers.

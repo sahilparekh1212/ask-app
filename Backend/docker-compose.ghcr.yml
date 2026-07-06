@@ -1,0 +1,24 @@
+# Pull-instead-of-build override: run the stack from the versioned images the CD workflow
+# (.github/workflows/cd.yml) pushes to GHCR on every merge to main, instead of building locally.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.ghcr.yml up -d --no-build
+#
+# Pin a specific build (the whole point of versioned images — promote by tag, don't rebuild):
+#
+#   AI_SANDBOX_TAG=sha-abc1234 docker compose -f docker-compose.yml -f docker-compose.ghcr.yml up -d --no-build
+#
+# --no-build matters: the base file's build: sections still apply, and without the flag compose
+# may rebuild locally, defeating the purpose. One-time setup: the GHCR packages must be public
+# (repo → Packages → package settings) or you must `docker login ghcr.io` first.
+services:
+  auth:
+    image: ghcr.io/sahilparekh1212/ai-sandbox/auth:${AI_SANDBOX_TAG:-latest}
+    pull_policy: always
+
+  audit:
+    image: ghcr.io/sahilparekh1212/ai-sandbox/audit:${AI_SANDBOX_TAG:-latest}
+    pull_policy: always
+
+  ui:
+    image: ghcr.io/sahilparekh1212/ai-sandbox/ui:${AI_SANDBOX_TAG:-latest}
+    pull_policy: always

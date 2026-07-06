@@ -83,9 +83,21 @@
       sets `SPRINGDOC_API_DOCS_VERSION=openapi_3_0` for the generated comparison specs only, so
       the running services keep serving 3.1. Whole pipeline validated locally end-to-end (boot →
       fetch → docker-run diff → "No differences") before it ever ran in CI.
-- [ ] **CD: versioned images to GHCR on merge to `main`.** Build once, tag SemVer + git SHA,
-      push to GitHub Container Registry; compose gets a variant that pulls instead of builds.
-      Closes the "CI but no CD" gap and makes release engineering a first-class talking point.
+- [x] **CD: versioned images to GHCR on merge to `main` — implemented.** New `CD` workflow
+      (`.github/workflows/cd.yml`): on every merge to `main` (path-filtered to system-affecting
+      paths, plus `workflow_dispatch`), a fail-fast-off matrix builds all three images (audit,
+      auth — `Backend/` context matching their Dockerfiles' COPY layout; ui — `UI/` context) and
+      pushes each to GHCR under `ghcr.io/<owner>/ai-sandbox/<name>` with three tags via
+      `docker/metadata-action`: a generated SemVer `0.1.<run_number>` (honest CI-versioning,
+      monotonic, until real release tags exist), `sha-<short>` (pins a build to its exact
+      commit — the promote-by-digest handle), and `latest`. Auth is `GITHUB_TOKEN` with
+      `packages: write` — no PAT to manage. The pull-instead-of-build variant is
+      `docker-compose.ghcr.yml`, an override on the main compose file
+      (`docker compose -f docker-compose.yml -f docker-compose.ghcr.yml up -d --no-build`,
+      `AI_SANDBOX_TAG=sha-<short>` to pin; `--no-build` documented in the header since the base
+      file's `build:` sections still apply). `docs/deployment.md` §3/§7 flipped from planned to
+      built for the publish half — deploy-to-a-live-env stays honestly `[planned]`, and one-time
+      GHCR package visibility (public vs `docker login`) is called out in the override's header.
 - [ ] **Mutation testing (PIT), report-only first.** The sophisticated answer to "is 90% line
       coverage meaningful?" — prove the tests fail when the code is mutated, not merely execute
       it. Start report-only (like the Trivy image scans did) and gate once the baseline is known.
