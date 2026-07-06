@@ -93,3 +93,17 @@ caps message length (2000), history length (20 turns × 4000 chars), and restric
 - If the assistant ever needs *tool use* (live queries decided by the model), the allowlist
   moves from "context builder" to "tool definitions" — the same one-class-answer property
   should be preserved.
+
+## Addendum — the flashcard generator reuses this data flow
+
+`POST /api/v1/assistant/flashcards` (a second LLM feature) generates a study deck about the
+app. It deliberately reuses the same seams rather than duplicating them: the same `LlmClient`
+proxy (server-side key, no auth headers forwarded), and the **same allowlist** — the context
+builder's role-scoped grounding block was extracted into a shared `groundingContext(admin)`
+method that both `buildSystemPrompt` (chat) and the flashcard prompt compose. So the RBAC
+disclosure boundary is identical: a USER-role deck can only draw on docs + aggregate stats, an
+ADMIN deck additionally on recent rows. Differences from chat: there's no free-text user input
+(the request is just a count 1..20), so `PromptScreener` isn't in this path — the injection
+surface is a fixed internal prompt, and the retrieved data is still tag-wrapped as
+non-instructional. The model is asked for strict JSON; an unreadable/empty reply is treated as
+a provider failure (503), and malformed cards are dropped so the UI never renders a blank.

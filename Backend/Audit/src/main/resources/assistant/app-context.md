@@ -38,8 +38,9 @@ from `Backend/`.
 - Login page (demo + Google), OAuth callback, profile page.
 - Audit dashboard: server-side paginated/sortable table, filter dropdowns, details
   contains-search, CSS bar-chart stats, demo-log generator button.
-- Assistant chat page (this feature): asks questions about the app, answered by a Claude
-  model through a server-side proxy in the Audit service.
+- Assistant chat page: asks questions about the app, answered by a Claude model through a
+  server-side proxy in the Audit service.
+- Flashcards page: generates a Q&A study deck about the app via the same proxy.
 - An HTTP interceptor attaches `Authorization: Bearer <token>` to our APIs only and silently
   refreshes once on 401.
 

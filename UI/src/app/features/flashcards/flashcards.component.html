@@ -1,0 +1,50 @@
+<section class="flashcards">
+  <h1>Flashcards</h1>
+  <p class="hint">
+    Generate a study deck that explains this application — architecture, design decisions, and
+    features — from a Claude model, grounded on the app's own docs and (for admins) its audit data.
+  </p>
+
+  <form class="controls" (ngSubmit)="generate()">
+    <label>
+      Cards
+      <input type="number" min="1" max="20" [formControl]="count" />
+    </label>
+    <button type="submit" class="primary" [disabled]="loading()">
+      {{ loading() ? 'Generating…' : hasDeck() ? 'Regenerate' : 'Generate deck' }}
+    </button>
+    @if (hasDeck()) {
+      <button type="button" (click)="shuffle()" [disabled]="loading()">Shuffle</button>
+    }
+  </form>
+
+  @if (error()) {
+    <p class="error" role="alert">{{ error() }}</p>
+  }
+
+  @if (hasDeck() && current(); as card) {
+    <div class="deck">
+      <button
+        type="button"
+        class="card"
+        [class.flipped]="flipped()"
+        (click)="flip()"
+        [attr.aria-pressed]="flipped()"
+      >
+        <span class="side question">{{ card.question }}</span>
+        <span class="side answer">{{ card.answer }}</span>
+        <span class="face-label">{{ flipped() ? 'Answer' : 'Question — click to flip' }}</span>
+      </button>
+
+      <div class="nav">
+        <button type="button" (click)="prev()" [disabled]="index() === 0">← Prev</button>
+        <span class="counter">{{ index() + 1 }} / {{ deck().length }}</span>
+        <button type="button" (click)="next()" [disabled]="index() === deck().length - 1">
+          Next →
+        </button>
+      </div>
+    </div>
+  } @else if (!loading()) {
+    <p class="empty">No deck yet — pick a count and generate one.</p>
+  }
+</section>

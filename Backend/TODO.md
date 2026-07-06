@@ -15,14 +15,18 @@
       limiting, observability, the LLM proxy) and *how* they're implemented, plus a feature tour
       with links into the app and the ADRs. This is the first thing a reviewer sees; it should
       read like the README's pitch, in-app.
-- [ ] **Flashcards feature — LLM-generated study deck about the app.** A page that asks the
-      Claude proxy (reuse the assistant infrastructure) to generate a deck of Q&A flashcards
-      explaining this application's architecture and features — an interview-prep study tool.
-      Backend: a new endpoint returning a structured deck (JSON, via a strict output schema),
-      grounded on the same app-context doc, behind the same guardrails and RBAC posture as the
-      chat assistant (server-side key, no auth headers forwarded, role-scoped context). UI: a
-      flip-card deck with next/prev/shuffle. Tests + 90% coverage gate; document the reuse in the
-      assistant ADR or a short follow-up note.
+- [x] **Flashcards feature — implemented.** `POST /api/v1/assistant/flashcards` generates a
+      Q&A study deck about the app via the same Claude proxy, reusing the assistant seams rather
+      than duplicating them: same `LlmClient` (server-side key, no auth headers forwarded) and
+      the **same allowlist** — the role-scoped grounding block was extracted into a shared
+      `AssistantContextBuilder.groundingContext(admin)` that both chat and the flashcard prompt
+      compose, so a USER deck draws on docs + aggregate stats and an ADMIN deck additionally on
+      recent rows (identical RBAC boundary). The model is asked for strict JSON; unreadable/empty
+      replies become 503 and malformed cards are dropped so the UI never renders a blank. UI: a
+      guarded `/flashcards` flip-card page with next/prev/shuffle and a 1..20 count. Tested at
+      each seam (parse/guardrail/role gating, MockMvc e2e with the provider mocked, component
+      nav/flip/shuffle); 90% coverage gate held. Reuse documented in the ADR-0009 addendum. Not
+      run against the live Claude API here (no key) — same smoke path as the chat assistant.
 
 ### Ops roadmap
 - [ ] **End-to-end deployment plan.** A concrete, written plan to deploy the whole app (SPA + Auth

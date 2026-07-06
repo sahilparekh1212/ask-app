@@ -5,6 +5,7 @@ import { AuthCallbackComponent } from './features/auth-callback/auth-callback.co
 import { ProfileComponent } from './features/profile/profile.component';
 import { AuditComponent } from './features/audit/audit.component';
 import { AssistantComponent } from './features/assistant/assistant.component';
+import { FlashcardsComponent } from './features/flashcards/flashcards.component';
 import { authGuard } from './core/auth/auth.guard';
 
 export const routes: Routes = [
@@ -17,6 +18,12 @@ export const routes: Routes = [
     path: 'assistant',
     component: AssistantComponent,
     title: 'Assistant',
+    canActivate: [authGuard],
+  },
+  {
+    path: 'flashcards',
+    component: FlashcardsComponent,
+    title: 'Flashcards',
     canActivate: [authGuard],
   },
   { path: '**', redirectTo: '' },

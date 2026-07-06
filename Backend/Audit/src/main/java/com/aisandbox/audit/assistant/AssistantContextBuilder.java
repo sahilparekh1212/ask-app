@@ -46,7 +46,7 @@ public class AssistantContextBuilder {
 		this.appDocs = loadAppDocs();
 	}
 
-	/** Builds the full system prompt for one request, scoped to the caller's role. */
+	/** Builds the full chat system prompt for one request, scoped to the caller's role. */
 	public String buildSystemPrompt(boolean admin) {
 		StringBuilder prompt = new StringBuilder();
 		prompt.append("""
@@ -61,17 +61,29 @@ public class AssistantContextBuilder {
 			- Answer only from the provided context; if it isn't in the context, say so.
 			- Keep answers short and concrete.
 			""");
-		prompt.append("\nThe current user's role is ").append(admin ? "ADMIN" : "USER").append(".\n");
+		prompt.append(groundingContext(admin));
+		return prompt.toString();
+	}
+
+	/**
+	 * The role-scoped grounding block shared by every LLM feature: the role note plus the
+	 * tag-wrapped reference data. This is the single data-access allowlist — USER gets docs +
+	 * aggregate stats, ADMIN additionally the recent raw rows. Reused by the flashcard
+	 * generator so both features are grounded (and role-gated) identically.
+	 */
+	public String groundingContext(boolean admin) {
+		StringBuilder ctx = new StringBuilder();
+		ctx.append("\nThe current user's role is ").append(admin ? "ADMIN" : "USER").append(".\n");
 		if (!admin) {
-			prompt.append("Only aggregate audit statistics are available for this role — individual "
+			ctx.append("Only aggregate audit statistics are available for this role — individual "
 				+ "audit rows and their details are not, and you must not guess at their contents.\n");
 		}
-		prompt.append("\n<app_docs>\n").append(appDocs).append("\n</app_docs>\n");
-		prompt.append("\n<aggregate_stats>\n").append(formatStats()).append("</aggregate_stats>\n");
+		ctx.append("\n<app_docs>\n").append(appDocs).append("\n</app_docs>\n");
+		ctx.append("\n<aggregate_stats>\n").append(formatStats()).append("</aggregate_stats>\n");
 		if (admin) {
-			prompt.append("\n<recent_audit_rows>\n").append(formatRecentRows()).append("</recent_audit_rows>\n");
+			ctx.append("\n<recent_audit_rows>\n").append(formatRecentRows()).append("</recent_audit_rows>\n");
 		}
-		return prompt.toString();
+		return ctx.toString();
 	}
 
 	private String formatStats() {
