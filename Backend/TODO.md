@@ -25,11 +25,15 @@
       assistant ADR or a short follow-up note.
 
 ### Ops roadmap
-- [ ] **End-to-end deployment plan.** A concrete, written plan to deploy the whole app (SPA + Auth
-      + Audit + Kafka + Postgres + Redis + observability) end to end: image registry (GHCR),
-      environment/config/secret management, database and broker provisioning, the OpenShift
-      manifests already in `openshift/`, the CI→CD promotion flow, rollout/rollback strategy, and
-      DNS/TLS/ingress. A design doc (`docs/deployment.md`), not necessarily executed here.
+- [x] **End-to-end deployment plan — written.** [`docs/deployment.md`](docs/deployment.md) walks
+      the whole app from commit to running system: what we deploy, the environment/profile matrix,
+      the build-once/promote-by-digest GHCR registry flow (marked planned vs built), config vs
+      secret management (incl. the server-side `ANTHROPIC_API_KEY`), stateful backing services and
+      their remaining no-SPOF work, the existing `openshift/` apply sequence, the CI→CD promotion
+      flow, rollout/rollback with Liquibase expand/contract discipline, DNS/TLS/forwarded-headers,
+      production observability, and a first-deploy checklist. Linked from the README's deploy
+      section. Grounded on the repo's real artifacts (Dockerfiles, compose, manifests, Actions);
+      each item tagged built vs planned so it's honest about what exists.
 
 ### CI/CD roadmap (highest interview value for a fullstack role, in order)
 - [ ] **Playwright E2E suite against the compose stack.** The biggest remaining gap: nothing

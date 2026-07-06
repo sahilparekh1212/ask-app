@@ -337,6 +337,10 @@ Config lives under `monitoring/` (`prometheus/`, `loki/`, `tempo/`, `grafana/pro
 
 ## Deploying to OpenShift
 
+> For the full commit-to-running-system picture — image registry, environments, CI→CD
+> promotion, rollout/rollback, DNS/TLS — see the [end-to-end deployment plan](docs/deployment.md).
+> This section is the concrete OpenShift apply sequence.
+
 Manifests live under `openshift/<service>/` (Deployment, Service, Route, ConfigMap,
 HPA; plus a Secret for Auth). Each service scales independently via its
 HorizontalPodAutoscaler.
