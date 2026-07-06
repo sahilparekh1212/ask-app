@@ -40,11 +40,22 @@
       each item tagged built vs planned so it's honest about what exists.
 
 ### CI/CD roadmap (highest interview value for a fullstack role, in order)
-- [ ] **Playwright E2E suite against the compose stack.** The biggest remaining gap: nothing
-      exercises browser → nginx → Auth → Kafka → Audit → Postgres as one system. CI job:
-      `docker compose up`, wait for health, then Playwright logs in via the demo form, filters
-      the audit table, adds demo logs, asserts rows/stats. This is the "how do you know the whole
-      thing works?" answer.
+- [x] **Playwright E2E suite against the compose stack — implemented.** New top-level `e2e/`
+      package (`@playwright/test`, Chromium, its own lockfile so the UI's `npm ci` stays lean) and
+      an `E2E` workflow (`.github/workflows/e2e.yml`): `docker compose up -d --build` on the real
+      top-level compose file (no CI-special profile), gate on both actuators + nginx serving the
+      SPA, then run the suite. Four flows, nothing mocked: demo-form login lands on `/profile`
+      (asserting the authed nav swap); **the demo login's `AuditEvent` is polled for through the
+      details-contains filter until it appears as a LOGIN row** — the browser → nginx → Auth →
+      Redpanda → Audit-consumer → Postgres path asserted as one system, the exact gap this item
+      named; "Add demo logs" grows the pager total by ≥N (≥ not =, because the suite's own LOGIN
+      events land concurrently); and an entity-type filter asserts every visible row matches *and*
+      that the stats total equals the pager total (the same-Specification search/aggregate
+      agreement, checked from the browser). Serial workers + one CI retry (traces kept on first
+      failure) since the system is genuinely async; compose logs dump on failure and the HTML
+      report uploads as an artifact. Deliberately not a required branch-protection check — its
+      path filters only cover system-affecting paths, the same never-triggers asymmetry the
+      Frontend CI item documented.
 - [ ] **API contract gate (openapi-diff).** Generate each service's OpenAPI spec in CI and fail
       the PR on breaking changes vs `main`'s spec. Demonstrates treating the UI↔API seam as a
       versioned contract (Pact is the heavier alternative; openapi-diff is 80% of the story for

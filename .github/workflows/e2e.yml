@@ -1,0 +1,81 @@
+name: E2E
+
+# Playwright against the full compose stack: browser -> nginx-served UI -> proxied Auth/Audit ->
+# Kafka (Redpanda) -> Postgres. This is the one place the whole system is exercised as one thing,
+# not module by module. Deliberately NOT a required branch-protection check (yet): it triggers
+# only on paths that can affect the running system, so making it required would hit the same
+# never-triggers-on-docs-PRs asymmetry the backend checks solved with broad path filters.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'Backend/**'
+      - 'UI/**'
+      - 'e2e/**'
+      - '.github/workflows/e2e.yml'
+  pull_request:
+    paths:
+      - 'Backend/**'
+      - 'UI/**'
+      - 'e2e/**'
+      - '.github/workflows/e2e.yml'
+
+jobs:
+  playwright:
+    name: Playwright E2E (compose stack)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # Build + start everything exactly the way a reviewer would: the top-level compose file,
+      # no CI-special profile. Detached so Playwright installs while Spring Boot boots.
+      - name: Build and start the compose stack
+        working-directory: Backend
+        run: docker compose up -d --build
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: e2e/package-lock.json
+
+      - name: Install Playwright
+        working-directory: e2e
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+
+      # The services have no compose healthchecks (they're the thing under test), so gate on
+      # their real readiness signals: both actuators UP and nginx serving the SPA.
+      - name: Wait for the stack to become healthy
+        run: |
+          wait_for() {
+            for i in $(seq 1 90); do
+              curl -sf "$1" >/dev/null && { echo "ready: $1"; return 0; }
+              sleep 2
+            done
+            echo "never became ready: $1"
+            return 1
+          }
+          wait_for http://localhost:8085/actuator/health
+          wait_for http://localhost:8083/actuator/health
+          wait_for http://localhost:4200/
+
+      - name: Run Playwright tests
+        working-directory: e2e
+        run: npx playwright test
+
+      - name: Dump compose logs (on failure)
+        if: failure()
+        working-directory: Backend
+        run: docker compose logs --no-color --tail 300
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report
+          path: |
+            e2e/playwright-report
+            e2e/test-results
+          if-no-files-found: ignore
