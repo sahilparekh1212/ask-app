@@ -59,7 +59,27 @@ provider data-flow is documented in
 
 # Run the tests for one service
 ./gradlew :Audit:test
+
+# Mutation testing (PIT, report-only — see TODO's CI/CD section for the measured baseline).
+# Report lands in <module>/build/reports/pitest/index.html; CI runs this in mutation.yml.
+./gradlew :Audit:pitest :Auth:pitest :common:pitest
 ```
+
+### End-to-end tests (Playwright)
+
+The `e2e/` suite (repo root) drives the real compose stack through a browser — demo login,
+the Kafka-published login event appearing in the audit table, demo-log generation, filters
+vs stats agreement. Start the stack first, then:
+
+```bash
+cd ../e2e          # from Backend/; it's <repo-root>/e2e
+npm ci
+npx playwright install chromium
+npx playwright test
+```
+
+CI runs the same suite against a freshly built stack on every system-affecting PR
+(`.github/workflows/e2e.yml`).
 
 ---
 
@@ -68,6 +88,16 @@ provider data-flow is documented in
 **One command, the whole system:** `docker compose up --build` (root `docker-compose.yml`) —
 Postgres, Kafka (Redpanda), both services, and Prometheus/Loki/Grafana. See the file's header
 comment for URLs and the zero-setup demo login. First build takes a few minutes.
+
+**Skip the build entirely** with the GHCR pull variant — runs the exact CI-built images CD
+publishes on every merge to `main` (public packages, no login needed):
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.ghcr.yml up -d --no-build
+
+# Pin a specific build instead of latest (promote-by-digest — see docs/deployment.md §3)
+AI_SANDBOX_TAG=sha-abc1234 docker compose -f docker-compose.yml -f docker-compose.ghcr.yml up -d --no-build
+```
 
 **Or run a service directly with Gradle**, standalone. The default profile is **LOCAL**, which
 uses an in-memory H2 database — no external database required to get started.
@@ -443,6 +473,30 @@ than landing after the fact.
 Dependabot watches three ecosystems — **gradle**, **github-actions**, and **docker** (base images) —
 groups routine bumps into a couple of PRs a week, and opens security-update PRs immediately for
 vulnerable dependencies.
+
+### Image signing & SBOM (cosign + syft)
+
+Beyond scanning, every image CD pushes to GHCR is **signed by digest with cosign** (keyless —
+the signing identity is the `cd.yml` workflow's OIDC token, recorded in the public Rekor
+transparency log; no key to store or rotate) and carries a **syft SPDX SBOM** as a signed
+attestation. Verify an image before running or deploying it:
+
+```bash
+# Signature: proves the image was built by THIS repo's CD workflow on main
+cosign verify \
+  --certificate-identity-regexp 'https://github.com/sahilparekh1212/AI-Sandbox/\.github/workflows/cd\.yml@.*' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  ghcr.io/sahilparekh1212/ai-sandbox/audit:latest
+
+# SBOM attestation: the dependency inventory attached to the image
+cosign verify-attestation --type spdxjson \
+  --certificate-identity-regexp 'https://github.com/sahilparekh1212/AI-Sandbox/\.github/workflows/cd\.yml@.*' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  ghcr.io/sahilparekh1212/ai-sandbox/audit:latest
+```
+
+The identity pin is the point of keyless signing: a signature only counts if it was produced by
+this repository's `cd.yml` running on GitHub's runners — not merely "signed by someone".
 
 ### Why this stack (and not a commercial suite like Snyk)
 

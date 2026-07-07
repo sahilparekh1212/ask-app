@@ -64,9 +64,10 @@ tradeoffs (and the ones this diagram doesn't show) are in
 | Messaging         | Apache Kafka (Redpanda locally) — event-driven audit trail           |
 | Database          | PostgreSQL (DEV/SIT/UAT/PROD), H2 (LOCAL/tests), Liquibase migrations |
 | Observability     | Prometheus (metrics), Loki (logs), Grafana (dashboards)              |
-| CI/CD             | GitHub Actions — build/test/coverage, k6 load test, CodeQL, Trivy (deps + images), Dependabot, secret scanning, conventional commits |
+| CI                | GitHub Actions — build/test/coverage, k6 load test, Playwright E2E against the full compose stack, API contract gate (openapi-diff), PIT mutation testing, CodeQL, Trivy (deps + images), Dependabot, secret scanning, conventional commits |
+| CD / supply chain | Versioned images to GHCR on every merge (SemVer + git SHA + latest), cosign keyless signing, syft SBOM attestations |
 | Deployment        | Docker (multi-stage builds), OpenShift manifests (HPA, PVCs, routes)  |
-| Frontend          | Angular (planned — see [`Backend/TODO.md`](Backend/TODO.md))          |
+| Frontend          | Angular 19 SPA (`UI/`) — nginx-served, same-origin proxies to the APIs |
 
 ---
 
@@ -77,8 +78,9 @@ cd Backend
 docker compose up --build
 ```
 
-Brings up Postgres, Kafka, both services, and the full observability stack. Try it immediately
-with the zero-setup demo login — no Google OAuth credentials needed:
+Brings up the Angular UI (http://localhost:4200, demo login `demo`/`demo`), Postgres, Kafka,
+both services, and the full observability stack. Or try the API immediately with the zero-setup
+demo login — no Google OAuth credentials needed:
 
 ```bash
 curl -X POST http://localhost:8085/auth/login \
@@ -86,8 +88,17 @@ curl -X POST http://localhost:8085/auth/login \
   -d '{"username":"demo","password":"demo"}'
 ```
 
+**No build at all** — run the exact CI-built images that CD publishes to GHCR on every merge
+(public, signed, SBOM-attached):
+
+```bash
+cd Backend
+docker compose -f docker-compose.yml -f docker-compose.ghcr.yml up -d --no-build
+```
+
 Full instructions (including running services individually with Gradle, connecting to the
-database, and deploying to OpenShift) are in [`Backend/README.md`](Backend/README.md).
+database, verifying image signatures, and deploying to OpenShift) are in
+[`Backend/README.md`](Backend/README.md).
 
 ---
 
