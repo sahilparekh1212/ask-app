@@ -339,11 +339,30 @@ this traffic volume; lower it for a real production workload).
 
 **Traces span the async Kafka boundary, not just one request.** `spring.kafka.template/
 listener.observation-enabled=true` wraps `KafkaTemplate.send()` and `@KafkaListener` in a
-Micrometer Observation, so a trace started by e.g. a `POST /auth/login` request continues through
-the `AuditEvent` Kafka message's headers and into Audit's consumer — one trace, two services, an
-async hop in between. Every log line also carries `traceId=`/`spanId=` (from Micrometer Tracing's
-MDC integration), so a trace found in Tempo's Explore view jumps straight to its matching log
-lines in Loki (searched by trace ID) via the pre-provisioned datasource correlation.
+Micrometer Observation, and a `ContextPropagatingTaskDecorator` carries the active trace across
+the `@Async` hop into the fire-and-forget publisher — so a trace started by a `POST /auth/login`
+request continues through the `AuditEvent` Kafka message's headers and into Audit's consumer:
+one trace, two services, an async executor hop *and* a broker in between. Every log line also
+carries `traceId=`/`spanId=` (from Micrometer Tracing's MDC integration), so a trace found in
+Tempo's Explore view jumps straight to its matching log lines in Loki (searched by trace ID) via
+the pre-provisioned datasource correlation.
+
+### Proven against real traffic
+
+![Grafana AI-Sandbox Overview dashboard during a k6 load run](docs/images/grafana-overview-load.png)
+
+Captured from the full `docker compose` stack — Auth scaled to **2 replicas** (see
+`docker-compose.scale.yml`; Prometheus discovers every replica via Docker DNS
+`dns_sd_configs`, not a host port) — while the k6 scripts ran against the JWT-secured DEV
+profile (`k6 run -e TOKEN=<demo-login JWT> load-test/*.js`). What it shows: request-rate
+bursts from the k6 runs, per-endpoint p95/p99 latency from the histogram buckets, live Loki
+logs, and an empty 5xx panel — the rate limiter sheds contention as 429s, never 5xx. Verified
+in the same session through Tempo's API: one trace for a single `POST /auth/login` containing
+auth's HTTP server span, its `audit.events send` producer span, and audit's
+`audit.events receive` consumer span — the login → Kafka → audit-persist path really is one
+trace. Getting this screenshot honest surfaced (and fixed) two silent breaks: loki4j 2.x
+ignoring its 1.x-style label config (every line shipped as `app=default`) and the `@Async`
+publish dropping the trace context, which had split that one trace in two.
 
 ### Run the stack locally
 

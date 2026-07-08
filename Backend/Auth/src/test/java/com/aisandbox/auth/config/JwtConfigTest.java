@@ -51,6 +51,30 @@ class JwtConfigTest {
 	}
 
 	@Test
+	void jwkSet_kidIsDeterministicForTheSameKeyAcrossReplicas() throws Exception {
+		// Two "replicas" loading the same AUTH_RSA_PRIVATE_KEY must advertise the same kid,
+		// or a resource server's kid-based JWKS lookup rejects tokens minted by the other
+		// replica (the bug the 2-replica compose proof surfaced).
+		KeyPairGenerator generator = KeyPairGenerator.getInstance("RSA");
+		generator.initialize(2048);
+		String pem = pkcs8Pem(generator.generateKeyPair());
+
+		String kidReplicaA = config.jwkSet(config.rsaKeyPair(pem)).getKeys().get(0).getKeyID();
+		String kidReplicaB = config.jwkSet(config.rsaKeyPair(pem)).getKeys().get(0).getKeyID();
+
+		assertThat(kidReplicaA).isNotBlank().isEqualTo(kidReplicaB);
+	}
+
+	@Test
+	void jwkSet_kidDiffersForDifferentKeys() throws Exception {
+		// Sanity check on the thumbprint derivation: distinct keys must not collide.
+		String kidA = config.jwkSet(config.rsaKeyPair("")).getKeys().get(0).getKeyID();
+		String kidB = config.jwkSet(config.rsaKeyPair("")).getKeys().get(0).getKeyID();
+
+		assertThat(kidA).isNotEqualTo(kidB);
+	}
+
+	@Test
 	void buildsJwkSetSourceEncoderAndDecoderBeans() throws Exception {
 		KeyPair keyPair = config.rsaKeyPair("");
 

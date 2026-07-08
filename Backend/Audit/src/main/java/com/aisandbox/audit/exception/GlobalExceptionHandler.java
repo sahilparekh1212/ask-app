@@ -4,6 +4,7 @@ import com.aisandbox.common.ratelimit.ActiveRequest;
 import com.aisandbox.common.ratelimit.DiscardContext;
 import com.aisandbox.common.ratelimit.RateLimitProperties;
 import com.aisandbox.common.ratelimit.RequestDiscardedException;
+import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
@@ -53,8 +54,20 @@ public class GlobalExceptionHandler {
 	 * configured cool-down (HTTP 429 + Retry-After).
 	 */
 	@ExceptionHandler(RequestDiscardedException.class)
-	public ResponseEntity<Map<String, Object>> handleDiscarded(RequestDiscardedException ex) {
+	public ResponseEntity<Map<String, Object>> handleDiscarded(
+			RequestDiscardedException ex, HttpServletResponse response) {
 		logException(ex);
+		// The discard interrupt can land after the superseded request's 200 response has already
+		// been committed (body flushed to the client). Writing the 429 body then would APPEND a
+		// second JSON document to bytes already on the wire — the client has a complete response,
+		// so write nothing (null = handled, no body). Surfaced by a k6 run against the compose
+		// stack: ~70% of same-key GETs came back as 200s with `{...stats}{...429 body}` payloads.
+		if (response.isCommitted()) {
+			return null;
+		}
+		// Not committed: drop any partial body the aborted handler buffered so the 429 JSON
+		// replaces it instead of trailing it.
+		response.resetBuffer();
 		int retryAfter = rateLimitProperties.getRetryAfterSeconds();
 		return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
 			.header(HttpHeaders.RETRY_AFTER, String.valueOf(retryAfter))
@@ -100,13 +113,13 @@ public class GlobalExceptionHandler {
 	}
 
 	@ExceptionHandler(Exception.class)
-	public ResponseEntity<Map<String, Object>> handleAll(Exception ex) {
+	public ResponseEntity<Map<String, Object>> handleAll(Exception ex, HttpServletResponse response) {
 		// A superseded (rate-limited) request can fail mid-work because the "newest wins" limiter
 		// interrupted its worker thread (e.g. during the DB write). Surface that as a 429 like any
 		// other discard, not a misleading 500.
 		ActiveRequest current = DiscardContext.current();
 		if (current != null && current.isDiscarded()) {
-			return handleDiscarded(new RequestDiscardedException(current.getKey()));
+			return handleDiscarded(new RequestDiscardedException(current.getKey()), response);
 		}
 		logException(ex);
 		return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorBody(500, "Internal Server Error", ex));

@@ -22,6 +22,9 @@ repos:
       - id: detect-private-key
       - id: check-yaml
         args: [--allow-multiple-documents] # k8s/OpenShift manifests are multi-doc
+        # docker-compose.scale.yml uses compose's !reset YAML tag, which PyYAML can't
+        # construct; `docker compose config` validates that file instead.
+        exclude: '^Backend/docker-compose\.scale\.yml$'
       - id: check-json
         # Angular's tsconfig*.json and .vscode/*.json are JSONC (comments + trailing commas),
         # which this strict JSON parser rejects — exclude them, not real JSON.

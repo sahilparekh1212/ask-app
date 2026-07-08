@@ -7,11 +7,18 @@
 // 429 share is reported as a metric (informational, not gated, to avoid timing flakiness).
 //
 //   k6 run Backend/load-test/rate-limit.js
+//
+// To run against a JWT-secured profile (e.g. the DEV compose stack) instead, pass a bearer
+// token: k6 run -e TOKEN=$(demo-login access token) rate-limit.js — every VU then shares the
+// token's identity, which is exactly the same-key contention this test wants.
 import http from 'k6/http';
 import { check } from 'k6';
 import { Rate } from 'k6/metrics';
 
 const BASE = __ENV.BASE_URL || 'http://localhost:8083';
+const HEADERS = __ENV.TOKEN
+  ? { 'Content-Type': 'application/json', Authorization: `Bearer ${__ENV.TOKEN}` }
+  : { 'Content-Type': 'application/json' };
 const rateLimited = new Rate('rate_limited_429');
 const serverErrors = new Rate('server_errors_5xx');
 
@@ -34,9 +41,7 @@ export const options = {
 
 export default function () {
   const body = JSON.stringify({ entityType: 'User', action: 'CREATE', details: 'rl' });
-  const res = http.post(`${BASE}/api/v1/audit-logs`, body, {
-    headers: { 'Content-Type': 'application/json' },
-  });
+  const res = http.post(`${BASE}/api/v1/audit-logs`, body, { headers: HEADERS });
 
   rateLimited.add(res.status === 429);
   serverErrors.add(res.status >= 500);

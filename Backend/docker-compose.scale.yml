@@ -1,0 +1,24 @@
+# Override to run Auth with more than one replica — the local proof for ADR-0007's
+# statelessness claim (Redis-backed refresh tokens surviving a cross-replica rotation chain):
+#
+#   export AUTH_RSA_PRIVATE_KEY="$(openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048)"
+#   docker compose -f docker-compose.yml -f docker-compose.scale.yml up -d --scale auth=2
+#   docker compose restart ui   # nginx resolves the `auth` DNS name at startup; re-resolve
+#                               # so /auth-api round-robins across both replicas
+#
+# AUTH_RSA_PRIVATE_KEY (PKCS8 PEM) is REQUIRED here and must come from the host env — never
+# commit one. Without it each replica generates its own ephemeral signing key and tokens
+# minted by one replica fail verification against the other (see ADR-0001 / JwtConfig).
+#
+# What `!reset` unpins from the base file, and why it blocks scaling otherwise:
+#   - container_name: two containers can't share one name; compose numbers them itself.
+#   - ports: two replicas can't both bind host :8085. In-network clients are unaffected
+#     (the UI's nginx and Audit's JWKS fetch address `auth:8085` via Docker DNS, which
+#     round-robins across replicas); only direct host access to :8085 goes away — use
+#     http://localhost:4200/auth-api/ instead.
+services:
+  auth:
+    container_name: !reset null
+    ports: !reset []
+    environment:
+      AUTH_RSA_PRIVATE_KEY: ${AUTH_RSA_PRIVATE_KEY:?export a PKCS8 PEM key - see header comment}

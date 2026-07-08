@@ -1,5 +1,6 @@
 package com.aisandbox.auth.config;
 
+import com.nimbusds.jose.JOSEException;
 import com.nimbusds.jose.jwk.JWKSet;
 import com.nimbusds.jose.jwk.RSAKey;
 import com.nimbusds.jose.jwk.source.ImmutableJWKSet;
@@ -23,7 +24,6 @@ import java.security.interfaces.RSAPublicKey;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.RSAPublicKeySpec;
 import java.util.Base64;
-import java.util.UUID;
 
 @Configuration
 public class JwtConfig {
@@ -56,11 +56,17 @@ public class JwtConfig {
 		return new KeyPair(publicKey, privateKey);
 	}
 
+	/*
+	 * The kid must be derived from the key material (RFC 7638 thumbprint), not random:
+	 * resource servers (Audit) match tokens to JWKS entries by kid, so horizontally-scaled
+	 * replicas sharing AUTH_RSA_PRIVATE_KEY must all advertise the same kid — a random one
+	 * makes tokens minted by one replica fail JWKS lookup against another's endpoint.
+	 */
 	@Bean
-	public JWKSet jwkSet(KeyPair rsaKeyPair) {
+	public JWKSet jwkSet(KeyPair rsaKeyPair) throws JOSEException {
 		RSAKey rsaKey = new RSAKey.Builder((RSAPublicKey) rsaKeyPair.getPublic())
 			.privateKey(rsaKeyPair.getPrivate())
-			.keyID(UUID.randomUUID().toString())
+			.keyIDFromThumbprint()
 			.build();
 		return new JWKSet(rsaKey);
 	}

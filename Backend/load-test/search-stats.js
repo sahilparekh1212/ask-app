@@ -6,11 +6,17 @@
 //
 //   k6 run Backend/load-test/search-stats.js           # defaults to http://localhost:8083
 //   k6 run -e BASE_URL=http://host:8083 search-stats.js
+//
+// To run against a JWT-secured profile (e.g. the DEV compose stack) instead, pass a bearer
+// token: k6 run -e TOKEN=$(demo-login access token) search-stats.js
 import http from 'k6/http';
 import { check, sleep } from 'k6';
 import { Rate } from 'k6/metrics';
 
 const BASE = __ENV.BASE_URL || 'http://localhost:8083';
+const HEADERS = __ENV.TOKEN
+  ? { 'Content-Type': 'application/json', Authorization: `Bearer ${__ENV.TOKEN}` }
+  : { 'Content-Type': 'application/json' };
 const checkFails = new Rate('check_failures');
 
 const ENTITY = ['User', 'Order', 'Invoice', 'Payment'];
@@ -44,7 +50,7 @@ export function setup() {
       action: ACTION[i % ACTION.length],
       details: `seed-${i}`,
     });
-    http.post(`${BASE}/api/v1/audit-logs`, body, { headers: { 'Content-Type': 'application/json' } });
+    http.post(`${BASE}/api/v1/audit-logs`, body, { headers: HEADERS });
   }
 }
 
@@ -53,6 +59,7 @@ export default function () {
 
   const search = http.get(
     `${BASE}/api/v1/audit-logs/search?entityType=${entityType}&page=0&size=20&sort=createdAt,desc`,
+    { headers: HEADERS },
   );
   const searchOk = check(search, {
     'search 200': (r) => r.status === 200,
@@ -60,7 +67,9 @@ export default function () {
   });
   checkFails.add(!searchOk);
 
-  const stats = http.get(`${BASE}/api/v1/audit-logs/stats?entityType=${entityType}`);
+  const stats = http.get(`${BASE}/api/v1/audit-logs/stats?entityType=${entityType}`, {
+    headers: HEADERS,
+  });
   const statsOk = check(stats, {
     'stats 200': (r) => r.status === 200,
     'stats has total': (r) => r.json('total') !== undefined,

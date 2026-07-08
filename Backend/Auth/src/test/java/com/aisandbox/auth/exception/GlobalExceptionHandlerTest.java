@@ -14,6 +14,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.validation.BeanPropertyBindingResult;
 import org.springframework.validation.BindingResult;
 import org.springframework.validation.FieldError;
@@ -54,13 +55,40 @@ class GlobalExceptionHandlerTest {
 	void handleDiscarded_returns429WithRetryAfterHeader() {
 		properties.setRetryAfterSeconds(42);
 
-		ResponseEntity<Map<String, Object>> response = handler.handleDiscarded(new RequestDiscardedException("k1"));
+		ResponseEntity<Map<String, Object>> response =
+			handler.handleDiscarded(new RequestDiscardedException("k1"), new MockHttpServletResponse());
 
 		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS);
 		assertThat(response.getHeaders().getFirst(HttpHeaders.RETRY_AFTER)).isEqualTo("42");
 		assertThat(response.getBody())
 			.containsEntry("status", 429)
 			.containsEntry("error", "Too Many Requests");
+	}
+
+	@Test
+	void handleDiscarded_writesNothingOntoAnAlreadyCommittedResponse() {
+		// The discard interrupt can land after the superseded request's 200 was flushed to the
+		// client; writing the 429 body then would append a second JSON document to the bytes
+		// already on the wire. Same guard as Audit's handler.
+		MockHttpServletResponse committed = new MockHttpServletResponse();
+		committed.setCommitted(true);
+
+		ResponseEntity<Map<String, Object>> response =
+			handler.handleDiscarded(new RequestDiscardedException("k1"), committed);
+
+		assertThat(response).isNull();
+	}
+
+	@Test
+	void handleDiscarded_dropsABufferedPartialBodySoThe429ReplacesIt() throws Exception {
+		MockHttpServletResponse uncommitted = new MockHttpServletResponse();
+		uncommitted.getWriter().print("{\"partial\":");
+
+		ResponseEntity<Map<String, Object>> response =
+			handler.handleDiscarded(new RequestDiscardedException("k1"), uncommitted);
+
+		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS);
+		assertThat(uncommitted.getContentAsString()).isEmpty();
 	}
 
 	@Test
@@ -97,7 +125,8 @@ class GlobalExceptionHandlerTest {
 
 	@Test
 	void handleAll_returns500AndBlankMessageAndRequestIdWhenAbsent() {
-		ResponseEntity<Map<String, Object>> response = handler.handleAll(new RuntimeException());
+		ResponseEntity<Map<String, Object>> response =
+			handler.handleAll(new RuntimeException(), new MockHttpServletResponse());
 
 		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
 		assertThat(response.getBody())
@@ -122,7 +151,8 @@ class GlobalExceptionHandlerTest {
 			registry.register("anonymous|POST|/auth/refresh"); // supersedes and discards the request above
 			Thread.interrupted(); // clear the interrupt discard() raised; not under test
 
-			ResponseEntity<Map<String, Object>> response = handler.handleAll(new RuntimeException("interrupted mid-save"));
+			ResponseEntity<Map<String, Object>> response =
+				handler.handleAll(new RuntimeException("interrupted mid-save"), new MockHttpServletResponse());
 
 			assertThat(response.getStatusCode()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS);
 			assertThat(response.getBody()).containsEntry("status", 429);
