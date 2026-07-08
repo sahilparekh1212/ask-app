@@ -11,7 +11,7 @@ dependencies {
 	// classloading, /v3/api-docs 500s with NoSuchMethodError on Schema.$dynamicRef(). The
 	// jakarta jar supplies every class the SDK's schema module reflects on, so exclude the
 	// duplicate rather than pinning versions.
-	implementation('com.anthropic:anthropic-java:2.34.0') {
+	implementation('com.anthropic:anthropic-java:2.48.0') {
 		exclude group: 'io.swagger.core.v3', module: 'swagger-annotations'
 	}
 	runtimeOnly 'com.h2database:h2'
