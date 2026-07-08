@@ -1,0 +1,23 @@
+# Scrape config for the TOP-LEVEL docker-compose stack, where the services run as compose
+# containers. Targets are discovered via Docker's DNS (dns_sd A-record lookup): the service
+# name resolves to one IP per replica, so `docker compose up --scale auth=2` gets BOTH
+# replicas scraped — a static host-port target can't see past the single published port
+# (and broke outright when docker-compose.scale.yml unpublishes auth's port). Per-replica
+# series stay distinguishable via the podName metrics tag both services already set.
+#
+# The sibling prometheus.yml stays host.docker.internal-based for the narrower
+# monitoring/docker-compose.yml + `gradlew bootRun` local loop.
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: aisandbox-services
+    metrics_path: /actuator/prometheus
+    dns_sd_configs:
+      - names: [auth]
+        type: A
+        port: 8085
+      - names: [audit]
+        type: A
+        port: 8083
