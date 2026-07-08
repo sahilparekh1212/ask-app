@@ -2,6 +2,23 @@
 
 ## Open roadmap (prioritized)
 
+### Feature: RAG MCP server with a vector DB (NEXT UP)
+- [ ] **RAG MCP server backed by a vector database.** Build a Model Context Protocol server
+      that exposes retrieval over this repo's own knowledge (READMEs, ADRs, `docs/`, the
+      assistant's `app-context.md`) so an MCP-capable client — and the existing chat
+      assistant — can ground answers in retrieved chunks instead of the current static
+      context block. Key decisions to make explicitly (each is ADR material): (1) vector
+      store — pgvector on the Postgres already in the stack vs a dedicated engine
+      (Qdrant/Chroma); pgvector is the natural first call since the compose stack and
+      Liquibase discipline already exist. (2) Embeddings — provider API vs local model;
+      the server-side-key posture from the LLM-chat feature applies unchanged. (3)
+      Chunking/indexing pipeline — what re-indexes when docs change, and how that runs in
+      CI vs at startup (the seeder pattern is precedent). (4) Integration seam — the
+      assistant's `AssistantContextBuilder` is the single allowlist today; retrieval must
+      compose with (not bypass) its RBAC boundary, same as the flashcards feature reused
+      it. (5) Transport/auth for the MCP server itself — stdio vs HTTP, and how a JWT
+      maps onto it if exposed beyond localhost.
+
 ### Product/UI roadmap (portfolio presentation)
 - [x] **GitHub-like dark theme UI restyle — implemented (PR #49).** One design-token layer in
       `styles.scss` (GitHub Primer dark palette as CSS custom properties: canvas `#0d1117`,
