@@ -5,7 +5,9 @@
   top: 0;
   z-index: 100;
   display: flex;
-  align-items: center;
+  // Tabs stretch to the header's fixed height so every tab's box derives from the
+  // same 56px — not from text metrics or padding — and can't sit staggered.
+  align-items: stretch;
   gap: 2rem;
   padding: 0 1.5rem;
   height: 56px;
@@ -14,6 +16,7 @@
   color: var(--fg);
 
   .brand {
+    align-self: center;
     font-weight: 600;
     font-size: 1.05rem;
     color: var(--fg);
@@ -24,14 +27,17 @@
     }
   }
 
-  nav {
+  .tabs {
     display: flex;
+    align-items: stretch;
     gap: 1.25rem;
 
     a {
+      display: inline-flex;
+      align-items: center;
       color: var(--fg-muted);
       text-decoration: none;
-      padding: 0.35rem 0;
+      // Full-height tab: the active underline pins to the header's bottom edge.
       border-bottom: 2px solid transparent;
 
       &:hover {
@@ -43,6 +49,56 @@
         color: var(--fg);
         border-bottom-color: var(--accent-emphasis);
       }
+    }
+  }
+
+  // Far-right slot: circular Profile avatar when signed in, Sign in otherwise.
+  .avatar,
+  .sign-in {
+    margin-left: auto;
+    align-self: center;
+  }
+
+  .avatar {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: var(--canvas-subtle);
+    border: 1px solid var(--border);
+    color: var(--fg-muted);
+
+    svg {
+      width: 18px;
+      height: 18px;
+      fill: currentColor;
+    }
+
+    &:hover {
+      color: var(--fg);
+      border-color: var(--fg-muted);
+      text-decoration: none;
+    }
+
+    &.active {
+      color: var(--fg);
+      border-color: var(--accent-emphasis);
+    }
+  }
+
+  .sign-in {
+    color: var(--fg-muted);
+    text-decoration: none;
+
+    &:hover {
+      color: var(--fg);
+      text-decoration: none;
+    }
+
+    &.active {
+      color: var(--fg);
     }
   }
 }

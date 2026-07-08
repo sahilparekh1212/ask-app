@@ -29,14 +29,22 @@
       run against the live Claude API here (no key) — same smoke path as the chat assistant.
 
 #### Frontend polish — header nav
-- [ ] **Nav tabs render with inconsistent alignment on load.** The five header tabs (Home, Audit,
-      Assistant, Flashcards, and Profile/Sign in) don't sit in a consistent position when the page
-      first loads — they appear staggered / shift. Give them uniform, stable placement so every
-      tab lines up the same way on every route and load.
-- [ ] **Reorder + restyle the header nav.** Move **Home** to the right of **Flashcards** (so the
-      primary feature tabs lead and Home follows), and move **Profile** to the far top-right as the
-      usual circular avatar icon (not a text link) — clicking it goes to the profile page (and,
-      when signed out, shows the Sign in affordance there instead).
+- [x] **Nav tabs render with inconsistent alignment on load — fixed via deterministic geometry.**
+      The tabs' boxes were derived from text metrics (baseline-aligned links with `padding` +
+      `align-items: center`), so their placement depended on font/zoom rounding per element.
+      Rebuilt so every tab's box derives from the header's fixed 56px alone: `align-items:
+      stretch` on the header and tab row, each tab a full-height `inline-flex` item with its
+      content centered, and the active underline pinned to the header's bottom edge
+      (GitHub-style) instead of floating under the text mid-header. Verified in the running app:
+      all four tabs measure exactly top 0 / height 56 on every route.
+- [x] **Reorder + restyle the header nav — implemented.** Tabs now read Audit, Assistant,
+      Flashcards, Home (feature tabs lead, Home follows), and the Profile link is a circular
+      avatar icon (person SVG, 32px, `aria-label="Profile"` so the Playwright e2e's
+      `getByRole('link', { name: 'Profile' })` still matches) pushed to the far top-right with
+      `margin-left: auto`; signed out, that same far-right slot shows the Sign in link instead.
+      New unit tests assert the tab order and the avatar/Sign-in swap (mocking `AuthService`'s
+      `isAuthenticated` signal); format/lint/47 unit tests/prod build all green, and both states
+      verified visually in the dev server.
 
 ### Ops roadmap
 - [x] **End-to-end deployment plan — written.** [`docs/deployment.md`](docs/deployment.md) walks
