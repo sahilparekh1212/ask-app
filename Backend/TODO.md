@@ -473,11 +473,19 @@ detect-private-key in `lint.yml`). Now added:
       with a Redis Deployment/Service added and a `redis` service wired into `docker-compose.yml`
       (`docker compose up --scale auth=2` now keeps refresh working). Verified: `./gradlew
       :Auth:check` green (new stores unit-tested incl. the atomic-consume path; 90% coverage gate
-      held). Sub-parts still open, all **infra-blocked** (need a live cluster/Docker, none here):
-      (2) **no SPOF** — Redis is single-replica (Sentinel/managed HA next), Kafka is a single-broker
-      Redpanda dev container (multi-broker next), Postgres is single (read-replica/HA next);
-      (3) **load & scale proof** — the k6 scripts pass single-instance, but running them against a
-      2-replica stack to prove refresh survives a pod bounce needs the stack actually up.
+      held). Sub-part (3) **load & scale proof — DONE**: `docker-compose.scale.yml` runs Auth at
+      2 replicas behind the UI's round-robin nginx (shared `AUTH_RSA_PRIVATE_KEY` from the host
+      env, host port unpublished); a 20-step refresh-rotation chain through the proxy landed
+      11/10 across the two replicas with every hop succeeding and a replayed consumed token
+      rejected 401 — Redis-backed single-use across replicas, demonstrated not assumed. Doing it
+      surfaced a real multi-replica bug: the JWKS `kid` was `UUID.randomUUID()` per process, so
+      replicas sharing a key advertised different kids and Audit's kid-matched JWKS lookup
+      rejected tokens minted by whichever replica it hadn't fetched from — fixed by deriving the
+      kid from the RFC 7638 key thumbprint (same key → same kid, tested). The k6 suite then ran
+      green against this 2-replica JWT-secured stack (new `-e TOKEN=` support in the scripts).
+      Sub-part (2) **no SPOF** stays open and infra-blocked: Redis is single-replica
+      (Sentinel/managed HA next), Kafka is a single-broker Redpanda dev container (multi-broker
+      next), Postgres is single (read-replica/HA next).
 - [x] **Handle concurrency explicitly — refresh-token race verified, not a bug.** The TODO here
       previously claimed "refresh-token consumption isn't guaranteed single-use under a race" —
       checked, and that's not actually true: `ConcurrentHashMap.remove(key)` is atomic per key, so
@@ -492,7 +500,21 @@ detect-private-key in `lint.yml`). Now added:
       `markDeleted()` (see ADR-adjacent note: no concurrent *field* updates exist yet), but add
       `@Version` if/when a real update path is added.
 - [x] **Auth refresh flow drops claims on rotation — fixed.** `TokenService` now stores `email`/`name` alongside `userId` in the refresh-token entry and returns them from `consumeRefreshToken()` (as a new `RefreshClaims` record); `AuthController.refresh()` passes them through to `generateTokens()` instead of `null, null`, so a rotated access token keeps its claims.
-- [ ] **Observability is configured but unproven end-to-end.** Prometheus/Grafana/Loki wiring is real (working PromQL/LogQL panels, not a template) but there's no evidence it was run against real traffic. Capture a dashboard screenshot from an actual load test and include it in the README.
+- [x] **Observability is configured but unproven end-to-end — now proven, and the proving found
+      real breaks.** Ran the k6 scripts against the full compose stack (JWT-secured DEV profile,
+      Auth at 2 replicas) and captured the Grafana overview dashboard mid-load into the README
+      (`docs/images/grafana-overview-load.png`): request-rate bursts, per-endpoint p95/p99,
+      live Loki logs, empty 5xx panel. The exercise surfaced and fixed four real bugs that config
+      review had passed: (1) loki4j 2.x silently ignores the 1.x `<format><label>` config — every
+      log line shipped as `app=default` and the dashboard's Logs panel showed "No data"; (2)
+      Prometheus scraped `host.docker.internal` — broke when auth's host port went away and could
+      never see a second replica; now `prometheus-compose.yml` with Docker-DNS `dns_sd_configs`
+      (all replicas discovered, verified 3 targets up); (3) the `@Async` audit publish dropped
+      the trace context (see the tracing item); (4) the rate limiter's 429 body corrupted
+      already-committed 200 responses under same-key GET contention — `{...json}{...429 json}`
+      on the wire, seen on ~70% of contended stats calls, fixed with a committed/resetBuffer
+      guard in both services' handlers (the CI load job couldn't see it: it runs search-stats
+      with the limiter off, and rate-limit.js checks status codes, not body integrity).
 - [x] **Identify which pod produced a given log line — implemented.** Added `pod=${HOSTNAME:-local}`
       to both services' console and Loki message patterns in `logback-spring.xml` (the Loki
       *label* `host=${HOSTNAME:-local}` already existed) and a `management.metrics.tags.podName`
@@ -519,10 +541,14 @@ detect-private-key in `lint.yml`). Now added:
       patterns, which Micrometer Tracing genuinely does populate into MDC automatically once
       tracing is active. Verified: `./gradlew :common:check :Audit:check :Auth:check` green
       (dependency resolution + no coverage regression — this is all config, no new Java code paths
-      to test), both compose files + Tempo config YAML-valid. Not run against a live collector
-      here (no Docker locally) — the actual trace propagation across the Kafka hop is the one part
-      of this whole TODO sweep I'd most want to see confirmed working end-to-end before relying on
-      it for an interview demo.
+      to test), both compose files + Tempo config YAML-valid. **Follow-up: confirmed live, after
+      a fix.** Running the stack and querying Tempo's API showed the producer/consumer halves
+      linked correctly — but detached from the originating HTTP trace: the fire-and-forget
+      `@Async` publish dropped the active Observation on the executor hop, so login → Kafka →
+      audit-persist rendered as two disconnected traces. A `ContextPropagatingTaskDecorator`
+      bean (Boot applies it to the `applicationTaskExecutor` backing `@Async`) closed it;
+      verified via Tempo: one trace containing auth's `http post /auth/login` server span, its
+      `audit.events send` producer span, and audit's `audit.events receive` consumer span.
 - [x] **OpenShift manifests — PVCs added, `emptyDir` gone.** Added a `pvc.yaml`
       (`ReadWriteOnce`, no `storageClassName` so it binds the cluster default) next to each of
       Loki/Grafana/Prometheus's `deployment.yaml`, sized 5Gi/1Gi/10Gi, and pointed each `data`
