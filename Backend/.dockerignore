@@ -3,3 +3,7 @@
 **/build
 **/.gradle
 *.md
+# RAG corpus: Audit's build bundles the backend README + docs/ into the jar (see
+# Audit/build.gradle processResources), so these must reach the Docker build context.
+!README.md
+!docs/**/*.md

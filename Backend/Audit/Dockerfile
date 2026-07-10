@@ -14,6 +14,10 @@ COPY common/build.gradle common/build.gradle
 COPY common/src common/src
 COPY Audit/build.gradle Audit/build.gradle
 COPY Audit/src Audit/src
+# RAG corpus inputs: Audit's processResources bundles the backend README + docs/ into the
+# jar (rag-corpus/), so they must exist in the build stage (.dockerignore un-ignores them).
+COPY README.md README.md
+COPY docs docs
 RUN chmod +x gradlew && ./gradlew :Audit:bootJar --no-daemon -x test
 
 FROM eclipse-temurin:25-jre-alpine

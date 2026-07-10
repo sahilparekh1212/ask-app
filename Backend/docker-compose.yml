@@ -21,7 +21,10 @@
 # than composing them so it stays a single, predictable `docker compose up`.
 services:
   postgres:
-    image: postgres:16-alpine
+    # pgvector's official image = postgres:16 + the vector extension preinstalled, which the
+    # RAG feature's Liquibase changeset enables (CREATE EXTENSION vector). Drop-in compatible
+    # with the previous postgres:16-alpine volume.
+    image: pgvector/pgvector:pg16
     container_name: aisandbox-postgres
     environment:
       POSTGRES_DB: auditdb
@@ -212,6 +215,12 @@ services:
       # LLM chat assistant. Export ANTHROPIC_API_KEY on the host to enable it; with no key the
       # assistant endpoint returns 503 and the rest of the app is unaffected.
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      # RAG MCP server (POST /mcp — vector search over the repo's own docs). Export
+      # VOYAGE_API_KEY on the host to enable indexing; with no key the search tool reports
+      # "not configured" and everything else is unaffected. pgvector = the real vector DB
+      # in this stack (LOCAL/tests default to the in-memory store instead).
+      VOYAGE_API_KEY: ${VOYAGE_API_KEY:-}
+      RAG_VECTOR_STORE: pgvector
     ports:
       - "8083:8083"
     depends_on:
