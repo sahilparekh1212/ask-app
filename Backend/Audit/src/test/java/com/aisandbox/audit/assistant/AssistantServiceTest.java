@@ -2,6 +2,8 @@ package com.aisandbox.audit.assistant;
 
 import com.aisandbox.audit.assistant.dto.ChatRequest;
 import com.aisandbox.audit.assistant.dto.ChatResponse;
+import com.aisandbox.audit.rag.RagService;
+import com.aisandbox.audit.rag.ScoredChunk;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -9,10 +11,12 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -25,15 +29,18 @@ class AssistantServiceTest {
 	private final PromptScreener screener = new PromptScreener();
 	private final AssistantContextBuilder contextBuilder = mock(AssistantContextBuilder.class);
 	private final LlmClient llmClient = mock(LlmClient.class);
+	private final RagService ragService = mock(RagService.class);
 
 	@BeforeEach
 	void stubContext() {
-		when(contextBuilder.buildSystemPrompt(anyBoolean())).thenReturn("system prompt");
+		when(contextBuilder.buildSystemPrompt(anyBoolean(), anyList())).thenReturn("system prompt");
+		// Default: RAG not ready (unconfigured/empty index) — chat works exactly as pre-RAG.
+		when(ragService.isReady()).thenReturn(false);
 	}
 
 	private AssistantService service(String apiKey) {
 		AssistantProperties properties = new AssistantProperties(apiKey, "claude-opus-4-8", 1024);
-		return new AssistantService(properties, screener, contextBuilder, llmClient);
+		return new AssistantService(properties, screener, contextBuilder, llmClient, ragService);
 	}
 
 	@Test
@@ -53,6 +60,9 @@ class AssistantServiceTest {
 		assertThat(response.blocked()).isTrue();
 		assertThat(response.reply()).isEqualTo(AssistantService.BLOCKED_REPLY);
 		verifyNoInteractions(llmClient);
+		// The screener runs before retrieval, so a blocked message never reaches the
+		// embeddings provider either.
+		verifyNoInteractions(ragService);
 	}
 
 	@Test
@@ -63,7 +73,7 @@ class AssistantServiceTest {
 
 		assertThat(response.blocked()).isFalse();
 		assertThat(response.reply()).isEqualTo("It stores audit rows.");
-		verify(contextBuilder).buildSystemPrompt(true);
+		verify(contextBuilder).buildSystemPrompt(true, List.of());
 		verify(llmClient).complete(eq("system prompt"), eq(List.of()), eq(CLEAN.message()));
 	}
 
@@ -73,7 +83,31 @@ class AssistantServiceTest {
 
 		service("key").chat(CLEAN, false);
 
-		verify(contextBuilder).buildSystemPrompt(false);
+		verify(contextBuilder).buildSystemPrompt(eq(false), anyList());
+	}
+
+	@Test
+	void retrievedChunksAreAppendedToThePromptWhenRagIsReady() {
+		List<ScoredChunk> chunks = List.of(new ScoredChunk("docs/adr/0001.md", "Decision", "text", 0.9));
+		when(ragService.isReady()).thenReturn(true);
+		when(ragService.search(eq(CLEAN.message()), isNull())).thenReturn(chunks);
+		when(llmClient.complete(anyString(), anyList(), anyString())).thenReturn("grounded reply");
+
+		service("key").chat(CLEAN, false);
+
+		verify(contextBuilder).buildSystemPrompt(false, chunks);
+	}
+
+	@Test
+	void retrievalFailureDegradesToTheUnretrievedPrompt() {
+		when(ragService.isReady()).thenReturn(true);
+		when(ragService.search(anyString(), any())).thenThrow(new RuntimeException("provider down"));
+		when(llmClient.complete(anyString(), anyList(), anyString())).thenReturn("still works");
+
+		ChatResponse response = service("key").chat(CLEAN, false);
+
+		assertThat(response.reply()).isEqualTo("still works");
+		verify(contextBuilder).buildSystemPrompt(false, List.of());
 	}
 
 	@Test

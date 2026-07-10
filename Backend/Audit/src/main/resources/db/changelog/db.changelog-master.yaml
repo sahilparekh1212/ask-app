@@ -74,3 +74,29 @@ databaseChangeLog:
             columns:
               - column:
                   name: event_id
+
+  # RAG chunk store (see the rag/ package and ADR-0010). Postgres-only: pgvector is a
+  # Postgres extension, so this changeset never runs on H2 (LOCAL/tests), where the
+  # in-memory vector store is active instead (rag.vector-store defaults to 'memory').
+  # Raw SQL rather than createTable because Liquibase has no model for the vector type or
+  # the extension. The vector(1024) width pins rag.embedding-dimension (Voyage's default).
+  - changeSet:
+      id: 002-rag-chunk
+      author: aisandbox
+      dbms: postgresql
+      changes:
+        - sql:
+            sql: CREATE EXTENSION IF NOT EXISTS vector
+        - sql:
+            sql: >-
+              CREATE TABLE rag_chunk (
+                id VARCHAR(64) PRIMARY KEY,
+                source VARCHAR(512) NOT NULL,
+                heading VARCHAR(512),
+                content TEXT NOT NULL,
+                embedding vector(1024) NOT NULL,
+                indexed_at TIMESTAMP NOT NULL
+              )
+      rollback:
+        - sql:
+            sql: DROP TABLE rag_chunk

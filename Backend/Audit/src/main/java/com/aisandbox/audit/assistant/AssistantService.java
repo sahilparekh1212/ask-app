@@ -2,10 +2,13 @@ package com.aisandbox.audit.assistant;
 
 import com.aisandbox.audit.assistant.dto.ChatRequest;
 import com.aisandbox.audit.assistant.dto.ChatResponse;
+import com.aisandbox.audit.rag.RagService;
+import com.aisandbox.audit.rag.ScoredChunk;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -26,13 +29,15 @@ public class AssistantService {
 	private final PromptScreener screener;
 	private final AssistantContextBuilder contextBuilder;
 	private final LlmClient llmClient;
+	private final RagService ragService;
 
 	public AssistantService(AssistantProperties properties, PromptScreener screener,
-			AssistantContextBuilder contextBuilder, LlmClient llmClient) {
+			AssistantContextBuilder contextBuilder, LlmClient llmClient, RagService ragService) {
 		this.properties = properties;
 		this.screener = screener;
 		this.contextBuilder = contextBuilder;
 		this.llmClient = llmClient;
+		this.ragService = ragService;
 	}
 
 	public ChatResponse chat(ChatRequest request, boolean admin) {
@@ -50,13 +55,33 @@ public class AssistantService {
 		}
 		try {
 			String reply = llmClient.complete(
-				contextBuilder.buildSystemPrompt(admin), request.historyOrEmpty(), request.message());
+				contextBuilder.buildSystemPrompt(admin, retrieve(request.message())),
+				request.historyOrEmpty(), request.message());
 			log.info("Assistant replied admin={} messageLength={} replyLength={}",
 				admin, request.message().length(), reply.length());
 			return ChatResponse.of(reply);
 		} catch (RuntimeException e) {
 			log.error("Assistant provider call failed: {}", e.getClass().getSimpleName());
 			throw new AssistantUnavailableException("Assistant is temporarily unavailable", e);
+		}
+	}
+
+	/**
+	 * RAG grounding for the question (see the rag/ package): best-effort by design. Runs
+	 * only after the screener passed the message (a blocked message never reaches the
+	 * embeddings provider either), and any retrieval failure degrades to the pre-RAG prompt
+	 * rather than failing the chat — retrieval is an enhancement, not a dependency.
+	 */
+	private List<ScoredChunk> retrieve(String message) {
+		if (!ragService.isReady()) {
+			return List.of();
+		}
+		try {
+			return ragService.search(message, null);
+		} catch (RuntimeException e) {
+			log.warn("RAG retrieval failed, continuing without retrieved context: {}",
+				e.getClass().getSimpleName());
+			return List.of();
 		}
 	}
 

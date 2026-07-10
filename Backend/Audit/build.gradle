@@ -24,3 +24,15 @@ dependencies {
 	// real Auth service/JWKS endpoint — used to verify @PreAuthorize role gating.
 	testImplementation 'org.springframework.security:spring-security-test'
 }
+
+// RAG corpus: bundle the repo's own knowledge (backend README + docs/, i.e. the ADRs and
+// deployment guide) into the jar under rag-corpus/, where CorpusLoader scans it. Build-time
+// bundling keeps the image self-contained — the same jar indexes the same corpus anywhere —
+// and doc edits flow through the normal build instead of needing a runtime volume mount.
+processResources {
+	from(rootProject.projectDir) {
+		include 'README.md'
+		include 'docs/**/*.md'
+		into 'rag-corpus'
+	}
+}

@@ -2,22 +2,34 @@
 
 ## Open roadmap (prioritized)
 
-### Feature: RAG MCP server with a vector DB (NEXT UP)
-- [ ] **RAG MCP server backed by a vector database.** Build a Model Context Protocol server
-      that exposes retrieval over this repo's own knowledge (READMEs, ADRs, `docs/`, the
-      assistant's `app-context.md`) so an MCP-capable client — and the existing chat
-      assistant — can ground answers in retrieved chunks instead of the current static
-      context block. Key decisions to make explicitly (each is ADR material): (1) vector
-      store — pgvector on the Postgres already in the stack vs a dedicated engine
-      (Qdrant/Chroma); pgvector is the natural first call since the compose stack and
-      Liquibase discipline already exist. (2) Embeddings — provider API vs local model;
-      the server-side-key posture from the LLM-chat feature applies unchanged. (3)
-      Chunking/indexing pipeline — what re-indexes when docs change, and how that runs in
-      CI vs at startup (the seeder pattern is precedent). (4) Integration seam — the
-      assistant's `AssistantContextBuilder` is the single allowlist today; retrieval must
-      compose with (not bypass) its RBAC boundary, same as the flashcards feature reused
-      it. (5) Transport/auth for the MCP server itself — stdio vs HTTP, and how a JWT
-      maps onto it if exposed beyond localhost.
+### Feature: RAG MCP server with a vector DB
+- [x] **RAG MCP server backed by a vector database — implemented.** New `rag/` package in
+      Audit + `POST /mcp`, a Model Context Protocol server (Streamable HTTP, stateless
+      subset) exposing `search_knowledge` + `list_sources` over this repo's own knowledge
+      (backend README, ADRs, `docs/`, `app-context.md`) — demo:
+      `claude mcp add --transport http ai-sandbox http://localhost:8083/mcp`. All five
+      scoped decisions made and recorded in [ADR-0010](docs/adr/0010-rag-mcp-server.md):
+      (1) **pgvector** on the existing Postgres (compose image → `pgvector/pgvector:pg16`,
+      `dbms: postgresql`-gated Liquibase changeset for `rag_chunk` with `vector(1024)`),
+      behind a `VectorStore` interface with an exact in-memory fallback for LOCAL/tests
+      where H2 can't host the extension. (2) **Voyage AI embeddings** (`voyage-3.5-lite`,
+      Anthropic has no embeddings endpoint) with the assistant's server-side-key posture:
+      no `VOYAGE_API_KEY` → indexing skipped, tools say "not configured", nothing fails.
+      (3) **Heading-based chunking + content-hash incremental indexing at startup** (seeder
+      precedent); corpus bundled into the jar at build time by `processResources`, so
+      re-indexing on doc change = rebuild + restart, and unchanged chunks cost zero
+      embedding calls. (4) **Assistant seam composes with the allowlist**: retrieved chunks
+      land in a `<retrieved_docs>` tag via `AssistantContextBuilder`; corpus holds zero
+      audit data so RBAC is untouched; screener still runs first; retrieval failure
+      degrades to the pre-RAG prompt. (5) **Hand-rolled stateless JSON-RPC endpoint**
+      (initialize/version negotiation, ping, tools/list, tools/call, 202 notifications,
+      405 on GET) instead of the MCP Java SDK — the SDK's session/SSE machinery is exactly
+      what this server doesn't use — and `permitAll` because the corpus is public repo docs
+      (revisit trigger: non-public data entering the corpus). Tested at every seam
+      (chunker, both stores, Voyage client via MockRestServiceServer, indexer increments,
+      full MCP wire protocol via MockMvc); 90% gate held. Not exercised against the live
+      Voyage API here (no key in this environment) — first real smoke: export
+      `VOYAGE_API_KEY`, `docker compose up -d --build`, then the `claude mcp add` line above.
 
 ### Product/UI roadmap (portfolio presentation)
 - [x] **GitHub-like dark theme UI restyle — implemented (PR #49).** One design-token layer in

@@ -42,6 +42,11 @@ public class SecurityConfig {
 				.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 			.authorizeHttpRequests(auth -> auth
 				.requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**", "/actuator/**").permitAll()
+				// MCP server (RAG over repo docs). Unauthenticated by design: the corpus is
+				// this repo's own public documentation — zero audit rows, zero user data —
+				// so retrieval has nothing the JWT roles protect. ADR-0010 records the
+				// trigger to revisit (any non-public data entering the corpus).
+				.requestMatchers("/mcp").permitAll()
 				.anyRequest().authenticated()
 			)
 			.oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter())));

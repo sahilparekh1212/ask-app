@@ -15,3 +15,4 @@ system does; these explain *why* it's built this way.
 | [0007](0007-redis-refresh-token-store-for-statelessness.md) | Redis refresh-token store for statelessness; rate limiter stays per-pod |
 | [0008](0008-no-microfrontend-split.md) | No microfrontend split — one standalone Angular SPA, not shell + remotes |
 | [0009](0009-llm-chat-assistant-data-flow.md) | LLM chat assistant — server-side Claude proxy, role-gated context, and exactly what can reach the provider |
+| [0010](0010-rag-mcp-server.md) | RAG MCP server — pgvector on the existing Postgres, Voyage embeddings, hand-rolled stateless MCP endpoint |
