@@ -39,6 +39,27 @@ numbers are refused locally and never forwarded), auth headers are never proxied
 provider data-flow is documented in
 [ADR-0009](docs/adr/0009-llm-chat-assistant-data-flow.md).
 
+### RAG MCP server
+
+The Audit service is also a [Model Context Protocol](https://modelcontextprotocol.io) server:
+`POST /mcp` exposes semantic search over this repo's own documentation (this README, the ADRs,
+`docs/`), backed by a real vector database — pgvector on the stack's Postgres — with Voyage AI
+embeddings. Point any MCP client at it and ask about the project:
+
+```bash
+claude mcp add --transport http ai-sandbox http://localhost:8083/mcp
+# then, inside Claude Code: "why is there no API gateway?" → grounded in ADR-0005
+```
+
+Tools: `search_knowledge` (top-k doc chunks by cosine similarity, with source + heading +
+score) and `list_sources` (index inventory). The docs corpus is bundled into the jar at build
+time, chunked along markdown headings, and indexed incrementally at startup (content-hashed —
+unchanged chunks cost zero embedding calls). Enable indexing by exporting `VOYAGE_API_KEY`;
+without it the tools report "not configured" and nothing else is affected. The same retrieval
+grounds the chat assistant's answers (a `<retrieved_docs>` block in its prompt). Decisions —
+pgvector vs a dedicated engine, provider vs local embeddings, why the MCP endpoint is
+hand-rolled and unauthenticated — are in [ADR-0010](docs/adr/0010-rag-mcp-server.md).
+
 ---
 
 ## Prerequisites
