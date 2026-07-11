@@ -53,3 +53,24 @@ from `Backend/`.
 - **CI/CD**: GitHub Actions — build + tests with a 90% line-coverage gate, k6 load tests,
   gitleaks, CodeQL SAST, Trivy CVE scans of jars and Docker images, Dependabot.
 - Architecture decisions are recorded as ADRs in `Backend/docs/adr/`.
+
+## API documentation (Swagger / OpenAPI)
+
+Each backend service serves interactive **Swagger UI** and a raw **OpenAPI spec** via springdoc.
+Both are public — no authentication is needed to view them (see each service's `SecurityConfig`,
+which permits `/swagger-ui/**`, `/swagger-ui.html`, and `/v3/api-docs/**`):
+
+- **Audit service** (port 8083):
+  - Swagger UI: `http://localhost:8083/swagger-ui.html`
+  - OpenAPI JSON: `http://localhost:8083/v3/api-docs`
+- **Auth service** (port 8085):
+  - Swagger UI: `http://localhost:8085/swagger-ui.html`
+  - OpenAPI JSON: `http://localhost:8085/v3/api-docs`
+
+The paths are set in each service's `application.properties`
+(`springdoc.swagger-ui.path=/swagger-ui.html`, `springdoc.api-docs.path=/v3/api-docs`). These URLs
+work whenever the service is reachable on its port — running it directly, or via
+`docker compose up` (which publishes 8083 and 8085). In the production deployment only Caddy's
+80/443 are published and the service ports are withdrawn, so Swagger UI is a local/development tool
+there rather than a public URL. In CI, the `api-contract` workflow generates these OpenAPI specs
+from the running services and fails a PR on breaking API changes.
