@@ -27,18 +27,20 @@
     <button type="submit">Apply filters</button>
   </form>
 
-  <div class="demo-tools">
-    <label
-      >Demo logs
-      <input type="number" min="1" max="500" [formControl]="demoCount" />
-    </label>
-    <button type="button" (click)="addDemoLogs()" [disabled]="demoBusy()">
-      {{ demoBusy() ? 'Adding…' : 'Add demo logs' }}
-    </button>
-    @if (demoMessage(); as m) {
-      <span class="note">{{ m }}</span>
-    }
-  </div>
+  @if (demoAvailable()) {
+    <div class="demo-tools">
+      <label
+        >Demo logs
+        <input type="number" min="1" max="500" [formControl]="demoCount" />
+      </label>
+      <button type="button" (click)="addDemoLogs()" [disabled]="demoBusy()">
+        {{ demoBusy() ? 'Adding…' : 'Add demo logs' }}
+      </button>
+      @if (demoMessage(); as m) {
+        <span class="note">{{ m }}</span>
+      }
+    </div>
+  }
 
   @if (stats(); as s) {
     <div class="stats">

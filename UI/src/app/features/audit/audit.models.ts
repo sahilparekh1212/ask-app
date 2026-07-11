@@ -48,6 +48,11 @@ export interface DemoDataResponse {
   created: number;
 }
 
+/** Runtime capability flags (GET /api/v1/meta/features) the SPA uses to adapt its UI. */
+export interface FeaturesResponse {
+  demoData: boolean; // demo-log generation exists only on a LOCAL/DEV backend
+}
+
 /** Zero-based page request plus a Spring `sort=field,dir` selection. */
 export interface PageRequest {
   page: number;
