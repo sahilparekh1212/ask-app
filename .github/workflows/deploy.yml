@@ -55,10 +55,23 @@ jobs:
 
       - uses: google-github-actions/setup-gcloud@v2
 
+      - name: Register SSH key with OS Login (60m TTL)
+        # Without this, `gcloud compute ssh` implicitly registers the runner's fresh key
+        # with a short service-account expiry — long enough for the first steps, expired by
+        # the later ones (observed live: scp 'Permission denied (publickey)' ~6 minutes into
+        # a run whose first SSH had succeeded; gcloud does not re-import an expired key).
+        # Registering explicitly with a TTL that outlives any run makes every subsequent
+        # ssh/scp deterministic.
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keygen -t rsa -f ~/.ssh/google_compute_engine -N '' -q
+          gcloud compute os-login ssh-keys add \
+            --key-file="$HOME/.ssh/google_compute_engine.pub" --ttl=60m --quiet
+
       - name: Prepare app directory on the VM
-        # Retried: each ephemeral runner mints a fresh SSH key, and the very first connection
-        # can race OS Login key propagation (observed as ssh exit 255 on an otherwise healthy
-        # setup). Later ssh/scp steps reuse the now-propagated key and don't need this.
+        # Retried: the very first connection can still race OS Login key propagation
+        # (observed as ssh exit 255 on an otherwise healthy setup). Later ssh/scp steps
+        # reuse the now-propagated key and don't need this.
         run: |
           for attempt in 1 2 3; do
             if gcloud compute ssh "$GCP_VM" --zone="$GCP_ZONE" --quiet --command \
