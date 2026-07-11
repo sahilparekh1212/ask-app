@@ -5,10 +5,10 @@
     features — from a Claude model, grounded on the app's own docs and (for admins) its audit data.
   </p>
 
-  <form class="controls" (ngSubmit)="generate()">
+  <form class="controls" [formGroup]="form" (ngSubmit)="generate()">
     <label>
       Cards
-      <input type="number" min="1" max="20" [formControl]="count" />
+      <input type="number" min="1" max="20" formControlName="count" />
     </label>
     <button type="submit" class="primary" [disabled]="loading()">
       {{ loading() ? 'Generating…' : hasDeck() ? 'Regenerate' : 'Generate deck' }}

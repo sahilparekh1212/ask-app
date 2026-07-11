@@ -30,10 +30,10 @@
     <p class="error" role="alert">{{ error() }}</p>
   }
 
-  <form class="composer" (ngSubmit)="send()">
+  <form class="composer" [formGroup]="form" (ngSubmit)="send()">
     <input
       type="text"
-      [formControl]="input"
+      formControlName="message"
       placeholder="Ask a question about this app…"
       maxlength="2000"
       [attr.disabled]="busy() ? '' : null"
