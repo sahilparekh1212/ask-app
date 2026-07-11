@@ -1,24 +1,29 @@
 <section class="flashcards">
-  <p class="hint">
-    Generate a study deck that explains this application — architecture, design decisions, and
-    features — from a Claude model, grounded on the app's own docs and (for admins) its audit data.
-  </p>
+  <p class="hint">{{ 'flashcards.hint' | t }}</p>
 
   <form class="controls" [formGroup]="form" (ngSubmit)="generate()">
     <label>
-      Cards
+      {{ 'flashcards.cards' | t }}
       <input type="number" min="1" max="20" formControlName="count" />
     </label>
     <button type="submit" class="primary" [disabled]="loading()">
-      {{ loading() ? 'Generating…' : hasDeck() ? 'Regenerate' : 'Generate deck' }}
+      {{
+        loading()
+          ? ('flashcards.generating' | t)
+          : hasDeck()
+            ? ('flashcards.regenerate' | t)
+            : ('flashcards.generate' | t)
+      }}
     </button>
     @if (hasDeck()) {
-      <button type="button" (click)="shuffle()" [disabled]="loading()">Shuffle</button>
+      <button type="button" (click)="shuffle()" [disabled]="loading()">
+        {{ 'flashcards.shuffle' | t }}
+      </button>
     }
   </form>
 
-  @if (error()) {
-    <p class="error" role="alert">{{ error() }}</p>
+  @if (error(); as e) {
+    <p class="error" role="alert">{{ e | t }}</p>
   }
 
   @if (hasDeck() && current(); as card) {
@@ -32,18 +37,22 @@
       >
         <span class="side question">{{ card.question }}</span>
         <span class="side answer">{{ card.answer }}</span>
-        <span class="face-label">{{ flipped() ? 'Answer' : 'Question — click to flip' }}</span>
+        <span class="face-label">{{
+          flipped() ? ('flashcards.answer' | t) : ('flashcards.questionFlip' | t)
+        }}</span>
       </button>
 
       <div class="nav">
-        <button type="button" (click)="prev()" [disabled]="index() === 0">← Prev</button>
+        <button type="button" (click)="prev()" [disabled]="index() === 0">
+          {{ 'flashcards.prev' | t }}
+        </button>
         <span class="counter">{{ index() + 1 }} / {{ deck().length }}</span>
         <button type="button" (click)="next()" [disabled]="index() === deck().length - 1">
-          Next →
+          {{ 'flashcards.next' | t }}
         </button>
       </div>
     </div>
   } @else if (!loading()) {
-    <p class="empty">No deck yet — pick a count and generate one.</p>
+    <p class="empty">{{ 'flashcards.empty' | t }}</p>
   }
 </section>

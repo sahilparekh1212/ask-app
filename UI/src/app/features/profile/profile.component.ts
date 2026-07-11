@@ -2,10 +2,11 @@ import { Component, OnInit, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { AuthService } from '../../core/auth/auth.service';
 import { UserProfile } from '../../core/auth/auth.models';
+import { TranslatePipe } from '../../core/i18n/translate.pipe';
 
 @Component({
   selector: 'app-profile',
-  imports: [],
+  imports: [TranslatePipe],
   templateUrl: './profile.component.html',
   styleUrl: './profile.component.scss',
 })
@@ -19,7 +20,7 @@ export class ProfileComponent implements OnInit {
   ngOnInit(): void {
     this.auth.loadProfile().subscribe({
       next: (profile) => this.profile.set(profile),
-      error: () => this.error.set('Could not load your profile.'),
+      error: () => this.error.set('profile.loadError'),
     });
   }
 

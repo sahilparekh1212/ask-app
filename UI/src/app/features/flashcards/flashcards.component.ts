@@ -2,10 +2,11 @@ import { Component, computed, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
 import { FlashcardsService } from './flashcards.service';
 import { Flashcard } from './flashcards.models';
+import { TranslatePipe } from '../../core/i18n/translate.pipe';
 
 @Component({
   selector: 'app-flashcards',
-  imports: [ReactiveFormsModule],
+  imports: [ReactiveFormsModule, TranslatePipe],
   templateUrl: './flashcards.component.html',
   styleUrl: './flashcards.component.scss',
 })
@@ -30,7 +31,7 @@ export class FlashcardsComponent {
   generate(): void {
     const count = this.count.value;
     if (this.loading() || count < 1 || count > 20) {
-      this.error.set(count < 1 || count > 20 ? 'Choose between 1 and 20 cards.' : null);
+      this.error.set(count < 1 || count > 20 ? 'flashcards.range' : null);
       return;
     }
     this.loading.set(true);
@@ -44,11 +45,7 @@ export class FlashcardsComponent {
       },
       error: (err) => {
         this.loading.set(false);
-        this.error.set(
-          err?.status === 503
-            ? 'The assistant is not available right now (it may not be configured on this server).'
-            : 'Could not generate a deck — please try again.',
-        );
+        this.error.set(err?.status === 503 ? 'flashcards.error503' : 'flashcards.error');
       },
     });
   }

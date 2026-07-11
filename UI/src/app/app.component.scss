@@ -52,10 +52,17 @@
     }
   }
 
-  // Far-right slot: circular Profile avatar when signed in, Sign in otherwise.
+  // Far-right cluster: language switcher, the (hidden) Google Translate mount, and the
+  // circular Profile avatar when signed in / the Login link otherwise.
+  .header-right {
+    margin-left: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
   .avatar,
   .sign-in {
-    margin-left: auto;
     align-self: center;
   }
 

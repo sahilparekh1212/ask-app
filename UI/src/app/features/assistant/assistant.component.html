@@ -1,43 +1,44 @@
 <section class="assistant">
-  <p class="hint">
-    Ask about this application — its features, how to sign in, or what the audit data shows.
-    Messages are screened server-side; don't paste credentials or personal data.
-  </p>
+  <p class="hint">{{ 'assistant.hint' | t }}</p>
 
   <div class="chat-log" #log>
     @if (turns().length === 0) {
       <p class="empty">
-        Try: <em>“What does the audit service do?”</em> or
-        <em>“Which actions were most frequent?”</em>
+        {{ 'assistant.tryPrefix' | t }} <em>“{{ 'assistant.sample1' | t }}”</em>
+        {{ 'login.or' | t }} <em>“{{ 'assistant.sample2' | t }}”</em>
       </p>
     }
     @for (turn of turns(); track $index) {
       <div class="turn" [class.user]="turn.role === 'user'" [class.blocked]="turn.blocked">
-        <span class="who">{{ turn.role === 'user' ? 'You' : 'Assistant' }}</span>
+        <span class="who">{{
+          turn.role === 'user' ? ('assistant.you' | t) : ('assistant.assistant' | t)
+        }}</span>
         <p class="bubble">{{ turn.content }}</p>
       </div>
     }
     @if (busy()) {
       <div class="turn">
-        <span class="who">Assistant</span>
-        <p class="bubble thinking">Thinking…</p>
+        <span class="who">{{ 'assistant.assistant' | t }}</span>
+        <p class="bubble thinking">{{ 'assistant.thinking' | t }}</p>
       </div>
     }
   </div>
 
-  @if (error()) {
-    <p class="error" role="alert">{{ error() }}</p>
+  @if (error(); as e) {
+    <p class="error" role="alert">{{ e | t }}</p>
   }
 
   <form class="composer" [formGroup]="form" (ngSubmit)="send()">
     <input
       type="text"
       formControlName="message"
-      placeholder="Ask a question about this app…"
+      [placeholder]="'assistant.placeholder' | t"
       maxlength="2000"
       [attr.disabled]="busy() ? '' : null"
-      aria-label="Message"
+      [attr.aria-label]="'assistant.placeholder' | t"
     />
-    <button type="submit" [disabled]="busy() || !input.value.trim()">Send</button>
+    <button type="submit" [disabled]="busy() || !input.value.trim()">
+      {{ 'assistant.send' | t }}
+    </button>
   </form>
 </section>

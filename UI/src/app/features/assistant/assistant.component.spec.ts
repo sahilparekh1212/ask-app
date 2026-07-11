@@ -77,7 +77,7 @@ describe('AssistantComponent', () => {
     component.input.setValue('hello?');
     component.send();
 
-    expect(component.error()).toContain('not available');
+    expect(component.error()).toBe('assistant.error503');
     expect(component.busy()).toBeFalse();
   });
 

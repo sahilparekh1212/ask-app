@@ -99,7 +99,7 @@ describe('FlashcardsComponent', () => {
 
     component.generate();
 
-    expect(component.error()).toContain('not available');
+    expect(component.error()).toBe('flashcards.error503');
     expect(component.hasDeck()).toBeFalse();
   });
 
@@ -107,6 +107,6 @@ describe('FlashcardsComponent', () => {
     component.count.setValue(50);
     component.generate();
     expect(service.generate).not.toHaveBeenCalled();
-    expect(component.error()).toContain('between 1 and 20');
+    expect(component.error()).toBe('flashcards.range');
   });
 });

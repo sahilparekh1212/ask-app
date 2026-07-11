@@ -2,6 +2,7 @@ import { Component, ElementRef, inject, signal, viewChild } from '@angular/core'
 import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
 import { AssistantService } from './assistant.service';
 import { ChatTurn } from './assistant.models';
+import { TranslatePipe } from '../../core/i18n/translate.pipe';
 
 /** A rendered chat entry; `blocked` marks the server's local guardrail refusals. */
 interface DisplayTurn extends ChatTurn {
@@ -10,7 +11,7 @@ interface DisplayTurn extends ChatTurn {
 
 @Component({
   selector: 'app-assistant',
-  imports: [ReactiveFormsModule],
+  imports: [ReactiveFormsModule, TranslatePipe],
   templateUrl: './assistant.component.html',
   styleUrl: './assistant.component.scss',
 })
@@ -58,11 +59,7 @@ export class AssistantComponent {
       },
       error: (err) => {
         this.busy.set(false);
-        this.error.set(
-          err?.status === 503
-            ? 'The assistant is not available right now (it may not be configured on this server).'
-            : 'Something went wrong — please try again.',
-        );
+        this.error.set(err?.status === 503 ? 'assistant.error503' : 'assistant.errorGeneric');
       },
     });
   }

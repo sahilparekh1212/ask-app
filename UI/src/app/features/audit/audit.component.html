@@ -1,40 +1,44 @@
 <section class="audit">
   <form class="filters" [formGroup]="filterForm" (ngSubmit)="applyFilters()">
     <label
-      >Entity type
+      >{{ 'audit.entityType' | t }}
       <select formControlName="entityType">
-        <option value="">All</option>
+        <option value="">{{ 'audit.all' | t }}</option>
         @for (t of entityTypeOptions(); track t) {
           <option [value]="t">{{ t }}</option>
         }
       </select>
     </label>
     <label
-      >Action
+      >{{ 'audit.action' | t }}
       <select formControlName="action">
-        <option value="">All</option>
+        <option value="">{{ 'audit.all' | t }}</option>
         @for (a of actionOptions(); track a) {
           <option [value]="a">{{ a }}</option>
         }
       </select>
     </label>
-    <label>Details <input type="text" formControlName="details" placeholder="contains…" /></label>
-    <label>From <input type="datetime-local" formControlName="from" /></label>
-    <label>To <input type="datetime-local" formControlName="to" /></label>
+    <label
+      >{{ 'audit.details' | t }}
+      <input type="text" formControlName="details" [placeholder]="'audit.detailsPlaceholder' | t"
+    /></label>
+    <label>{{ 'audit.from' | t }} <input type="datetime-local" formControlName="from" /></label>
+    <label>{{ 'audit.to' | t }} <input type="datetime-local" formControlName="to" /></label>
     <label class="checkbox"
-      ><input type="checkbox" formControlName="includeDeleted" /> Include deleted</label
+      ><input type="checkbox" formControlName="includeDeleted" />
+      {{ 'audit.includeDeleted' | t }}</label
     >
-    <button type="submit">Apply filters</button>
+    <button type="submit">{{ 'audit.applyFilters' | t }}</button>
   </form>
 
   @if (demoAvailable()) {
     <div class="demo-tools">
       <label
-        >Demo logs
+        >{{ 'audit.demoLogs' | t }}
         <input type="number" min="1" max="500" [formControl]="demoCount" />
       </label>
       <button type="button" (click)="addDemoLogs()" [disabled]="demoBusy()">
-        {{ demoBusy() ? 'Adding…' : 'Add demo logs' }}
+        {{ demoBusy() ? ('audit.adding' | t) : ('audit.addDemoLogs' | t) }}
       </button>
       @if (demoMessage(); as m) {
         <span class="note">{{ m }}</span>
@@ -44,10 +48,10 @@
 
   @if (stats(); as s) {
     <div class="stats">
-      <p class="total">{{ s.total }} matching entries</p>
+      <p class="total">{{ 'audit.matchingEntries' | t: { count: s.total } }}</p>
       <div class="charts">
         <div class="chart">
-          <h3>By action</h3>
+          <h3>{{ 'audit.byAction' | t }}</h3>
           @for (bucket of s.byAction; track bucket.key) {
             <div class="bar-row">
               <span class="label">{{ bucket.key }}</span>
@@ -59,7 +63,7 @@
           }
         </div>
         <div class="chart">
-          <h3>By entity type</h3>
+          <h3>{{ 'audit.byEntityType' | t }}</h3>
           @for (bucket of s.byEntityType; track bucket.key) {
             <div class="bar-row">
               <span class="label">{{ bucket.key }}</span>
@@ -82,38 +86,38 @@
     <thead>
       <tr>
         <th class="sortable" (click)="sortBy('createdAt')">
-          Time
+          {{ 'audit.colTime' | t }}
           @if (sortField() === 'createdAt') {
             <span>{{ sortDir() === 'asc' ? '▲' : '▼' }}</span>
           }
         </th>
         <th class="sortable" (click)="sortBy('entityType')">
-          Entity
+          {{ 'audit.colEntity' | t }}
           @if (sortField() === 'entityType') {
             <span>{{ sortDir() === 'asc' ? '▲' : '▼' }}</span>
           }
         </th>
         <th class="sortable" (click)="sortBy('action')">
-          Action
+          {{ 'audit.colAction' | t }}
           @if (sortField() === 'action') {
             <span>{{ sortDir() === 'asc' ? '▲' : '▼' }}</span>
           }
         </th>
-        <th>Details</th>
+        <th>{{ 'audit.colDetails' | t }}</th>
       </tr>
     </thead>
     <tbody>
       @for (row of result()?.content ?? []; track row.id) {
         <tr>
-          <td data-label="Time">{{ row.createdAt | date: 'medium' }}</td>
-          <td data-label="Entity">{{ row.entityType }}</td>
-          <td data-label="Action">{{ row.action }}</td>
-          <td data-label="Details">{{ row.details || '—' }}</td>
+          <td [attr.data-label]="'audit.colTime' | t">{{ row.createdAt | date: 'medium' }}</td>
+          <td [attr.data-label]="'audit.colEntity' | t">{{ row.entityType }}</td>
+          <td [attr.data-label]="'audit.colAction' | t">{{ row.action }}</td>
+          <td [attr.data-label]="'audit.colDetails' | t">{{ row.details || '—' }}</td>
         </tr>
       } @empty {
         <tr>
           <td colspan="4" class="empty">
-            {{ loading() ? 'Loading…' : 'No audit entries match.' }}
+            {{ loading() ? ('profile.loading' | t) : ('audit.noEntries' | t) }}
           </td>
         </tr>
       }
@@ -123,10 +127,14 @@
   @if (result(); as r) {
     <div class="pager">
       <button type="button" (click)="goToPage(r.page - 1)" [disabled]="r.page === 0">
-        Previous
+        {{ 'audit.previous' | t }}
       </button>
-      <span>Page {{ r.page + 1 }} of {{ r.totalPages || 1 }} · {{ r.totalElements }} total</span>
-      <button type="button" (click)="goToPage(r.page + 1)" [disabled]="r.last">Next</button>
+      <span>{{
+        'audit.pageOf' | t: { page: r.page + 1, total: r.totalPages || 1, count: r.totalElements }
+      }}</span>
+      <button type="button" (click)="goToPage(r.page + 1)" [disabled]="r.last">
+        {{ 'audit.next' | t }}
+      </button>
     </div>
   }
 </section>

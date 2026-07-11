@@ -74,9 +74,15 @@
     padding: 1rem;
     margin-bottom: 1.25rem;
 
+    // A full-width heading for the whole panel, divided from the two charts by a rule so it
+    // reads as the total across both views — not as a caption belonging to the first chart.
     .total {
-      margin: 0 0 0.75rem;
+      margin: 0 0 1rem;
+      padding-bottom: 0.75rem;
+      border-bottom: 1px solid var(--border);
       font-weight: 600;
+      font-size: 1rem;
+      color: var(--fg);
     }
 
     .charts {

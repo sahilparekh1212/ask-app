@@ -260,6 +260,26 @@ should populate it instead.
       `VOYAGE_API_KEY`, `docker compose up -d --build`, then the `claude mcp add` line above.
 
 ### Product/UI roadmap (portfolio presentation)
+- [x] **Internationalization (i18n) — implemented, hand-rolled + JSON-driven.** The UI text is
+      driven from per-language JSON dictionaries (`UI/public/i18n/<code>.json`) through a tiny
+      no-framework runtime: a `TranslateService` (current-language signal, English bundled as the
+      always-present fallback, other languages fetched once and cached in memory + an nginx
+      `Cache-Control` on `/i18n/` since they only change per deploy), an impure `t` pipe
+      (`{{ 'nav.dashboard' | t }}`, with `{token}` interpolation for counts), and a header
+      **language switcher next to the avatar** offering the nine required languages — English,
+      French, Spanish, Hindi, Gujarati, Punjabi, Chinese, Korean, Japanese (each shown in its own
+      endonym) — plus an on-demand **Google Translate** option that lazily loads Google's Website
+      Translator for anything not translated in-app (e.g. the long-form About prose, left to
+      Google by design). The choice persists in localStorage and drives `<html lang>` (also helps
+      Google detect the source page). Scope: nav, login, dashboard, chat, flashcards and profile
+      chrome are translated; backend data values (entityType/action bucket keys) stay as-is.
+      Verified live end-to-end (switched to Japanese: full UI + count-interpolated "338 件の一致",
+      persisted across reload, `ja.json` served 200 from the image). Frontend-CI green (build,
+      ESLint, Prettier, 49 unit tests). Two small dashboard fixes rode along: the "N matching
+      entries" line is now a full-width panel heading divided from the two charts by a rule (it
+      previously read ambiguously as a caption on the first chart), and confirmed the "Add demo
+      logs" input+button stay hidden in PROD (the `/api/v1/meta/features` probe derives `demoData`
+      from the LOCAL/DEV-only `DemoDataController` bean's presence).
 - [x] **GitHub-like dark theme UI restyle — implemented (PR #49).** One design-token layer in
       `styles.scss` (GitHub Primer dark palette as CSS custom properties: canvas `#0d1117`,
       borders `#30363d`, accent `#2f81f7`, plus text/status/button tokens) with base element

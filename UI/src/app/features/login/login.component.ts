@@ -2,10 +2,11 @@ import { Component, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { AuthService } from '../../core/auth/auth.service';
+import { TranslatePipe } from '../../core/i18n/translate.pipe';
 
 @Component({
   selector: 'app-login',
-  imports: [ReactiveFormsModule],
+  imports: [ReactiveFormsModule, TranslatePipe],
   templateUrl: './login.component.html',
   styleUrl: './login.component.scss',
 })
@@ -39,9 +40,7 @@ export class LoginComponent {
         setTimeout(() => void this.router.navigateByUrl(this.returnUrl()), 700);
       },
       error: () => {
-        this.error.set(
-          'Login failed — check the demo credentials and that the Auth service is running.',
-        );
+        this.error.set('login.failed');
         this.submitting.set(false);
       },
     });

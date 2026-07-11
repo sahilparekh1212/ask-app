@@ -1,19 +1,19 @@
 <section class="profile">
-  <h1>Your profile</h1>
+  <h1>{{ 'profile.title' | t }}</h1>
 
   @if (profile(); as p) {
     <dl>
-      <dt>User ID</dt>
+      <dt>{{ 'profile.userId' | t }}</dt>
       <dd>{{ p.userId }}</dd>
-      <dt>Email</dt>
+      <dt>{{ 'profile.email' | t }}</dt>
       <dd>{{ p.email || '—' }}</dd>
-      <dt>Name</dt>
+      <dt>{{ 'profile.name' | t }}</dt>
       <dd>{{ p.name || '—' }}</dd>
     </dl>
-    <button type="button" (click)="logout()">Log out</button>
-  } @else if (error()) {
-    <p class="error" role="alert">{{ error() }}</p>
+    <button type="button" (click)="logout()">{{ 'profile.logout' | t }}</button>
+  } @else if (error(); as e) {
+    <p class="error" role="alert">{{ e | t }}</p>
   } @else {
-    <p>Loading…</p>
+    <p>{{ 'profile.loading' | t }}</p>
   }
 </section>

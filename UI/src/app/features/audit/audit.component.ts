@@ -3,19 +3,22 @@ import { DatePipe } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
 import { AuditService } from './audit.service';
 import { AuditLog, AuditLogFilter, AuditLogStats, PagedResponse } from './audit.models';
+import { TranslatePipe } from '../../core/i18n/translate.pipe';
+import { TranslateService } from '../../core/i18n/translate.service';
 
 type SortDir = 'asc' | 'desc';
 type SortField = 'createdAt' | 'entityType' | 'action';
 
 @Component({
   selector: 'app-audit',
-  imports: [ReactiveFormsModule, DatePipe],
+  imports: [ReactiveFormsModule, DatePipe, TranslatePipe],
   templateUrl: './audit.component.html',
   styleUrl: './audit.component.scss',
 })
 export class AuditComponent implements OnInit {
   private readonly fb = inject(FormBuilder);
   private readonly audit = inject(AuditService);
+  private readonly translate = inject(TranslateService);
 
   readonly filterForm = this.fb.nonNullable.group({
     entityType: [''],
@@ -73,7 +76,7 @@ export class AuditComponent implements OnInit {
   addDemoLogs(): void {
     const count = this.demoCount.value;
     if (this.demoBusy() || count < 1 || count > 500) {
-      this.demoMessage.set(count < 1 || count > 500 ? 'Count must be between 1 and 500.' : null);
+      this.demoMessage.set(count < 1 || count > 500 ? this.translate.t('audit.demoRange') : null);
       return;
     }
     this.demoBusy.set(true);
@@ -81,14 +84,12 @@ export class AuditComponent implements OnInit {
     this.audit.addDemoLogs(count).subscribe({
       next: (res) => {
         this.demoBusy.set(false);
-        this.demoMessage.set(`Added ${res.created} demo logs.`);
+        this.demoMessage.set(this.translate.t('audit.demoAdded', { count: res.created }));
         this.reload();
       },
       error: () => {
         this.demoBusy.set(false);
-        this.demoMessage.set(
-          'Could not add demo logs — the demo endpoint only exists in LOCAL/DEV.',
-        );
+        this.demoMessage.set(this.translate.t('audit.addDemoError'));
       },
     });
   }
@@ -128,9 +129,7 @@ export class AuditComponent implements OnInit {
           this.loading.set(false);
         },
         error: () => {
-          this.error.set(
-            'Could not load audit logs — is the Audit service running and are you signed in?',
-          );
+          this.error.set(this.translate.t('audit.loadError'));
           this.loading.set(false);
         },
       });

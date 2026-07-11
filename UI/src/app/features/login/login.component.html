@@ -1,47 +1,49 @@
 <section class="login">
-  <h1>Sign in</h1>
+  <h1>{{ 'login.title' | t }}</h1>
 
   <form [formGroup]="form" (ngSubmit)="submit()">
     <label>
-      Username
+      {{ 'login.username' | t }}
       <input type="text" formControlName="username" autocomplete="username" />
     </label>
     <label>
-      Password
+      {{ 'login.password' | t }}
       <input type="password" formControlName="password" autocomplete="current-password" />
     </label>
     <label>
-      Role
+      {{ 'login.role' | t }}
       <select formControlName="role">
         <option value="ROLE_USER">ROLE_USER</option>
         <option value="ROLE_ADMIN">ROLE_ADMIN</option>
       </select>
     </label>
 
-    @if (error()) {
-      <p class="error" role="alert">{{ error() }}</p>
+    @if (error(); as e) {
+      <p class="error" role="alert">{{ e | t }}</p>
     }
 
     @if (redirecting()) {
-      <p class="redirecting" role="status">Signed in — redirecting you back…</p>
+      <p class="redirecting" role="status">{{ 'login.redirectingMsg' | t }}</p>
     }
 
     <button type="submit" [disabled]="form.invalid || submitting()">
-      {{ redirecting() ? 'Redirecting…' : submitting() ? 'Signing in…' : 'Demo login' }}
+      {{
+        redirecting()
+          ? ('login.redirecting' | t)
+          : submitting()
+            ? ('login.signingIn' | t)
+            : ('login.demoLogin' | t)
+      }}
     </button>
   </form>
 
-  <div class="divider"><span>or</span></div>
+  <div class="divider">
+    <span>{{ 'login.or' | t }}</span>
+  </div>
 
-  <button type="button" class="google" (click)="loginWithGoogle()">Sign in with Google</button>
+  <button type="button" class="google" (click)="loginWithGoogle()">{{ 'login.google' | t }}</button>
 
-  <p class="hint oauth-note">
-    Google sign-in is limited to users registered as testers in this app's Google Cloud project (its
-    OAuth consent screen is in testing mode) — everyone else, use the demo login above.
-  </p>
+  <p class="hint oauth-note">{{ 'login.googleNote' | t }}</p>
 
-  <p class="hint">
-    Demo account: <code>demo</code> / <code>demo</code>. Pick ROLE_ADMIN to exercise admin-gated
-    actions.
-  </p>
+  <p class="hint">{{ 'login.demoNote' | t }}</p>
 </section>
