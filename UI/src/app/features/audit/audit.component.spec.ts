@@ -54,6 +54,10 @@ describe('AuditComponent', () => {
         byAction: [{ key: 'LOGIN', count: 1 }],
         byEntityType: [{ key: 'User', count: 1 }],
       });
+    // ngOnInit also probes the capability endpoint to decide whether to show the demo button.
+    httpMock
+      .expectOne((r) => r.url === `${environment.auditApiUrl}/api/v1/meta/features`)
+      .flush({ demoData: true });
   }
 
   it('should create and load the first page on init', () => {
@@ -61,6 +65,23 @@ describe('AuditComponent', () => {
     expect(component).toBeTruthy();
     expect(component.result()?.content.length).toBe(1);
     expect(component.stats()?.total).toBe(1);
+  });
+
+  it('hides the demo-log button when the backend reports demoData:false (a PROD backend)', () => {
+    fixture.detectChanges(); // ngOnInit → search + stats + features
+    httpMock
+      .expectOne((r) => r.url === `${base}/search`)
+      .flush({ content: [], page: 0, size: 20, totalElements: 0, totalPages: 0, last: true });
+    httpMock
+      .expectOne((r) => r.url === `${base}/stats`)
+      .flush({ total: 0, byAction: [], byEntityType: [] });
+    httpMock
+      .expectOne((r) => r.url === `${environment.auditApiUrl}/api/v1/meta/features`)
+      .flush({ demoData: false });
+    fixture.detectChanges();
+
+    expect(component.demoAvailable()).toBeFalse();
+    expect((fixture.nativeElement as HTMLElement).querySelector('.demo-tools')).toBeNull();
   });
 
   it('populates the dropdown options from the stats buckets and never shrinks them', () => {

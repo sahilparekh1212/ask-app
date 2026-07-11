@@ -70,6 +70,21 @@ alternative" treatment as ADR-0005/0008.
       https://ai-sandbox.sahilparekh1212.com (search/stats endpoints, modest VUs) answers
       "how does the $50 VM hold up" honestly; publish p95/throughput in the README next to
       the CI numbers.
+- [ ] **Set up the observability stack for prod.** The four containers
+      (Grafana/Prometheus/Loki/Tempo) ship in the compose stack and start on the VM, but
+      "running" ≠ "set up" — verify each actually works against the *deployed* services, not
+      just locally: (a) Prometheus is scraping both Auth and Audit on the VM (the compose
+      variant uses Docker DNS `dns_sd_configs`, not host ports — confirm targets are UP);
+      (b) Loki is receiving logs from the prod containers (the loki4j appender is only active
+      in DEV/SIT/UAT/PROD — confirm `LOKI_URL` resolves on the VM and log lines carry the
+      right `app` label, the bug that bit locally in PR #64); (c) Tempo is getting traces via
+      the OTLP endpoint and a login→Kafka→persist flow shows as one trace; (d) Grafana's
+      provisioned dashboards + datasources load and are populated. Then decide exposure:
+      currently unpublished (SSH-tunnel only, see the runbook item below) — for a live
+      portfolio demo, put read-only Grafana behind Caddy on a subdomain
+      (`grafana.ai-sandbox.sahilparekh1212.com`) with basic-auth or Grafana anonymous
+      viewer, and change the default `admin`/`admin`. Provider note: none needed — it's all
+      self-hosted OSS.
 - [ ] **Prod monitoring runbook.** Grafana/Prometheus/Loki/Tempo run on the VM but are
       deliberately unpublished; access via SSH tunnel:
       `gcloud compute ssh ai-sandbox-vm --zone=us-east1-b -- -L 3000:localhost:3000 -N`
@@ -102,6 +117,38 @@ alternative" treatment as ADR-0005/0008.
       ai-sandbox https://<domain>/mcp`), Grafana. Decide deliberately: keep `demo`/`demo`
       in prod (recruiter-friendly) vs drop it; the demo-log generator and seeder already
       don't exist outside LOCAL/DEV.
+
+### Dashboard — make it meaningful and relevant (NEXT UP)
+The prod dashboard is sparse because the audit trail only records Auth's `LOGIN` events; for
+a project that's fundamentally an AI sandbox (chat, flashcards, RAG, MCP) it should show what
+the app actually does. Four items, item 1 is the headline and unblocks the rest. Context: the
+"Add demo logs" button is now hidden in prod (a LOCAL/DEV-only affordance — see the
+`/api/v1/meta/features` capability probe), so prod won't be padded with dummy rows; real usage
+should populate it instead.
+- [ ] **1. Emit audit events from the AI features (headline; unblocks 2–4).** Have Chat,
+      Flashcards, RAG search and the MCP tools each publish an `AuditEvent` over the existing
+      Kafka → Audit pipeline (reuse the exact `com.aisandbox.common.event.AuditEvent` contract
+      Auth already produces with — check `AuthController`/its publisher first). Suggested
+      shapes: `Assistant/CHAT`, `Flashcards/GENERATED`, `Rag/SEARCH`, `Mcp/TOOL_CALL`, with
+      **non-PII** detail only (model, latency ms, retrieved-chunk count, screener-blocked
+      flag — never message text). Payoff: the dashboard tells *this app's* story, prod
+      populates organically from real visitors (no dummy data), and it's a strong
+      event-sourcing/CQRS narrative ("every feature emits a domain event; Audit is the sink;
+      the dashboard is its read model") that exercises the Kafka pipeline for something real.
+      Watch the fire-and-forget/at-most-once posture from ADR-0006 (audit loss on broker
+      outage is acceptable for these too).
+- [ ] **2. Add a time dimension.** Today only by-action/by-entityType bars exist. Add an
+      "events over the last 24h/7d" line or sparkline (dependency-free, matching the existing
+      CSS bar-chart style) so usage trends are visible — needs a backend time-bucket
+      aggregation (`GROUP BY date_trunc(...)`), built from the same `AuditLogSpecifications`
+      as search/stats so it honours the same filters.
+- [ ] **3. KPI summary cards on top.** A headline row: total events (24h), busiest feature,
+      blocked/error rate, unique event types — instant "what's happening", the standard
+      dashboard pattern. Cheap once the aggregation endpoints exist.
+- [ ] **4. Frame it against the observability stack.** Position this dashboard as the
+      *domain/business* view ("what users and agents did") complementing Grafana's *system*
+      view ("how the servers are performing") — a short About/README note plus optionally a
+      link out to Grafana. The contrast is itself an interview talking point.
 
 ### Feature: RAG MCP server with a vector DB
 - [x] **RAG MCP server backed by a vector database — implemented.** New `rag/` package in

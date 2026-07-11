@@ -7,6 +7,7 @@ import {
   AuditLogFilter,
   AuditLogStats,
   DemoDataResponse,
+  FeaturesResponse,
   PageRequest,
   PagedResponse,
 } from './audit.models';
@@ -16,6 +17,12 @@ import {
 export class AuditService {
   private readonly http = inject(HttpClient);
   private readonly base = `${environment.auditApiUrl}/api/v1/audit-logs`;
+  private readonly metaBase = `${environment.auditApiUrl}/api/v1/meta`;
+
+  /** Runtime capability flags — e.g. whether the demo-log generator exists on this backend. */
+  features(): Observable<FeaturesResponse> {
+    return this.http.get<FeaturesResponse>(`${this.metaBase}/features`);
+  }
 
   search(filter: AuditLogFilter, page: PageRequest): Observable<PagedResponse<AuditLog>> {
     const params = this.filterParams(filter)

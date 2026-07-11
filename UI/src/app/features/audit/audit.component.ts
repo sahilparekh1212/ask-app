@@ -43,6 +43,9 @@ export class AuditComponent implements OnInit {
   readonly demoCount = this.fb.nonNullable.control(10);
   readonly demoBusy = signal(false);
   readonly demoMessage = signal<string | null>(null);
+  // Hidden until the backend confirms the demo endpoint exists (LOCAL/DEV only), so a PROD
+  // deployment never shows a button whose click would 404. Starts false → never flashes.
+  readonly demoAvailable = signal(false);
 
   readonly page = signal(0);
   readonly size = signal(20);
@@ -56,6 +59,10 @@ export class AuditComponent implements OnInit {
 
   ngOnInit(): void {
     this.reload();
+    this.audit.features().subscribe({
+      next: (f) => this.demoAvailable.set(f.demoData),
+      error: () => this.demoAvailable.set(false),
+    });
   }
 
   applyFilters(): void {
