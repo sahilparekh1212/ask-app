@@ -22,8 +22,12 @@
       <p class="error" role="alert">{{ error() }}</p>
     }
 
+    @if (redirecting()) {
+      <p class="redirecting" role="status">Signed in — redirecting you back…</p>
+    }
+
     <button type="submit" [disabled]="form.invalid || submitting()">
-      {{ submitting() ? 'Signing in…' : 'Demo login' }}
+      {{ redirecting() ? 'Redirecting…' : submitting() ? 'Signing in…' : 'Demo login' }}
     </button>
   </form>
 

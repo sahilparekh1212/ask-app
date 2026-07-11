@@ -42,11 +42,11 @@ describe('AppComponent', () => {
     expect(tabs).toEqual(['Dashboard', 'Chat', 'Flashcards', 'About']);
   });
 
-  it('should show a Sign in link (and no avatar) when signed out', () => {
+  it('should show a Login link (and no avatar) when signed out', () => {
     const fixture = TestBed.createComponent(AppComponent);
     fixture.detectChanges();
     const compiled = fixture.nativeElement as HTMLElement;
-    expect(compiled.querySelector('.sign-in')?.textContent).toContain('Sign in');
+    expect(compiled.querySelector('.sign-in')?.textContent).toContain('Login');
     expect(compiled.querySelector('.avatar')).toBeNull();
   });
 

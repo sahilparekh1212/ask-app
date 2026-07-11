@@ -22,6 +22,7 @@ export class LoginComponent {
   });
 
   readonly submitting = signal(false);
+  readonly redirecting = signal(false);
   readonly error = signal<string | null>(null);
 
   submit(): void {
@@ -31,7 +32,12 @@ export class LoginComponent {
     this.submitting.set(true);
     this.error.set(null);
     this.auth.demoLogin(this.form.getRawValue()).subscribe({
-      next: () => this.router.navigateByUrl(this.returnUrl()),
+      next: () => {
+        // Show a brief "Redirecting…" state before sending the user back to wherever they were
+        // headed before the guard bounced them here (returnUrl), defaulting to their profile.
+        this.redirecting.set(true);
+        setTimeout(() => void this.router.navigateByUrl(this.returnUrl()), 700);
+      },
       error: () => {
         this.error.set(
           'Login failed — check the demo credentials and that the Auth service is running.',
