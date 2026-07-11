@@ -35,4 +35,9 @@ processResources {
 		include 'docs/**/*.md'
 		into 'rag-corpus'
 	}
+	// Note: the repository-ROOT README (one level above Backend/) is deliberately NOT bundled.
+	// The Audit image's Docker build context is Backend/, so anything above it is unreachable at
+	// image-build time — copying it here would only ever populate the host/CI build, giving a
+	// corpus that differs between a local Gradle build and the shipped container. The backend
+	// README (above) plus docs/code-map.md already cover the repo for retrieval.
 }

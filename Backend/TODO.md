@@ -166,6 +166,28 @@ should populate it instead.
       link out to Grafana. The contrast is itself an interview talking point.
 
 ### Feature: RAG MCP server with a vector DB
+- [x] **Assistant explains the codebase + turns stack traces into IDE prompts — implemented.**
+      Two changes on top of the RAG assistant so it can "explain everything" about the repo, not
+      just the app's behaviour. (1) **Dataset:** a new file-by-file [`docs/code-map.md`](docs/code-map.md)
+      summarises every significant source/config/infra file, grouped by concern (Docker, CI/CD,
+      Kafka pipeline, Auth, Audit, RAG/MCP, Assistant, UI, observability, DB, docs). The concern
+      headings double as retrieval anchors — heading-based chunking means "which files are tied to
+      the Docker setup?" pulls the whole Docker group as one chunk. It rides the existing corpus
+      path (`docs/**/*.md` → `rag-corpus/` → `CorpusLoader`), so it indexed automatically on rebuild
+      (150 chunks / 15 docs, 18 newly embedded). (2) **Prompt:** `AssistantContextBuilder`'s chat
+      system prompt now (a) permits codebase/file questions and tells the model to list relevant
+      file paths with a one-line role each, drawing only on the code map (no invented paths), and
+      (b) handles a pasted error/stack trace by naming the likely files and then emitting a single
+      ready-to-paste prompt for an IDE assistant (Claude Code / GitHub Copilot) in a fenced code
+      block — goal, quoted error line, files to inspect, root-cause ask. Considered but dropped:
+      bundling the repo-ROOT README into the corpus — the Audit image's Docker build context is
+      `Backend/`, so anything above it is unreachable at image-build time; copying it would only
+      populate the host/CI build and give a corpus that differs from the shipped container (the
+      backend README + code map already cover retrieval). Tested (`CorpusLoaderTest` asserts the
+      code map is bundled; `AssistantContextBuilderTest` asserts the new prompt rules) and verified
+      live against the running stack: the docker-files question returned the exact file list, and a
+      Kafka-consumer NPE stack trace produced a correct IDE prompt naming `AuditEventConsumer`/
+      `AuditLog`/`AuditEvent` and even flagging the DLT/fire-and-forget nuance from ADR-0006.
 - [x] **RAG MCP server backed by a vector database — implemented.** New `rag/` package in
       Audit + `POST /mcp`, a Model Context Protocol server (Streamable HTTP, stateless
       subset) exposing `search_knowledge` + `list_sources` over this repo's own knowledge

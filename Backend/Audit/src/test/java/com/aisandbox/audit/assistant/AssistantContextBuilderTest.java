@@ -42,6 +42,21 @@ class AssistantContextBuilderTest {
 	}
 
 	@Test
+	void promptEnablesCodebaseAndStacktraceQuestions() {
+		String prompt = builder.buildSystemPrompt(false);
+
+		// The assistant is told it can answer "which files do X" from the code map...
+		assertThat(prompt).contains("code map");
+		assertThat(prompt).contains("which files");
+		assertThat(prompt).containsIgnoringCase("do not invent file paths");
+		// ...and that a pasted stack trace should yield a ready-to-paste IDE prompt in a code block.
+		assertThat(prompt).containsIgnoringCase("stack trace");
+		assertThat(prompt).containsIgnoringCase("Claude Code");
+		assertThat(prompt).containsIgnoringCase("GitHub Copilot");
+		assertThat(prompt).contains("code block");
+	}
+
+	@Test
 	void userRoleGetsNoRawRows() {
 		String prompt = builder.buildSystemPrompt(false);
 

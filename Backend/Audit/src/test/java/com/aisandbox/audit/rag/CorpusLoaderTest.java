@@ -23,6 +23,9 @@ class CorpusLoaderTest {
 		assertThat(documents).anySatisfy(doc -> assertThat(doc.source()).isEqualTo("README.md"));
 		assertThat(documents).anySatisfy(doc -> assertThat(doc.source()).startsWith("docs/adr/"));
 		assertThat(documents).anySatisfy(doc -> assertThat(doc.source()).isEqualTo("assistant/app-context.md"));
+		// The file-by-file code map is part of the corpus so the assistant can answer
+		// "which files do X" questions (see AssistantContextBuilder's codebase rules).
+		assertThat(documents).anySatisfy(doc -> assertThat(doc.source()).isEqualTo("docs/code-map.md"));
 		assertThat(documents).allSatisfy(doc -> assertThat(doc.content()).isNotBlank());
 	}
 
