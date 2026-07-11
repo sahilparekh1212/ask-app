@@ -60,4 +60,29 @@ processResources {
 		exclude '**/*.md'
 		into 'rag-corpus'
 	}
+	// Observability + deployment topology: the Prometheus/Loki/Tempo/Grafana configs, the compose
+	// stack, and the OpenShift manifests. These live under Backend/ (already in the Docker build
+	// context), so no extra wiring beyond Audit/Dockerfile COPYing them into the build stage.
+	from(rootProject.projectDir) {
+		include 'monitoring/**'
+		include 'docker-compose*.yml'
+		include 'kafka/docker-compose.yml'
+		include 'openshift/**'
+		into 'rag-corpus'
+	}
+	// Frontend (Angular UI) source. UI/ sits ABOVE Backend/ (this Gradle root), i.e. outside the
+	// Audit image's Docker build context — so the container build receives it as a named build
+	// context (ui=../UI, copied to /UI in Audit/Dockerfile) and this path resolves to /UI there
+	// and to <repo>/UI on a host build: identical either way, so the bundle can't become a
+	// host-only artifact. package-lock is excluded (huge, no explanatory value); node_modules
+	// never enters the context (UI/.dockerignore).
+	from(file("${rootProject.projectDir}/../UI")) {
+		include 'src/**'
+		include 'nginx.conf'
+		include 'package.json'
+		include 'angular.json'
+		include 'tsconfig*.json'
+		exclude '**/*.spec.ts'
+		into 'rag-corpus/UI'
+	}
 }

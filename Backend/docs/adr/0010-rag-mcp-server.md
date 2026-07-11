@@ -148,3 +148,23 @@ Gradle files qualify; the Angular `UI/` and the compose/CI YAML that live *above
 bundling the repo-root README a host-only artifact). The `docs/code-map.md` and `docs/ui-guide.md`
 descriptions cover those instead. If the UI source is wanted in the index later, the deliberate move
 is to widen the Docker build context, not to sneak a host-only `from` into `processResources`.
+
+### Addendum 2 — extending the corpus to the UI and observability stack
+
+The corpus was then widened again to cover the **Angular UI source** and the **observability +
+deployment configs** (Prometheus/Loki/Tempo/Grafana, the compose stack, the OpenShift manifests),
+so the assistant can read the whole system, not just the backend.
+
+The observability/deploy configs live under `Backend/` (already in the build context), so they were
+just added to the `processResources` copy and `Audit/Dockerfile`. The UI was the interesting case:
+`UI/` is a *sibling* of `Backend/`, outside the Audit image's build context — the exact limitation
+the first addendum recorded. Rather than widen the context to the repo root (which would have
+re-pathed every `COPY` and needed a repo-root `.dockerignore`), the UI is supplied as a **named
+build context** (`--build-context ui=../UI`, `additional_contexts` in compose) and copied to an
+absolute `/UI` — a sibling of the Gradle root `/workspace` — so `processResources`'
+`"${rootProject}/../UI"` resolves to it in-container exactly as it resolves to `<repo>/UI` on a host
+build. That keeps host and container corpora identical (no host-only artifact) with a one-line
+`COPY --from=ui`. Every place the Audit image is built now passes that context: `docker-compose.yml`
+(`additional_contexts`), `cd.yml` (`build-contexts`), and the Trivy build in `backend-ci.yml`
+(`--build-context`). `package-lock.json` and `node_modules` are excluded (no explanatory value /
+never in the context); empty files (e.g. an empty Angular `*.scss`) are skipped by `CorpusLoader`.

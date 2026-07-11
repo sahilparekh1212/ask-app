@@ -199,6 +199,10 @@ services:
     build:
       context: .
       dockerfile: Audit/Dockerfile
+      # UI/ is outside this build context (Backend/), but Audit bundles the Angular source into
+      # its RAG corpus — so pass it as a named build context the Dockerfile COPYs from (--from=ui).
+      additional_contexts:
+        ui: ../UI
     container_name: aisandbox-audit
     environment:
       SPRING_PROFILES_ACTIVE: DEV

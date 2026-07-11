@@ -183,6 +183,20 @@ should populate it instead.
       chat accurately quoted `AuditEventPublisher`'s topic/keying/`@Async` posture straight from the
       source. Tested (`CodeChunkerTest`; `CorpusLoaderTest` asserts a `.java` + a Gradle file are
       bundled; `RagIndexerTest` covers the code path); 90% gate + Spotless green.
+      **Extended to the UI + observability stack:** the corpus now also bundles the **Angular UI
+      source** (`UI/src`) and the **observability/deployment configs** (`monitoring/`, the compose
+      files, `openshift/`). Observability lives under `Backend/` so it was a straight COPY + include;
+      `UI/` is outside the Audit image's build context, so it's supplied as a **named build context**
+      (`--build-context ui=../UI`, copied to `/UI` so the Gradle `../UI` path resolves identically
+      host-vs-container — no host-only artifact). Every Audit-image build site passes it:
+      `docker-compose.yml` (`additional_contexts`), `cd.yml` (`build-contexts`), and the Trivy build
+      in `backend-ci.yml` (`--build-context`). Verified live in the rebuilt image (459 chunks / 219
+      docs; 47 UI files, 8 monitoring, 29 openshift indexed): the chat read `auth.interceptor.ts`'s
+      401 refresh-retry and compared all three Prometheus configs (static vs `dns_sd_configs` vs
+      OpenShift) from the actual files. Recorded in ADR-0010 addendum 2. **Note:** the three CI/build
+      changes are verified locally via `docker compose build` and the mirrored
+      `docker build --build-context ui=../UI` command; the `cd.yml` `build-contexts` input can only
+      be exercised on a real push — watch that CD run when this ships.
 - [x] **Assistant explains the codebase + turns stack traces into IDE prompts — implemented.**
       Two changes on top of the RAG assistant so it can "explain everything" about the repo, not
       just the app's behaviour. (1) **Dataset:** a new file-by-file [`docs/code-map.md`](docs/code-map.md)

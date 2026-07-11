@@ -32,6 +32,10 @@ class CorpusLoaderTest {
 		assertThat(documents).anySatisfy(doc -> assertThat(doc.source())
 			.endsWith("com/aisandbox/audit/event/AuditEventPublisher.java"));
 		assertThat(documents).anySatisfy(doc -> assertThat(doc.source()).isEqualTo("settings.gradle"));
+		// The observability configs and the Angular UI source are bundled as well.
+		assertThat(documents).anySatisfy(doc -> assertThat(doc.source()).startsWith("monitoring/"));
+		assertThat(documents).anySatisfy(doc -> assertThat(doc.source())
+			.isEqualTo("UI/src/app/features/assistant/assistant.component.ts"));
 		assertThat(documents).allSatisfy(doc -> assertThat(doc.content()).isNotBlank());
 	}
 

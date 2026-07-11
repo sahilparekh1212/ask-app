@@ -200,10 +200,12 @@ jobs:
       # dependencies, not the OS layer. Each Dockerfile's COPY paths are relative to Backend/ (its
       # own header comment's "repo root" means Backend/, not the actual git root one level up), so
       # this must run with Backend/ as both the working directory and the build context.
+      # Audit also bundles the Angular UI into its RAG corpus, so it gets UI/ (one level up from
+      # the Backend working directory) as a named build context (Dockerfile COPYs it via --from=ui).
       - name: Build Docker images
         working-directory: Backend
         run: |
-          docker build -f Audit/Dockerfile -t audit-service:ci .
+          DOCKER_BUILDKIT=1 docker build -f Audit/Dockerfile --build-context ui=../UI -t audit-service:ci .
           docker build -f Auth/Dockerfile -t auth-service:ci .
 
       # SARIF reports land in the Security tab (all severities — trivy-action doesn't apply the

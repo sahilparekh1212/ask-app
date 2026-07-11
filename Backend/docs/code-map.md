@@ -199,8 +199,10 @@ topic and Audit consumes and persists them. Files tied to this pipeline:
 - `rag/MarkdownChunker.java` — splits markdown documents into chunks by heading.
 - `rag/CodeChunker.java` — splits bundled **source files** into chunks by size on line boundaries
   (labelled with their line range). The corpus includes the backend source (Auth/Audit/common Java
-  + resources + Gradle files), bundled at build time, so the assistant can read the actual deployed
-  code — `RagIndexer` picks markdown vs code chunking per file. See ADR-0010's addendum.
+  + resources + Gradle files), the **Angular UI source** (`UI/src`, via a named build context), and
+  the **observability + deployment configs** (`monitoring/`, the compose files, `openshift/`) — all
+  bundled at build time, so the assistant can read the actual deployed system. `RagIndexer` picks
+  markdown vs code chunking per file. See ADR-0010's addenda.
 - `rag/EmbeddingClient.java` — the embeddings seam (interface).
 - `rag/VoyageEmbeddingClient.java` — Voyage AI embeddings implementation (`voyage-3.5-lite`).
 - `rag/VectorStore.java` — the vector-store Strategy interface.

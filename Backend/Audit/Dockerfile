@@ -23,6 +23,17 @@ COPY Audit/src Audit/src
 # (.dockerignore un-ignores them).
 COPY README.md README.md
 COPY docs docs
+# More RAG corpus inputs — the observability + deployment topology (in this Backend context):
+# Prometheus/Loki/Tempo/Grafana configs, the compose stack, and the OpenShift manifests.
+COPY monitoring monitoring
+COPY docker-compose.yml docker-compose.prod.yml docker-compose.ghcr.yml docker-compose.scale.yml ./
+COPY kafka kafka
+COPY openshift openshift
+# The Angular UI source lives ABOVE this build context (UI/ is a sibling of Backend/), so it is
+# supplied as a named build context and copied to /UI — a sibling of the Gradle root (/workspace)
+# — so processResources' "${rootProject}/../UI" resolves to it exactly as it does on a host build.
+# Callers must pass it: docker build --build-context ui=../UI ...  (compose: additional_contexts).
+COPY --from=ui . /UI
 RUN chmod +x gradlew && ./gradlew :Audit:bootJar --no-daemon -x test
 
 FROM eclipse-temurin:25-jre-alpine

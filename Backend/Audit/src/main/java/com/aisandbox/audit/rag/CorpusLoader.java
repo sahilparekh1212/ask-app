@@ -33,8 +33,13 @@ public class CorpusLoader {
 	// Source files bundled alongside the docs. Everything with a dot is scanned, then filtered to
 	// the text/code extensions below (so a stray binary or the markdown docs aren't double-loaded).
 	private static final String CODE_PATTERN = "classpath*:rag-corpus/**/*.*";
-	private static final Set<String> CODE_EXTENSIONS =
-		Set.of("java", "gradle", "properties", "xml", "yaml", "yml");
+	private static final Set<String> CODE_EXTENSIONS = Set.of(
+		// backend
+		"java", "gradle", "properties", "xml",
+		// infra / observability / deployment configs
+		"yaml", "yml", "json", "conf",
+		// frontend (Angular UI)
+		"ts", "html", "scss");
 	private static final String CORPUS_MARKER = "rag-corpus/";
 	private static final String APP_CONTEXT = "assistant/app-context.md";
 
@@ -52,7 +57,12 @@ public class CorpusLoader {
 			for (Resource resource : resolver.getResources(CODE_PATTERN)) {
 				String name = relativeName(resource);
 				if (hasCodeExtension(name)) {
-					documents.add(new CorpusDocument(name, read(resource)));
+					String content = read(resource);
+					// Skip empty files (e.g. an empty Angular *.scss) — nothing to embed, and a
+					// blank chunk would only dilute retrieval.
+					if (!content.isBlank()) {
+						documents.add(new CorpusDocument(name, content));
+					}
 				}
 			}
 			Resource appContext = resolver.getResource("classpath:" + APP_CONTEXT);
