@@ -1,9 +1,7 @@
-// Break out of .app-main's centered 1100px column so the audit table gets the full
-// viewport width: pull both margins to the viewport edge, then restore the page gutter.
+// .app-main is now full-width and top-left aligned, so the audit table fills it directly —
+// no breakout hack needed (the old margin-inline: calc(50% - 50vw) would over-shoot now).
 :host {
   display: block;
-  margin-inline: calc(50% - 50vw);
-  padding-inline: 1.5rem;
 }
 
 .audit {

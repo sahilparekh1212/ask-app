@@ -39,6 +39,23 @@ describe('AssistantComponent', () => {
     expect(component.input.value).toBe('');
   });
 
+  // Regression: (ngSubmit) is only a real event when a forms directive is attached to the
+  // <form> ([formGroup]) — without it the binding is silently dead and the Send button does
+  // a native page-reload GET instead of calling the API. Calling component.send() directly
+  // (like the tests above) can never catch that, so this test goes through the DOM.
+  it('sends when the composer form itself is submitted', () => {
+    assistant.chat.and.returnValue(of({ reply: 'hi', blocked: false }));
+
+    component.input.setValue('hello there');
+    fixture.detectChanges();
+    const form: HTMLFormElement = fixture.nativeElement.querySelector('form.composer');
+    form.dispatchEvent(new Event('submit'));
+    fixture.detectChanges();
+
+    expect(assistant.chat).toHaveBeenCalledWith('hello there', []);
+    expect(component.turns().length).toBe(2);
+  });
+
   it('marks guardrail refusals as blocked and excludes them from later history', () => {
     assistant.chat.and.returnValue(of({ reply: "Can't help with that.", blocked: true }));
     component.input.setValue('my password=hunter2');

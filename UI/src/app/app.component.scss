@@ -104,7 +104,7 @@
 }
 
 .app-main {
+  // Full-width, top-left content on every tab (matching the Dashboard's anchored layout)
+  // rather than a centered column — pages align to the same left gutter as they switch.
   padding: 1.5rem;
-  max-width: 1100px;
-  margin: 0 auto;
 }

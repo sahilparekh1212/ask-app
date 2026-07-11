@@ -39,6 +39,21 @@ describe('FlashcardsComponent', () => {
     expect(component.flipped()).toBeFalse();
   });
 
+  // Regression: (ngSubmit) is only a real event when a forms directive is attached to the
+  // <form> ([formGroup]) — without it the binding is silently dead and the submit button
+  // does a native page-reload GET instead of calling the API. Calling component.generate()
+  // directly (like the tests above) can never catch that, so this test goes through the DOM.
+  it('generates when the form itself is submitted', () => {
+    service.generate.and.returnValue(of({ cards: deck }));
+
+    const form: HTMLFormElement = fixture.nativeElement.querySelector('form.controls');
+    form.dispatchEvent(new Event('submit'));
+    fixture.detectChanges();
+
+    expect(service.generate).toHaveBeenCalledWith(5);
+    expect(component.deck().length).toBe(3);
+  });
+
   it('flips the current card and resets flip on navigation', () => {
     service.generate.and.returnValue(of({ cards: deck }));
     component.generate();

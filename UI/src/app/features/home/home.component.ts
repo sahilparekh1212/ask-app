@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 
 interface TechGroup {
@@ -32,6 +32,11 @@ interface Feature {
 })
 export class HomeComponent {
   readonly repoUrl = 'https://github.com/sahilparekh1212/AI-Sandbox';
+  readonly linkedInUrl = 'https://www.linkedin.com/in/sahilparekh1212/';
+
+  // Which "Design decisions" group is shown; the others stay in the DOM but hidden, so
+  // switching is instant (no re-render) and there's no long scroll through every group.
+  readonly activeDecision = signal(0);
 
   readonly stack: TechGroup[] = [
     {
@@ -48,7 +53,14 @@ export class HomeComponent {
       area: 'Build & CI/CD',
       items: ['Gradle', 'Docker', 'GitHub Actions', 'k6', 'CodeQL + Trivy'],
     },
-    { area: 'AI', items: ['Claude (Anthropic Java SDK)'] },
+    {
+      area: 'AI',
+      items: [
+        'Claude (Anthropic Java SDK)',
+        'RAG (pgvector + Voyage embeddings)',
+        'MCP server (Model Context Protocol)',
+      ],
+    },
   ];
 
   readonly decisionGroups: DecisionGroup[] = [
@@ -175,21 +187,21 @@ export class HomeComponent {
 
   readonly features: Feature[] = [
     {
-      title: 'Audit dashboard',
+      title: 'Dashboard',
       blurb:
         'Server-side paginated, sortable, filterable table over the audit trail, with database-side aggregation shown as dependency-free bar charts.',
-      link: { label: 'Open the audit dashboard →', to: '/audit' },
+      link: { label: 'Open the dashboard →', to: '/audit' },
     },
     {
-      title: 'Assistant',
+      title: 'Chat',
       blurb:
-        'Ask a Claude model about this application; answers are grounded on the app docs and role-scoped audit data, with server-side guardrails.',
-      link: { label: 'Open the assistant →', to: '/assistant' },
+        'Ask a Claude model about this application. Answers are grounded via RAG — each question retrieves the most relevant chunks of the repo’s own docs (README, ADRs) from a pgvector index using Voyage embeddings — plus role-scoped audit data, with server-side guardrails. The same index is exposed to any MCP client as a Model Context Protocol server.',
+      link: { label: 'Open the chat →', to: '/assistant' },
     },
     {
       title: 'Flashcards',
       blurb:
-        'Generate an LLM study deck about the app — architecture, design decisions, and tradeoffs — through the same guarded proxy as the assistant.',
+        'Generate an LLM study deck about the app — architecture, design decisions, and tradeoffs — through the same guarded Claude proxy and doc-grounded context as the chat.',
       link: { label: 'Open the flashcards →', to: '/flashcards' },
     },
     {

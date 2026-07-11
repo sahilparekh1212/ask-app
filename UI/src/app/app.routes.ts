@@ -13,11 +13,11 @@ export const routes: Routes = [
   { path: 'login', component: LoginComponent, title: 'Sign in' },
   { path: 'login/callback', component: AuthCallbackComponent, title: 'Signing in…' },
   { path: 'profile', component: ProfileComponent, title: 'Profile', canActivate: [authGuard] },
-  { path: 'audit', component: AuditComponent, title: 'Audit log', canActivate: [authGuard] },
+  { path: 'audit', component: AuditComponent, title: 'Dashboard', canActivate: [authGuard] },
   {
     path: 'assistant',
     component: AssistantComponent,
-    title: 'Assistant',
+    title: 'Chat',
     canActivate: [authGuard],
   },
   {

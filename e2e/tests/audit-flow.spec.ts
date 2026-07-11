@@ -16,7 +16,7 @@ async function loginAsDemo(page: Page): Promise<void> {
 }
 
 async function openAudit(page: Page): Promise<void> {
-  await page.getByRole('link', { name: 'Audit' }).click();
+  await page.getByRole('link', { name: 'Dashboard' }).click();
   await page.waitForURL('**/audit');
   // The seeder guarantees data on first run, so the initial unfiltered load must show rows.
   await expect(page.locator('tbody tr').first()).toBeVisible();

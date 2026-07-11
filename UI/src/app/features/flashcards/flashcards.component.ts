@@ -13,7 +13,11 @@ export class FlashcardsComponent {
   private readonly fb = inject(FormBuilder);
   private readonly flashcards = inject(FlashcardsService);
 
-  readonly count = this.fb.nonNullable.control(8);
+  readonly count = this.fb.nonNullable.control(5);
+  // The [formGroup] binding is what attaches Angular's form directive to the <form> element;
+  // without it, (ngSubmit) is a dead binding and the submit button falls back to a native
+  // page-reload GET submit — no API call ever fires (the prod bug this group fixes).
+  readonly form = this.fb.group({ count: this.count });
   readonly deck = signal<Flashcard[]>([]);
   readonly index = signal(0);
   readonly flipped = signal(false);

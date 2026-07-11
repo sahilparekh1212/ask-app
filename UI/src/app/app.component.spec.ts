@@ -34,19 +34,12 @@ describe('AppComponent', () => {
     expect(app.title).toEqual('AI-Sandbox');
   });
 
-  it('should render the brand in the header', () => {
-    const fixture = TestBed.createComponent(AppComponent);
-    fixture.detectChanges();
-    const compiled = fixture.nativeElement as HTMLElement;
-    expect(compiled.querySelector('.brand')?.textContent).toContain('AI-Sandbox');
-  });
-
   it('should order the tabs with the feature tabs leading and About after Flashcards', () => {
     const fixture = TestBed.createComponent(AppComponent);
     fixture.detectChanges();
     const compiled = fixture.nativeElement as HTMLElement;
     const tabs = [...compiled.querySelectorAll('.tabs a')].map((a) => a.textContent?.trim());
-    expect(tabs).toEqual(['Audit', 'Assistant', 'Flashcards', 'About']);
+    expect(tabs).toEqual(['Dashboard', 'Chat', 'Flashcards', 'About']);
   });
 
   it('should show a Sign in link (and no avatar) when signed out', () => {

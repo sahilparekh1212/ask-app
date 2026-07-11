@@ -50,6 +50,13 @@ alternative" treatment as ADR-0005/0008.
       created with an empty `$PROJECT_NUM` (Cloud Shell env vars don't survive sessions),
       the smoke check racing Let's Encrypt's first issuance, and gcloud's short-TTL implicit
       OS Login key expiring mid-run — the merge→CD→Deploy chain then ran fully green.
+- [ ] **Make the app work on mobile.** The SPA is desktop-first today (fixed 56px header
+      tabs, 1100px centered column, the audit table's full-bleed breakout, side-by-side
+      composer). Needs a responsive pass: viewport-driven layout for the nav (collapse or
+      scrollable tabs), the dashboard table (horizontal scroll or card rows on small
+      screens), chat/flashcards forms stacking, and touch targets. Verify with Playwright's
+      mobile emulation (adds a real e2e dimension) and Lighthouse mobile score as the
+      honest metric.
 - [ ] **Update README for public use.** Lead with the live URL
       (https://ai-sandbox.sahilparekh1212.com), the demo login (`demo`/`demo`), and the
       public MCP endpoint (`claude mcp add --transport http ai-sandbox
