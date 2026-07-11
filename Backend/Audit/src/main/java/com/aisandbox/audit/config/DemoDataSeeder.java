@@ -43,22 +43,22 @@ public class DemoDataSeeder implements CommandLineRunner {
 			log.info("Skipping demo data seed — audit_logs already has rows");
 			return;
 		}
+		// This app's own domain events (auth + AI features), not generic e-commerce rows — so a
+		// freshly-seeded dashboard reflects what AI-Sandbox actually does. Details mirror the real
+		// events' non-PII key=value shape.
 		List<AuditLog> seed = List.of(
 			new AuditLog("User", "LOGIN", "Demo user signed in"),
 			new AuditLog("User", "TOKEN_REFRESH", "Access token refreshed"),
 			new AuditLog("User", "LOGOUT", "Demo user signed out"),
-			new AuditLog("Order", "CREATE", "Order #1042 created"),
-			new AuditLog("Order", "UPDATE", "Order #1042 shipped"),
-			new AuditLog("Order", "CREATE", "Order #1043 created"),
-			new AuditLog("Order", "UPDATE", "Order #1039 refunded"),
-			new AuditLog("Order", "DELETE", "Order #1039 cancelled"),
-			new AuditLog("Payment", "CREATE", "Payment captured for order #1042"),
-			new AuditLog("Payment", "CREATE", "Payment captured for order #1043"),
-			new AuditLog("Payment", "DELETE", "Payment reversed for order #1039"),
-			new AuditLog("Inventory", "UPDATE", "Stock decremented for SKU-2201"),
-			new AuditLog("Inventory", "UPDATE", "Stock replenished for SKU-2201"),
-			new AuditLog("Report", "CREATE", "Monthly sales report generated"),
-			new AuditLog("User", "LOGIN", "Recruiter demo login")
+			new AuditLog("User", "LOGIN", "Recruiter demo login"),
+			new AuditLog("Assistant", "CHAT", "blocked=false model=claude-opus-4-8 latencyMs=1820 retrievedChunks=5"),
+			new AuditLog("Assistant", "CHAT", "blocked=false model=claude-opus-4-8 latencyMs=2450 retrievedChunks=3"),
+			new AuditLog("Assistant", "CHAT", "blocked=true category=EMAIL"),
+			new AuditLog("Flashcards", "GENERATED", "model=claude-opus-4-8 requested=8 produced=8 latencyMs=6120"),
+			new AuditLog("Flashcards", "GENERATED", "model=claude-opus-4-8 requested=5 produced=5 latencyMs=4300"),
+			new AuditLog("Rag", "SEARCH", "tool=search_knowledge latencyMs=38 error=false"),
+			new AuditLog("Rag", "SEARCH", "tool=search_knowledge latencyMs=52 error=false"),
+			new AuditLog("Mcp", "TOOL_CALL", "tool=list_sources latencyMs=7 error=false")
 		);
 		repository.saveAll(seed);
 		log.info("Seeded {} demo audit log rows", seed.size());

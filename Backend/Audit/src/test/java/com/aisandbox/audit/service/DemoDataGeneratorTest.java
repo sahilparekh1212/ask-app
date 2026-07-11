@@ -20,8 +20,9 @@ class DemoDataGeneratorTest {
 
 	@Test
 	void generate_producesFullyPopulatedRowsFromTheKnownVocabulary() {
-		Set<String> entityTypes = Set.of("User", "Order", "Payment", "Inventory", "Report");
-		Set<String> actions = Set.of("LOGIN", "TOKEN_REFRESH", "LOGOUT", "CREATE", "UPDATE", "DELETE");
+		// This app's own domain events — auth (User) + the AI features — not e-commerce rows.
+		Set<String> entityTypes = Set.of("User", "Assistant", "Flashcards", "Rag", "Mcp");
+		Set<String> actions = Set.of("LOGIN", "TOKEN_REFRESH", "LOGOUT", "CHAT", "GENERATED", "SEARCH", "TOOL_CALL");
 
 		List<AuditLog> rows = generator.generate(100);
 
@@ -39,8 +40,8 @@ class DemoDataGeneratorTest {
 		List<AuditLog> rows = generator.generate(100);
 
 		long distinctDetails = rows.stream().map(AuditLog::getDetails).distinct().count();
-		// 100 draws over 12 templates × ~9000 ids collide occasionally; "well above one
-		// per template" is the property that matters for a details-search demo.
+		// 100 draws over the templates, most carrying a random id/latency, collide occasionally;
+		// "well above one per template" is the property that matters for a details-search demo.
 		assertThat(distinctDetails).isGreaterThan(20);
 	}
 
