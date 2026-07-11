@@ -20,9 +20,7 @@ export class AssistantComponent {
 
   // Pre-filled (not placeholder) so a visitor can hit Send immediately — and the default is
   // a conceptual question the RAG grounding answers well, doubling as a feature demo.
-  readonly input = this.fb.nonNullable.control(
-    'How does the RAG pipeline behind this chat work?',
-  );
+  readonly input = this.fb.nonNullable.control('How does the RAG pipeline behind this chat work?');
   // The [formGroup] binding is what attaches Angular's form directive to the <form> element;
   // without it, (ngSubmit) is a dead binding and the Send button falls back to a native
   // page-reload GET submit — no API call ever fires (the prod bug this group fixes).
