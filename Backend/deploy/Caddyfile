@@ -1,0 +1,11 @@
+# TLS front for the production VM (see docker-compose.prod.yml). Caddy obtains and renews
+# the Let's Encrypt certificate for $DOMAIN automatically — the only prerequisites are the
+# DNS A-record pointing at this host and ports 80/443 open, both part of the GCP-foundation
+# TODO items. Everything behind it is the existing ui nginx, which already does SPA fallback
+# and the same-origin /auth-api + /audit-api reverse proxying with the X-Forwarded-* headers
+# Spring's OAuth redirect derivation depends on — Caddy adds X-Forwarded-Proto/Host for its
+# own hop by default, so the https scheme survives to the backends.
+{$DOMAIN} {
+	encode gzip
+	reverse_proxy ui:80
+}

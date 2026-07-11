@@ -1,0 +1,113 @@
+# Deploys the compose stack to the production GCE VM after CD has pushed fresh images.
+#
+# Auth is keyless: Workload Identity Federation exchanges the workflow's GitHub OIDC token
+# for the deploy service account — no exported JSON key exists anywhere. The same trust
+# chain as the cosign keyless signing in cd.yml, pointed the other direction.
+#
+# Gated on the repository variable DEPLOY_ENABLED == 'true', so this workflow can merge and
+# sit dormant until the one-time GCP setup (WIF pool/provider, deploy SA, VM OS Login) and
+# the repository secrets exist. Flip the variable to arm it; workflow_dispatch triggers a
+# first deploy without waiting for a merge.
+#
+# Secret handling on the VM: everything single-line goes into /opt/ai-sandbox/.env (read by
+# docker compose interpolation); the RSA signing key is multi-line PEM, which .env cannot
+# carry, so it ships as a 600-mode file and is exported into the shell that runs
+# `docker compose up` (shell env beats .env in compose precedence).
+name: Deploy
+
+on:
+  workflow_run:
+    workflows: [CD]
+    types: [completed]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-prod
+  cancel-in-progress: false
+
+env:
+  GCP_ZONE: us-east1-b
+  GCP_VM: ai-sandbox-vm
+  APP_DIR: /opt/ai-sandbox
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  deploy:
+    # Run only when armed, and (for the workflow_run trigger) only after a successful CD
+    # on main. workflow_dispatch skips the conclusion check — there is no triggering run.
+    if: >-
+      vars.DEPLOY_ENABLED == 'true' &&
+      (github.event_name == 'workflow_dispatch' ||
+       (github.event.workflow_run.conclusion == 'success' &&
+        github.event.workflow_run.head_branch == 'main'))
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud (WIF, keyless)
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
+          service_account: ${{ secrets.GCP_DEPLOY_SA }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Prepare app directory on the VM
+        run: |
+          gcloud compute ssh "$GCP_VM" --zone="$GCP_ZONE" --quiet --command \
+            "sudo mkdir -p $APP_DIR/deploy $APP_DIR/secrets && sudo chown -R \$(whoami) $APP_DIR && chmod 700 $APP_DIR/secrets"
+
+      - name: Ship compose bundle
+        run: |
+          gcloud compute scp --zone="$GCP_ZONE" --quiet \
+            Backend/docker-compose.yml Backend/docker-compose.ghcr.yml Backend/docker-compose.prod.yml \
+            "$GCP_VM:$APP_DIR/"
+          gcloud compute scp --zone="$GCP_ZONE" --quiet \
+            Backend/deploy/Caddyfile "$GCP_VM:$APP_DIR/deploy/"
+          # The monitoring stack mounts its configs from the tree (prometheus/loki/tempo/grafana).
+          gcloud compute scp --zone="$GCP_ZONE" --quiet --recurse \
+            Backend/monitoring "$GCP_VM:$APP_DIR/"
+
+      - name: Ship environment and signing key
+        run: |
+          umask 077
+          cat > .env.deploy <<EOF
+          DOMAIN=${{ vars.DEPLOY_DOMAIN }}
+          DB_PASSWORD=${{ secrets.DB_PASSWORD }}
+          GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}
+          ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }}
+          VOYAGE_API_KEY=${{ secrets.VOYAGE_API_KEY }}
+          AI_SANDBOX_TAG=latest
+          EOF
+          printf '%s\n' "${{ secrets.AUTH_RSA_PRIVATE_KEY }}" > auth_key.pem
+          gcloud compute scp --zone="$GCP_ZONE" --quiet .env.deploy "$GCP_VM:$APP_DIR/.env"
+          gcloud compute scp --zone="$GCP_ZONE" --quiet auth_key.pem "$GCP_VM:$APP_DIR/secrets/auth_key.pem"
+          gcloud compute ssh "$GCP_VM" --zone="$GCP_ZONE" --quiet --command \
+            "chmod 600 $APP_DIR/.env $APP_DIR/secrets/auth_key.pem"
+          rm -f .env.deploy auth_key.pem
+
+      - name: Pull images and restart the stack
+        run: |
+          gcloud compute ssh "$GCP_VM" --zone="$GCP_ZONE" --quiet --command \
+            "cd $APP_DIR && export AUTH_RSA_PRIVATE_KEY=\"\$(cat secrets/auth_key.pem)\" && \
+             sudo -E docker compose -f docker-compose.yml -f docker-compose.ghcr.yml -f docker-compose.prod.yml pull --quiet && \
+             sudo -E docker compose -f docker-compose.yml -f docker-compose.ghcr.yml -f docker-compose.prod.yml up -d --no-build --remove-orphans"
+
+      - name: Smoke-check through the public origin
+        run: |
+          DOMAIN="${{ vars.DEPLOY_DOMAIN }}"
+          # Caddy needs a moment on first-ever deploy to obtain the certificate; the Spring
+          # services take ~60s to boot. Poll rather than sleep-and-pray.
+          for i in $(seq 1 30); do
+            if curl -sf --max-time 10 "https://$DOMAIN/" >/dev/null; then break; fi
+            sleep 10
+          done
+          curl -sf "https://$DOMAIN/" >/dev/null
+          curl -sf "https://$DOMAIN/audit-api/actuator/health" | grep -q '"UP"'
+          curl -sf -X POST "https://$DOMAIN/audit-api/mcp" -H 'Content-Type: application/json' \
+            -d '{"jsonrpc":"2.0","id":1,"method":"ping"}' | grep -q '"result"'
+          echo "Deployed https://$DOMAIN"
