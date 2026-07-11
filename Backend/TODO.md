@@ -103,6 +103,38 @@ alternative" treatment as ADR-0005/0008.
       in prod (recruiter-friendly) vs drop it; the demo-log generator and seeder already
       don't exist outside LOCAL/DEV.
 
+### Dashboard — make it meaningful and relevant (NEXT UP)
+The prod dashboard is sparse because the audit trail only records Auth's `LOGIN` events; for
+a project that's fundamentally an AI sandbox (chat, flashcards, RAG, MCP) it should show what
+the app actually does. Four items, item 1 is the headline and unblocks the rest. Context: the
+"Add demo logs" button is now hidden in prod (a LOCAL/DEV-only affordance — see the
+`/api/v1/meta/features` capability probe), so prod won't be padded with dummy rows; real usage
+should populate it instead.
+- [ ] **1. Emit audit events from the AI features (headline; unblocks 2–4).** Have Chat,
+      Flashcards, RAG search and the MCP tools each publish an `AuditEvent` over the existing
+      Kafka → Audit pipeline (reuse the exact `com.aisandbox.common.event.AuditEvent` contract
+      Auth already produces with — check `AuthController`/its publisher first). Suggested
+      shapes: `Assistant/CHAT`, `Flashcards/GENERATED`, `Rag/SEARCH`, `Mcp/TOOL_CALL`, with
+      **non-PII** detail only (model, latency ms, retrieved-chunk count, screener-blocked
+      flag — never message text). Payoff: the dashboard tells *this app's* story, prod
+      populates organically from real visitors (no dummy data), and it's a strong
+      event-sourcing/CQRS narrative ("every feature emits a domain event; Audit is the sink;
+      the dashboard is its read model") that exercises the Kafka pipeline for something real.
+      Watch the fire-and-forget/at-most-once posture from ADR-0006 (audit loss on broker
+      outage is acceptable for these too).
+- [ ] **2. Add a time dimension.** Today only by-action/by-entityType bars exist. Add an
+      "events over the last 24h/7d" line or sparkline (dependency-free, matching the existing
+      CSS bar-chart style) so usage trends are visible — needs a backend time-bucket
+      aggregation (`GROUP BY date_trunc(...)`), built from the same `AuditLogSpecifications`
+      as search/stats so it honours the same filters.
+- [ ] **3. KPI summary cards on top.** A headline row: total events (24h), busiest feature,
+      blocked/error rate, unique event types — instant "what's happening", the standard
+      dashboard pattern. Cheap once the aggregation endpoints exist.
+- [ ] **4. Frame it against the observability stack.** Position this dashboard as the
+      *domain/business* view ("what users and agents did") complementing Grafana's *system*
+      view ("how the servers are performing") — a short About/README note plus optionally a
+      link out to Grafana. The contrast is itself an interview talking point.
+
 ### Feature: RAG MCP server with a vector DB
 - [x] **RAG MCP server backed by a vector database — implemented.** New `rag/` package in
       Audit + `POST /mcp`, a Model Context Protocol server (Streamable HTTP, stateless
