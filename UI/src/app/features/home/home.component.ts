@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 
 interface TechGroup {
@@ -32,6 +32,11 @@ interface Feature {
 })
 export class HomeComponent {
   readonly repoUrl = 'https://github.com/sahilparekh1212/AI-Sandbox';
+  readonly linkedInUrl = 'https://www.linkedin.com/in/sahilparekh1212/';
+
+  // Which "Design decisions" group is shown; the others stay in the DOM but hidden, so
+  // switching is instant (no re-render) and there's no long scroll through every group.
+  readonly activeDecision = signal(0);
 
   readonly stack: TechGroup[] = [
     {

@@ -68,19 +68,41 @@
   }
 }
 
-.decision-group {
-  margin-top: 1.5rem;
-
-  &:first-of-type {
-    margin-top: 0.5rem;
-  }
+// Pill row that switches which decision group is shown — replaces the long scroll through
+// every group with a tabbed view. Each button carries the group's heading text.
+.decision-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-bottom: 1rem;
 
   .group-heading {
-    margin: 0 0 0.15rem;
-    font-size: 1.05rem;
-    color: var(--accent);
-  }
+    appearance: none;
+    cursor: pointer;
+    background: var(--canvas-subtle);
+    border: 1px solid var(--border);
+    border-radius: 2rem;
+    padding: 0.35rem 0.9rem;
+    font-size: 0.85rem;
+    color: var(--fg-muted);
+    transition:
+      color 0.15s ease,
+      border-color 0.15s ease,
+      background 0.15s ease;
 
+    &:hover {
+      color: var(--fg);
+    }
+
+    &.active {
+      color: var(--fg);
+      border-color: var(--accent-emphasis);
+      background: rgba(47, 129, 247, 0.12);
+    }
+  }
+}
+
+.decision-group {
   .group-blurb {
     margin: 0 0 0.85rem;
     color: var(--fg-muted);
@@ -161,5 +183,46 @@
 
   a {
     font-weight: 600;
+  }
+}
+
+// Persistent contact strip: sticks to the bottom of the viewport while the About page
+// scrolls (opaque --canvas so content passes cleanly underneath), settling at the very end.
+.social-bar {
+  position: sticky;
+  bottom: 0;
+  z-index: 20;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 2rem;
+  padding: 0.85rem 0;
+  background: var(--canvas);
+  border-top: 1px solid var(--border);
+
+  .social {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.45rem 1rem;
+    border: 1px solid var(--border);
+    border-radius: 2rem;
+    background: var(--canvas-subtle);
+    color: var(--fg);
+    font-weight: 600;
+    font-size: 0.9rem;
+    text-decoration: none;
+
+    svg {
+      width: 18px;
+      height: 18px;
+      fill: currentColor;
+    }
+
+    &:hover {
+      border-color: var(--accent-emphasis);
+      color: var(--accent);
+      text-decoration: none;
+    }
   }
 }

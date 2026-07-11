@@ -50,7 +50,7 @@ describe('FlashcardsComponent', () => {
     form.dispatchEvent(new Event('submit'));
     fixture.detectChanges();
 
-    expect(service.generate).toHaveBeenCalledWith(8);
+    expect(service.generate).toHaveBeenCalledWith(5);
     expect(component.deck().length).toBe(3);
   });
 
