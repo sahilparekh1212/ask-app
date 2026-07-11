@@ -36,14 +36,20 @@ alternative" treatment as ADR-0005/0008.
       https://ai-sandbox.sahilparekh1212.com live with valid Let's Encrypt TLS, demo login
       issuing JWTs, audit stats showing LOGIN events flowing through Kafka in prod, MCP
       endpoint answering.
-- [ ] **Fund the provider accounts (5-min fixes, both diagnosed from prod logs).**
-      (1) Voyage: no payment method → 10K TPM cap → the indexer's first batch 429s and the
-      RAG index stays empty. Add a payment method at dashboard.voyageai.com (the 200M free
-      tokens still apply — indexing is effectively $0), then restart audit
-      (`sudo docker restart aisandbox-audit` or redeploy) and verify `list_sources` via the
-      public MCP endpoint. (2) Anthropic: assistant 503s with `BadRequestException` — the
-      "credit balance too low" 400; buy minimum credits at platform.claude.com → Billing,
-      no restart needed.
+- [x] **Fund the provider accounts — done, both features verified live.** Voyage payment
+      method added (the 10K-TPM no-payment-method cap had 429'd the indexer's first batch)
+      → after an audit restart the index built: **132 chunks from all 14 docs** in prod
+      pgvector, semantic search verified through the public MCP endpoint ("why is there no
+      API gateway?" → ADR-0005; a deployment question → the README's OpenShift section).
+      Anthropic credits bought (the 503 was the credit-balance 400) → assistant verified
+      live with a real grounded reply through the public origin. War-story footnote: right
+      after funding, `list_sources` briefly showed 12/14 docs — the verification query had
+      raced the indexer mid-upsert; the `RAG index ready: 132 chunks from 14 docs` log line
+      (and a later re-query) settled that nothing was missing. Also on launch night, three
+      deploy-pipeline transients were root-caused and fixed (PRs #72/#74): a WIF binding
+      created with an empty `$PROJECT_NUM` (Cloud Shell env vars don't survive sessions),
+      the smoke check racing Let's Encrypt's first issuance, and gcloud's short-TTL implicit
+      OS Login key expiring mid-run — the merge→CD→Deploy chain then ran fully green.
 - [ ] **Update README for public use.** Lead with the live URL
       (https://ai-sandbox.sahilparekh1212.com), the demo login (`demo`/`demo`), and the
       public MCP endpoint (`claude mcp add --transport http ai-sandbox
