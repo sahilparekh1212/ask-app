@@ -244,6 +244,9 @@ superseded one.
 
 ## Frontend (Angular SPA — `UI/`)
 
+For element-level detail — which component owns a given input/button/form and which backend
+endpoint each page calls — see [`ui-guide.md`](ui-guide.md). This section is the file index.
+
 - `src/app/app.component.ts/.html`, `app.config.ts`, `app.routes.ts` — the root component, DI/config,
   and route table (lazy feature routes, guarded).
 - `src/app/core/auth/auth.service.ts` — signal-based auth state; login/refresh/logout.

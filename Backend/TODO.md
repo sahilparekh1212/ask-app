@@ -188,6 +188,12 @@ should populate it instead.
       live against the running stack: the docker-files question returned the exact file list, and a
       Kafka-consumer NPE stack trace produced a correct IDE prompt naming `AuditEventConsumer`/
       `AuditLog`/`AuditEvent` and even flagging the DLT/fire-and-forget nuance from ADR-0006.
+      Follow-up: added a component-level [`docs/ui-guide.md`](docs/ui-guide.md) (each Angular page →
+      its component/template, interactive elements, service, and the backend endpoint it hits)
+      after a live question ("which component has the chat input line and what endpoint?") exposed
+      that the code map indexed the UI *files* but not their *elements/endpoints* — the assistant
+      now answers it crisply (Assistant page → `assistant.component.html` composer input →
+      `assistant.service.ts` → `POST /api/v1/assistant/chat`).
 - [x] **RAG MCP server backed by a vector database — implemented.** New `rag/` package in
       Audit + `POST /mcp`, a Model Context Protocol server (Streamable HTTP, stateless
       subset) exposing `search_knowledge` + `list_sources` over this repo's own knowledge
