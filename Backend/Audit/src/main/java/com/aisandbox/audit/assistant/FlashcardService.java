@@ -2,6 +2,7 @@ package com.aisandbox.audit.assistant;
 
 import com.aisandbox.audit.assistant.dto.Flashcard;
 import com.aisandbox.audit.assistant.dto.FlashcardDeck;
+import com.aisandbox.audit.event.AuditEventPublisher;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -25,13 +26,15 @@ public class FlashcardService {
 	private final AssistantContextBuilder contextBuilder;
 	private final LlmClient llmClient;
 	private final ObjectMapper objectMapper;
+	private final AuditEventPublisher auditEventPublisher;
 
 	public FlashcardService(AssistantProperties properties, AssistantContextBuilder contextBuilder,
-			LlmClient llmClient, ObjectMapper objectMapper) {
+			LlmClient llmClient, ObjectMapper objectMapper, AuditEventPublisher auditEventPublisher) {
 		this.properties = properties;
 		this.contextBuilder = contextBuilder;
 		this.llmClient = llmClient;
 		this.objectMapper = objectMapper;
+		this.auditEventPublisher = auditEventPublisher;
 	}
 
 	public FlashcardDeck generate(int count, boolean admin) {
@@ -43,6 +46,7 @@ public class FlashcardService {
 		String userMessage = "Generate exactly " + count + " flashcards now. Respond with the JSON only.";
 
 		String raw;
+		long startNanos = System.nanoTime();
 		try {
 			raw = llmClient.complete(systemPrompt, List.of(), userMessage);
 		} catch (RuntimeException e) {
@@ -51,8 +55,12 @@ public class FlashcardService {
 		}
 
 		FlashcardDeck deck = parse(raw);
-		log.info("Generated flashcard deck admin={} requested={} produced={}", admin, count,
-			deck.cards() != null ? deck.cards().size() : 0);
+		long latencyMs = (System.nanoTime() - startNanos) / 1_000_000;
+		int produced = deck.cards() != null ? deck.cards().size() : 0;
+		log.info("Generated flashcard deck admin={} requested={} produced={}", admin, count, produced);
+		// Non-PII detail only: model, counts, latency — the cards themselves are not recorded.
+		auditEventPublisher.publish("Flashcards", "GENERATED", "model=" + properties.getModel()
+			+ " requested=" + count + " produced=" + produced + " latencyMs=" + latencyMs);
 		return deck;
 	}
 

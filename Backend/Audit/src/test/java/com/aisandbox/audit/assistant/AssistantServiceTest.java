@@ -2,10 +2,12 @@ package com.aisandbox.audit.assistant;
 
 import com.aisandbox.audit.assistant.dto.ChatRequest;
 import com.aisandbox.audit.assistant.dto.ChatResponse;
+import com.aisandbox.audit.event.AuditEventPublisher;
 import com.aisandbox.audit.rag.RagService;
 import com.aisandbox.audit.rag.ScoredChunk;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 import java.util.List;
 
@@ -30,6 +32,7 @@ class AssistantServiceTest {
 	private final AssistantContextBuilder contextBuilder = mock(AssistantContextBuilder.class);
 	private final LlmClient llmClient = mock(LlmClient.class);
 	private final RagService ragService = mock(RagService.class);
+	private final AuditEventPublisher auditEventPublisher = mock(AuditEventPublisher.class);
 
 	@BeforeEach
 	void stubContext() {
@@ -40,7 +43,8 @@ class AssistantServiceTest {
 
 	private AssistantService service(String apiKey) {
 		AssistantProperties properties = new AssistantProperties(apiKey, "claude-opus-4-8", 1024);
-		return new AssistantService(properties, screener, contextBuilder, llmClient, ragService);
+		return new AssistantService(properties, screener, contextBuilder, llmClient, ragService,
+			auditEventPublisher);
 	}
 
 	@Test
@@ -49,6 +53,8 @@ class AssistantServiceTest {
 			.isInstanceOf(AssistantUnavailableException.class)
 			.hasMessageContaining("ANTHROPIC_API_KEY");
 		verifyNoInteractions(llmClient);
+		// Nothing happened, so no audit event either.
+		verifyNoInteractions(auditEventPublisher);
 	}
 
 	@Test
@@ -66,6 +72,19 @@ class AssistantServiceTest {
 	}
 
 	@Test
+	void blockedTurnEmitsAScreenerCategoryButNoContent() {
+		ChatRequest dirty = new ChatRequest("my password=hunter2 fails", null);
+
+		service("key").chat(dirty, false);
+
+		ArgumentCaptor<String> details = ArgumentCaptor.forClass(String.class);
+		verify(auditEventPublisher).publish(eq("Assistant"), eq("CHAT"), details.capture());
+		assertThat(details.getValue()).contains("blocked=true").contains("category=");
+		// The matched sensitive value must never leak into the audit detail.
+		assertThat(details.getValue()).doesNotContain("hunter2");
+	}
+
+	@Test
 	void cleanInputIsForwardedWithTheRoleScopedPrompt() {
 		when(llmClient.complete(anyString(), anyList(), anyString())).thenReturn("It stores audit rows.");
 
@@ -75,6 +94,36 @@ class AssistantServiceTest {
 		assertThat(response.reply()).isEqualTo("It stores audit rows.");
 		verify(contextBuilder).buildSystemPrompt(true, List.of());
 		verify(llmClient).complete(eq("system prompt"), eq(List.of()), eq(CLEAN.message()));
+	}
+
+	@Test
+	void successfulChatEmitsANonPiiChatEvent() {
+		List<ScoredChunk> chunks = List.of(new ScoredChunk("docs/adr/0001.md", "Decision", "text", 0.9));
+		when(ragService.isReady()).thenReturn(true);
+		when(ragService.search(eq(CLEAN.message()), isNull())).thenReturn(chunks);
+		when(llmClient.complete(anyString(), anyList(), anyString())).thenReturn("grounded reply");
+
+		service("key").chat(CLEAN, false);
+
+		ArgumentCaptor<String> details = ArgumentCaptor.forClass(String.class);
+		verify(auditEventPublisher).publish(eq("Assistant"), eq("CHAT"), details.capture());
+		assertThat(details.getValue())
+			.contains("blocked=false")
+			.contains("model=claude-opus-4-8")
+			.contains("retrievedChunks=1")
+			.contains("latencyMs=");
+		// No message or reply text in the audit detail.
+		assertThat(details.getValue()).doesNotContain(CLEAN.message()).doesNotContain("grounded reply");
+	}
+
+	@Test
+	void providerFailureEmitsNoChatEvent() {
+		when(llmClient.complete(anyString(), anyList(), anyString())).thenThrow(new RuntimeException("boom"));
+
+		assertThatThrownBy(() -> service("key").chat(CLEAN, false))
+			.isInstanceOf(AssistantUnavailableException.class);
+
+		verifyNoInteractions(auditEventPublisher);
 	}
 
 	@Test

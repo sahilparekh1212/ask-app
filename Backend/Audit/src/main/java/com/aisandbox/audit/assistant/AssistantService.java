@@ -2,6 +2,7 @@ package com.aisandbox.audit.assistant;
 
 import com.aisandbox.audit.assistant.dto.ChatRequest;
 import com.aisandbox.audit.assistant.dto.ChatResponse;
+import com.aisandbox.audit.event.AuditEventPublisher;
 import com.aisandbox.audit.rag.RagService;
 import com.aisandbox.audit.rag.ScoredChunk;
 import org.slf4j.Logger;
@@ -30,14 +31,17 @@ public class AssistantService {
 	private final AssistantContextBuilder contextBuilder;
 	private final LlmClient llmClient;
 	private final RagService ragService;
+	private final AuditEventPublisher auditEventPublisher;
 
 	public AssistantService(AssistantProperties properties, PromptScreener screener,
-			AssistantContextBuilder contextBuilder, LlmClient llmClient, RagService ragService) {
+			AssistantContextBuilder contextBuilder, LlmClient llmClient, RagService ragService,
+			AuditEventPublisher auditEventPublisher) {
 		this.properties = properties;
 		this.screener = screener;
 		this.contextBuilder = contextBuilder;
 		this.llmClient = llmClient;
 		this.ragService = ragService;
+		this.auditEventPublisher = auditEventPublisher;
 	}
 
 	public ChatResponse chat(ChatRequest request, boolean admin) {
@@ -51,14 +55,25 @@ public class AssistantService {
 			// sensitive value into our logs instead of the provider's).
 			log.info("Assistant request blocked by screen category={} messageLength={}",
 				violation.get(), request.message().length());
+			// Emit the blocked turn too: the screener category is a rule name, not content,
+			// so a blocked-rate is visible on the dashboard without leaking the matched value.
+			auditEventPublisher.publish("Assistant", "CHAT",
+				"blocked=true category=" + violation.get());
 			return ChatResponse.blockedBy(BLOCKED_REPLY);
 		}
+		List<ScoredChunk> retrieved = retrieve(request.message());
+		long startNanos = System.nanoTime();
 		try {
 			String reply = llmClient.complete(
-				contextBuilder.buildSystemPrompt(admin, retrieve(request.message())),
+				contextBuilder.buildSystemPrompt(admin, retrieved),
 				request.historyOrEmpty(), request.message());
+			long latencyMs = (System.nanoTime() - startNanos) / 1_000_000;
 			log.info("Assistant replied admin={} messageLength={} replyLength={}",
 				admin, request.message().length(), reply.length());
+			// Non-PII detail only: model, latency, and how much RAG grounding was used —
+			// never the message or the reply text.
+			auditEventPublisher.publish("Assistant", "CHAT", "blocked=false model="
+				+ properties.getModel() + " latencyMs=" + latencyMs + " retrievedChunks=" + retrieved.size());
 			return ChatResponse.of(reply);
 		} catch (RuntimeException e) {
 			log.error("Assistant provider call failed: {}", e.getClass().getSimpleName());

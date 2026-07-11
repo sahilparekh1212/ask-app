@@ -121,22 +121,37 @@ alternative" treatment as ADR-0005/0008.
 ### Dashboard — make it meaningful and relevant (NEXT UP)
 The prod dashboard is sparse because the audit trail only records Auth's `LOGIN` events; for
 a project that's fundamentally an AI sandbox (chat, flashcards, RAG, MCP) it should show what
-the app actually does. Four items, item 1 is the headline and unblocks the rest. Context: the
+the app actually does. Four items; item 1 (the headline that unblocks the rest) has landed —
+the AI features now emit domain events, so item 2 (a time dimension) is next up. Context: the
 "Add demo logs" button is now hidden in prod (a LOCAL/DEV-only affordance — see the
 `/api/v1/meta/features` capability probe), so prod won't be padded with dummy rows; real usage
 should populate it instead.
-- [ ] **1. Emit audit events from the AI features (headline; unblocks 2–4).** Have Chat,
-      Flashcards, RAG search and the MCP tools each publish an `AuditEvent` over the existing
-      Kafka → Audit pipeline (reuse the exact `com.aisandbox.common.event.AuditEvent` contract
-      Auth already produces with — check `AuthController`/its publisher first). Suggested
-      shapes: `Assistant/CHAT`, `Flashcards/GENERATED`, `Rag/SEARCH`, `Mcp/TOOL_CALL`, with
-      **non-PII** detail only (model, latency ms, retrieved-chunk count, screener-blocked
-      flag — never message text). Payoff: the dashboard tells *this app's* story, prod
-      populates organically from real visitors (no dummy data), and it's a strong
-      event-sourcing/CQRS narrative ("every feature emits a domain event; Audit is the sink;
-      the dashboard is its read model") that exercises the Kafka pipeline for something real.
-      Watch the fire-and-forget/at-most-once posture from ADR-0006 (audit loss on broker
-      outage is acceptable for these too).
+- [x] **1. Emit audit events from the AI features (headline; unblocks 2–4) — implemented.** The
+      AI features all live *inside* the Audit service, so rather than persist rows inline they
+      now publish through the same `audit.events` Kafka topic Auth uses and are consumed back by
+      Audit's own `AuditEventConsumer` — one uniform event-sourcing path for every producer
+      (another service or this one), exercising the Kafka pipeline for real feature traffic. New
+      `com.aisandbox.audit.event.AuditEventPublisher` mirrors Auth's exactly: reuses the shared
+      `com.aisandbox.common.event.AuditEvent` contract, `@Async` + fire-and-forget (with
+      `@EnableAsync` on `AuditApplication` and `max.block.ms=5000` on the producer, both mirrored
+      from Auth) so a slow/absent broker never blocks or fails a feature request — the ADR-0006
+      at-most-once posture applies unchanged. Four shapes, each at its own service boundary with
+      **non-PII** `key=value` detail only (never message/query/card text): `Assistant/CHAT`
+      (`AssistantService` — `blocked`, `model`, `latencyMs`, `retrievedChunks`; the blocked turn
+      emits too, carrying the screener *category* name, not the matched value), `Flashcards/
+      GENERATED` (`FlashcardService` — `model`, `requested`, `produced`, `latencyMs`), `Rag/SEARCH`
+      and `Mcp/TOOL_CALL` (`McpController` — `search_knowledge` maps to `Rag/SEARCH` since it *is*
+      a semantic search; other tools like `list_sources` map to `Mcp/TOOL_CALL`; detail carries
+      `tool`, `latencyMs`, `error`). Deliberate no-double-count decision: chat's internal RAG
+      grounding is captured as the `retrievedChunks` field on the CHAT event rather than a second
+      `Rag/SEARCH` row, so every user-facing action is exactly one event — matching the TODO's
+      own "retrieved-chunk count" detail hint. Events emit only on genuinely-completed actions
+      (not on unconfigured 503s, provider failures, or protocol-level tool errors). Tested at each
+      seam: new `AuditEventPublisherTest` (keying, fire-and-forget failure swallow) plus emit +
+      no-emit + no-PII-leak assertions added to `AssistantServiceTest`/`FlashcardServiceTest`/
+      `McpControllerTest`; full Audit suite + 90% coverage gate + Spotless all green locally. Not
+      yet seen populating a live dashboard (needs the deploy) — but the pipeline it rides is the
+      same one the E2E suite already asserts end-to-end for LOGIN.
 - [ ] **2. Add a time dimension.** Today only by-action/by-entityType bars exist. Add an
       "events over the last 24h/7d" line or sparkline (dependency-free, matching the existing
       CSS bar-chart style) so usage trends are visible — needs a backend time-bucket

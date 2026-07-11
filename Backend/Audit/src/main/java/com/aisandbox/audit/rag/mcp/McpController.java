@@ -1,5 +1,6 @@
 package com.aisandbox.audit.rag.mcp;
 
+import com.aisandbox.audit.event.AuditEventPublisher;
 import com.aisandbox.audit.rag.RagService;
 import com.aisandbox.audit.rag.ScoredChunk;
 import com.aisandbox.audit.rag.SourceSummary;
@@ -52,10 +53,13 @@ public class McpController {
 
 	private final RagService ragService;
 	private final ObjectMapper objectMapper;
+	private final AuditEventPublisher auditEventPublisher;
 
-	public McpController(RagService ragService, ObjectMapper objectMapper) {
+	public McpController(RagService ragService, ObjectMapper objectMapper,
+			AuditEventPublisher auditEventPublisher) {
 		this.ragService = ragService;
 		this.objectMapper = objectMapper;
+		this.auditEventPublisher = auditEventPublisher;
 	}
 
 	/** Spec: a server that offers no server-initiated SSE stream answers GET with 405. */
@@ -139,13 +143,19 @@ public class McpController {
 	private Map<String, Object> toolsCall(JsonNode id, JsonNode params) {
 		String tool = params.path("name").asText("");
 		JsonNode arguments = params.path("arguments");
+		long startNanos = System.nanoTime();
 		try {
-			return switch (tool) {
-				case TOOL_SEARCH -> result(id, searchKnowledge(arguments));
-				case TOOL_SOURCES -> result(id, listSources());
+			Map<String, Object> toolResult = switch (tool) {
+				case TOOL_SEARCH -> searchKnowledge(arguments);
+				case TOOL_SOURCES -> listSources();
 				// Spec: an unknown tool is a protocol-level error, not a tool-result error.
-				default -> error(id, -32602, "Unknown tool: " + tool);
+				default -> null;
 			};
+			if (toolResult == null) {
+				return error(id, -32602, "Unknown tool: " + tool);
+			}
+			auditToolCall(tool, toolResult, startNanos);
+			return result(id, toolResult);
 		} catch (IllegalArgumentException e) {
 			return error(id, -32602, e.getMessage());
 		} catch (RuntimeException e) {
@@ -153,6 +163,23 @@ public class McpController {
 			// the result with isError so the LLM can see and react to the failure.
 			log.error("MCP tool '{}' failed: {}", tool, e.getClass().getSimpleName());
 			return result(id, toolError("Tool '" + tool + "' failed: " + e.getMessage()));
+		}
+	}
+
+	/**
+	 * Emit a domain event for a completed tool call. {@code search_knowledge} is fundamentally a
+	 * semantic search, so it maps to {@code Rag/SEARCH}; every other tool maps to the generic
+	 * {@code Mcp/TOOL_CALL}. Non-PII detail only — the tool name, latency, and whether the tool
+	 * returned an error result, never the query text or the retrieved content.
+	 */
+	private void auditToolCall(String tool, Map<String, Object> toolResult, long startNanos) {
+		long latencyMs = (System.nanoTime() - startNanos) / 1_000_000;
+		boolean isError = Boolean.TRUE.equals(toolResult.get("isError"));
+		String details = "tool=" + tool + " latencyMs=" + latencyMs + " error=" + isError;
+		if (TOOL_SEARCH.equals(tool)) {
+			auditEventPublisher.publish("Rag", "SEARCH", details);
+		} else {
+			auditEventPublisher.publish("Mcp", "TOOL_CALL", details);
 		}
 	}
 

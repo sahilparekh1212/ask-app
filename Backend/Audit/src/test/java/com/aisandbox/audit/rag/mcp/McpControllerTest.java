@@ -1,19 +1,24 @@
 package com.aisandbox.audit.rag.mcp;
 
+import com.aisandbox.audit.event.AuditEventPublisher;
 import com.aisandbox.audit.rag.RagService;
 import com.aisandbox.audit.rag.ScoredChunk;
 import com.aisandbox.audit.rag.SourceSummary;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import java.util.List;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -28,8 +33,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class McpControllerTest {
 
 	private final RagService ragService = mock(RagService.class);
+	private final AuditEventPublisher auditEventPublisher = mock(AuditEventPublisher.class);
 	private final MockMvc mvc = MockMvcBuilders
-		.standaloneSetup(new McpController(ragService, new ObjectMapper()))
+		.standaloneSetup(new McpController(ragService, new ObjectMapper(), auditEventPublisher))
 		.build();
 
 	private org.springframework.test.web.servlet.ResultActions postRpc(String body) throws Exception {
@@ -224,6 +230,66 @@ class McpControllerTest {
 	@Test
 	void getIsMethodNotAllowedBecauseThereIsNoServerStream() throws Exception {
 		mvc.perform(get("/mcp")).andExpect(status().isMethodNotAllowed());
+	}
+
+	@Test
+	void searchToolEmitsARagSearchEvent() throws Exception {
+		when(ragService.isConfigured()).thenReturn(true);
+		when(ragService.search(eq("how does auth work?"), isNull())).thenReturn(List.of(
+			new ScoredChunk("docs/adr/0002.md", "Decision", "JWTs are issued by Auth.", 0.91)));
+
+		postRpc("""
+			{"jsonrpc":"2.0","id":20,"method":"tools/call",
+			 "params":{"name":"search_knowledge","arguments":{"query":"how does auth work?"}}}
+			""")
+			.andExpect(jsonPath("$.result.isError").value(false));
+
+		ArgumentCaptor<String> details = ArgumentCaptor.forClass(String.class);
+		verify(auditEventPublisher).publish(eq("Rag"), eq("SEARCH"), details.capture());
+		assertThat(details.getValue()).contains("tool=search_knowledge").contains("error=false").contains("latencyMs=");
+		// The query text must never leak into the audit detail.
+		assertThat(details.getValue()).doesNotContain("how does auth work?");
+	}
+
+	@Test
+	void listSourcesEmitsAnMcpToolCallEvent() throws Exception {
+		when(ragService.isConfigured()).thenReturn(true);
+		when(ragService.sources()).thenReturn(List.of(new SourceSummary("README.md", 12)));
+		when(ragService.chunkCount()).thenReturn(12L);
+
+		postRpc("""
+			{"jsonrpc":"2.0","id":21,"method":"tools/call","params":{"name":"list_sources"}}
+			""")
+			.andExpect(jsonPath("$.result.isError").value(false));
+
+		verify(auditEventPublisher).publish(eq("Mcp"), eq("TOOL_CALL"),
+			org.mockito.ArgumentMatchers.contains("tool=list_sources"));
+	}
+
+	@Test
+	void unknownToolEmitsNoAuditEvent() throws Exception {
+		postRpc("""
+			{"jsonrpc":"2.0","id":22,"method":"tools/call","params":{"name":"nope","arguments":{}}}
+			""")
+			.andExpect(jsonPath("$.error.code").value(-32602));
+
+		// A protocol-level error is not a completed tool call — nothing to audit.
+		verifyNoInteractions(auditEventPublisher);
+	}
+
+	@Test
+	void toolExecutionFailureEmitsNoAuditEvent() throws Exception {
+		when(ragService.isConfigured()).thenReturn(true);
+		when(ragService.search(eq("q"), isNull())).thenThrow(new IllegalStateException("provider down"));
+
+		postRpc("""
+			{"jsonrpc":"2.0","id":23,"method":"tools/call",
+			 "params":{"name":"search_knowledge","arguments":{"query":"q"}}}
+			""")
+			.andExpect(jsonPath("$.result.isError").value(true));
+
+		// The call threw before completing, so no event is emitted (the failure is logged instead).
+		verifyNoInteractions(auditEventPublisher);
 	}
 
 }

@@ -1,9 +1,11 @@
 package com.aisandbox.audit.assistant;
 
 import com.aisandbox.audit.assistant.dto.FlashcardDeck;
+import com.aisandbox.audit.event.AuditEventPublisher;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 import java.util.List;
 
@@ -23,6 +25,7 @@ class FlashcardServiceTest {
 	private final AssistantContextBuilder contextBuilder = mock(AssistantContextBuilder.class);
 	private final LlmClient llmClient = mock(LlmClient.class);
 	private final ObjectMapper objectMapper = new ObjectMapper();
+	private final AuditEventPublisher auditEventPublisher = mock(AuditEventPublisher.class);
 
 	@BeforeEach
 	void stubContext() {
@@ -31,7 +34,7 @@ class FlashcardServiceTest {
 
 	private FlashcardService service(String apiKey) {
 		AssistantProperties properties = new AssistantProperties(apiKey, "claude-opus-4-8", 2048);
-		return new FlashcardService(properties, contextBuilder, llmClient, objectMapper);
+		return new FlashcardService(properties, contextBuilder, llmClient, objectMapper, auditEventPublisher);
 	}
 
 	@Test
@@ -39,6 +42,7 @@ class FlashcardServiceTest {
 		assertThatThrownBy(() -> service("").generate(5, false))
 			.isInstanceOf(AssistantUnavailableException.class);
 		verifyNoInteractions(llmClient);
+		verifyNoInteractions(auditEventPublisher);
 	}
 
 	@Test
@@ -51,6 +55,34 @@ class FlashcardServiceTest {
 		assertThat(deck.cards()).hasSize(1);
 		assertThat(deck.cards().get(0).question()).isEqualTo("What is Audit?");
 		verify(contextBuilder).groundingContext(false);
+	}
+
+	@Test
+	void successfulGenerationEmitsANonPiiGeneratedEvent() {
+		when(llmClient.complete(anyString(), anyList(), anyString())).thenReturn(
+			"{\"cards\":[{\"question\":\"What is Audit?\",\"answer\":\"It stores audit rows.\"}]}");
+
+		service("key").generate(3, false);
+
+		ArgumentCaptor<String> details = ArgumentCaptor.forClass(String.class);
+		verify(auditEventPublisher).publish(eq("Flashcards"), eq("GENERATED"), details.capture());
+		assertThat(details.getValue())
+			.contains("model=claude-opus-4-8")
+			.contains("requested=3")
+			.contains("produced=1")
+			.contains("latencyMs=");
+		// No card content in the audit detail.
+		assertThat(details.getValue()).doesNotContain("What is Audit?").doesNotContain("stores audit rows");
+	}
+
+	@Test
+	void providerFailureEmitsNoGeneratedEvent() {
+		when(llmClient.complete(anyString(), anyList(), anyString())).thenThrow(new RuntimeException("boom"));
+
+		assertThatThrownBy(() -> service("key").generate(3, false))
+			.isInstanceOf(AssistantUnavailableException.class);
+
+		verifyNoInteractions(auditEventPublisher);
 	}
 
 	@Test
