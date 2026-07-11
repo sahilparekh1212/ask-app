@@ -126,13 +126,16 @@ jobs:
           # curl's own retry machinery instead of a hand-rolled loop: --retry-all-errors
           # covers the Let's Encrypt first-issuance window (TLS handshake failures while
           # Caddy is still obtaining the cert — this lost the race on the first deploy) as
-          # well as Spring's ~60s boot. Up to ~7 minutes of patience on the first probe;
-          # once it passes, the rest get a short allowance.
+          # well as Spring's boot. Each probe gets its own ~7-minute allowance: the UI (nginx)
+          # comes up fast, but the Audit service is the slow one — it re-indexes the bundled
+          # RAG corpus (repo docs + backend/UI source, ~hundreds of chunks embedded via Voyage)
+          # on startup, so "homepage is up" no longer implies "audit is up". Give the audit
+          # health + MCP probes the same patience rather than a short post-homepage allowance.
           curl -sf --retry 40 --retry-delay 10 --retry-all-errors --max-time 15 \
             "https://$DOMAIN/" >/dev/null
-          curl -sf --retry 5 --retry-delay 10 --retry-all-errors --max-time 15 \
+          curl -sf --retry 40 --retry-delay 10 --retry-all-errors --max-time 15 \
             "https://$DOMAIN/audit-api/actuator/health" | grep -q '"UP"'
-          curl -sf --retry 5 --retry-delay 10 --retry-all-errors --max-time 15 \
+          curl -sf --retry 40 --retry-delay 10 --retry-all-errors --max-time 15 \
             -X POST "https://$DOMAIN/audit-api/mcp" -H 'Content-Type: application/json' \
             -d '{"jsonrpc":"2.0","id":1,"method":"ping"}' | grep -q '"result"'
           echo "Deployed https://$DOMAIN"
