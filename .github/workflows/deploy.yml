@@ -56,9 +56,19 @@ jobs:
       - uses: google-github-actions/setup-gcloud@v2
 
       - name: Prepare app directory on the VM
+        # Retried: each ephemeral runner mints a fresh SSH key, and the very first connection
+        # can race OS Login key propagation (observed as ssh exit 255 on an otherwise healthy
+        # setup). Later ssh/scp steps reuse the now-propagated key and don't need this.
         run: |
-          gcloud compute ssh "$GCP_VM" --zone="$GCP_ZONE" --quiet --command \
-            "sudo mkdir -p $APP_DIR/deploy $APP_DIR/secrets && sudo chown -R \$(whoami) $APP_DIR && chmod 700 $APP_DIR/secrets"
+          for attempt in 1 2 3; do
+            if gcloud compute ssh "$GCP_VM" --zone="$GCP_ZONE" --quiet --command \
+              "sudo mkdir -p $APP_DIR/deploy $APP_DIR/secrets && sudo chown -R \$(whoami) $APP_DIR && chmod 700 $APP_DIR/secrets"; then
+              exit 0
+            fi
+            echo "ssh attempt $attempt failed; retrying in 20s"
+            sleep 20
+          done
+          exit 1
 
       - name: Ship compose bundle
         run: |
@@ -100,14 +110,16 @@ jobs:
       - name: Smoke-check through the public origin
         run: |
           DOMAIN="${{ vars.DEPLOY_DOMAIN }}"
-          # Caddy needs a moment on first-ever deploy to obtain the certificate; the Spring
-          # services take ~60s to boot. Poll rather than sleep-and-pray.
-          for i in $(seq 1 30); do
-            if curl -sf --max-time 10 "https://$DOMAIN/" >/dev/null; then break; fi
-            sleep 10
-          done
-          curl -sf "https://$DOMAIN/" >/dev/null
-          curl -sf "https://$DOMAIN/audit-api/actuator/health" | grep -q '"UP"'
-          curl -sf -X POST "https://$DOMAIN/audit-api/mcp" -H 'Content-Type: application/json' \
+          # curl's own retry machinery instead of a hand-rolled loop: --retry-all-errors
+          # covers the Let's Encrypt first-issuance window (TLS handshake failures while
+          # Caddy is still obtaining the cert — this lost the race on the first deploy) as
+          # well as Spring's ~60s boot. Up to ~7 minutes of patience on the first probe;
+          # once it passes, the rest get a short allowance.
+          curl -sf --retry 40 --retry-delay 10 --retry-all-errors --max-time 15 \
+            "https://$DOMAIN/" >/dev/null
+          curl -sf --retry 5 --retry-delay 10 --retry-all-errors --max-time 15 \
+            "https://$DOMAIN/audit-api/actuator/health" | grep -q '"UP"'
+          curl -sf --retry 5 --retry-delay 10 --retry-all-errors --max-time 15 \
+            -X POST "https://$DOMAIN/audit-api/mcp" -H 'Content-Type: application/json' \
             -d '{"jsonrpc":"2.0","id":1,"method":"ping"}' | grep -q '"result"'
           echo "Deployed https://$DOMAIN"
