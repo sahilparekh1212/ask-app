@@ -121,6 +121,20 @@ jobs:
              sudo -E docker compose -f docker-compose.yml -f docker-compose.ghcr.yml -f docker-compose.prod.yml pull --quiet && \
              sudo -E docker compose -f docker-compose.yml -f docker-compose.ghcr.yml -f docker-compose.prod.yml up -d --no-build --remove-orphans"
 
+      # GF_SECURITY_ADMIN_PASSWORD only applies when Grafana initializes a FRESH database —
+      # on any subsequent boot the env var is silently ignored and whatever password the DB
+      # was first created with stays. Resetting via grafana-cli on every deploy makes the
+      # secret authoritative regardless of the DB's history (first deploy, recreated
+      # container, or a value that drifted). Reads the password from the .env just shipped,
+      # so it can't disagree with what compose passed to the container.
+      - name: Reset Grafana admin password to the current secret
+        run: |
+          gcloud compute ssh "$GCP_VM" --zone="$GCP_ZONE" --quiet --command \
+            "cd $APP_DIR && set -a && . ./.env && set +a && \
+             sudo -E docker compose -f docker-compose.yml -f docker-compose.ghcr.yml -f docker-compose.prod.yml \
+               exec -T grafana grafana cli admin reset-admin-password \"\$GRAFANA_ADMIN_PASSWORD\" >/dev/null && \
+             echo 'Grafana admin password reset to the deployed secret'"
+
       - name: Smoke-check through the public origin
         run: |
           DOMAIN="${{ vars.DEPLOY_DOMAIN }}"
