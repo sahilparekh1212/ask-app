@@ -349,6 +349,11 @@ same request UUID. Filter the in-app audit trail in Loki with `{app=~".+-service
 
 ## Observability (Prometheus + Loki + Tempo + Grafana)
 
+This stack is the **system view** — how the servers are performing (request rates, p95/p99
+latency, logs, traces). It complements the app's own audit dashboard, which is the
+**domain view** — what users and agents actually did, fed by the event-sourced audit trail.
+Same deployment, two different questions.
+
 | Tool       | Role                                | Source from each service                        |
 |------------|-------------------------------------|---------------------------------------------------|
 | Prometheus | Scrapes metrics                     | Micrometer `/actuator/prometheus`                |

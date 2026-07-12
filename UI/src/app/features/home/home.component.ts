@@ -130,6 +130,11 @@ export class HomeComponent {
           how: 'Both the search query and the database-side GROUP BY aggregation are built from the same AuditLogSpecifications, so the WHERE clause is identical and both ride the same indexes.',
         },
         {
+          title: 'Domain dashboard vs system observability',
+          why: 'Two different questions need two different views: "what did users and agents do?" is a business/domain question, while "how are the servers performing?" is a system question — conflating them buries one in the other.',
+          how: 'The audit dashboard is the domain view, fed by the event-sourced audit trail (every feature emits a domain event; Audit is the sink). The system view is a separate self-hosted Grafana/Prometheus/Loki/Tempo stack: request rates, p95/p99 latency, logs, and traces that follow a login across the Kafka hop.',
+        },
+        {
           title: 'Guarded LLM proxy with a one-class allowlist',
           why: 'Sending app data to a third-party model makes the data flow the security decision; the browser must never hold the API key or reach the provider directly, and a user must not be able to pull data their role can’t see.',
           how: 'A server-side proxy holds the key, screens inbound text for secrets/PII, never forwards auth headers, and scopes context by role in a single context-builder class — the whole allowlist has a one-class answer (ADR-0009).',
@@ -189,7 +194,7 @@ export class HomeComponent {
     {
       title: 'Dashboard',
       blurb:
-        'Server-side paginated, sortable, filterable table over the audit trail, with database-side aggregation shown as dependency-free bar charts.',
+        'The domain view of the system — what users and agents did. KPI cards, events-over-time, and database-side aggregations over the event-sourced audit trail, complementing the Grafana/Prometheus/Loki/Tempo stack’s system view of how the servers are performing.',
       link: { label: 'Open the dashboard →', to: '/audit' },
     },
     {

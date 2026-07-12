@@ -1,6 +1,7 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
+import { forkJoin } from 'rxjs';
 import { AuditService } from './audit.service';
 import {
   AuditLog,
@@ -21,6 +22,14 @@ interface TimelineBar {
   time: number; // bucket start, epoch ms
   count: number;
   label: string; // locale-formatted tooltip text
+}
+
+/** Headline numbers for the KPI cards — always the last 24h, independent of the filter form. */
+interface Kpis {
+  total: number;
+  busiest: string | null; // top byEntityType bucket
+  blockedRate: number | null; // (blocked + errored) / total; null when there were no events
+  eventTypes: number; // distinct actions seen
 }
 
 const HOUR_MS = 3_600_000;
@@ -67,6 +76,9 @@ export class AuditComponent implements OnInit {
   // deployment never shows a button whose click would 404. Starts false → never flashes.
   readonly demoAvailable = signal(false);
 
+  // KPI headline cards (24h window, filter-independent — the "what's happening" row).
+  readonly kpis = signal<Kpis | null>(null);
+
   // Events-over-time chart: window picks both the span and the bucket granularity.
   readonly timelineWindow = signal<TimelineWindow>('24h');
   readonly timelineBars = signal<TimelineBar[]>([]);
@@ -86,6 +98,7 @@ export class AuditComponent implements OnInit {
 
   ngOnInit(): void {
     this.reload();
+    this.loadKpis();
     this.audit.features().subscribe({
       next: (f) => this.demoAvailable.set(f.demoData),
       error: () => this.demoAvailable.set(false),
@@ -110,6 +123,7 @@ export class AuditComponent implements OnInit {
         this.demoBusy.set(false);
         this.demoMessage.set(this.translate.t('audit.demoAdded', { count: res.created }));
         this.reload();
+        this.loadKpis();
       },
       error: () => {
         this.demoBusy.set(false);
@@ -138,6 +152,34 @@ export class AuditComponent implements OnInit {
 
   barWidth(count: number, max: number): string {
     return max > 0 ? `${Math.round((count / max) * 100)}%` : '0%';
+  }
+
+  blockedRateLabel(kpis: Kpis): string {
+    return kpis.blockedRate === null ? '—' : `${Math.round(kpis.blockedRate * 1000) / 10}%`;
+  }
+
+  /**
+   * The KPI row is deliberately filter-independent: it answers "what's happening on this
+   * deployment right now" over a fixed 24h window, while the panel below answers "what
+   * matches my filter". Blocked/errored are detail-field facts, not actions, so they come
+   * from the same details-contains filter the search box uses.
+   */
+  private loadKpis(): void {
+    const from = new Date(Date.now() - DAY_MS).toISOString();
+    forkJoin({
+      day: this.audit.stats({ from }),
+      blocked: this.audit.stats({ from, details: 'blocked=true' }),
+      errored: this.audit.stats({ from, details: 'error=' }),
+    }).subscribe({
+      next: ({ day, blocked, errored }) =>
+        this.kpis.set({
+          total: day.total,
+          busiest: day.byEntityType[0]?.key ?? null,
+          eventTypes: day.byAction.length,
+          blockedRate: day.total > 0 ? (blocked.total + errored.total) / day.total : null,
+        }),
+      error: () => this.kpis.set(null),
+    });
   }
 
   setTimelineWindow(window: TimelineWindow): void {

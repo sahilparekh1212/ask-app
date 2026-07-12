@@ -46,6 +46,27 @@
     </div>
   }
 
+  @if (kpis(); as k) {
+    <div class="kpis">
+      <div class="kpi">
+        <span class="kpi-value">{{ k.total }}</span>
+        <span class="kpi-label">{{ 'audit.kpiEvents24h' | t }}</span>
+      </div>
+      <div class="kpi">
+        <span class="kpi-value">{{ k.busiest ?? '—' }}</span>
+        <span class="kpi-label">{{ 'audit.kpiBusiest' | t }}</span>
+      </div>
+      <div class="kpi">
+        <span class="kpi-value">{{ blockedRateLabel(k) }}</span>
+        <span class="kpi-label">{{ 'audit.kpiBlockedRate' | t }}</span>
+      </div>
+      <div class="kpi">
+        <span class="kpi-value">{{ k.eventTypes }}</span>
+        <span class="kpi-label">{{ 'audit.kpiEventTypes' | t }}</span>
+      </div>
+    </div>
+  }
+
   @if (stats(); as s) {
     <div class="stats">
       <p class="total">{{ 'audit.matchingEntries' | t: { count: s.total } }}</p>

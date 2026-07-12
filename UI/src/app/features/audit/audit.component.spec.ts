@@ -25,7 +25,7 @@ describe('AuditComponent', () => {
   afterEach(() => httpMock.verify());
 
   function flushInitialLoad(): void {
-    fixture.detectChanges(); // ngOnInit → search + stats
+    fixture.detectChanges(); // ngOnInit → search + stats + KPIs
     httpMock
       .expectOne((r) => r.url === `${base}/search`)
       .flush({
@@ -47,14 +47,13 @@ describe('AuditComponent', () => {
         totalPages: 1,
         last: true,
       });
-    httpMock
-      .expectOne((r) => r.url === `${base}/stats`)
-      .flush({
-        total: 1,
-        byAction: [{ key: 'LOGIN', count: 1 }],
-        byEntityType: [{ key: 'User', count: 1 }],
-      });
+    filteredStats().flush({
+      total: 1,
+      byAction: [{ key: 'LOGIN', count: 1 }],
+      byEntityType: [{ key: 'User', count: 1 }],
+    });
     flushTimeline();
+    flushKpis();
     // ngOnInit also probes the capability endpoint to decide whether to show the demo button.
     httpMock
       .expectOne((r) => r.url === `${environment.auditApiUrl}/api/v1/meta/features`)
@@ -63,6 +62,31 @@ describe('AuditComponent', () => {
 
   function flushTimeline(buckets: { bucket: string; count: number }[] = []): void {
     httpMock.expectOne((r) => r.url === `${base}/stats/timeline`).flush(buckets);
+  }
+
+  /** The panel's own stats request — the KPI requests carry a `from` param, this one doesn't. */
+  function filteredStats() {
+    return httpMock.expectOne((r) => r.url === `${base}/stats` && !r.params.has('from'));
+  }
+
+  const emptyStats = { total: 0, byAction: [], byEntityType: [] };
+
+  function flushKpis(
+    day: { total: number; byAction: unknown[]; byEntityType: unknown[] } = emptyStats,
+    blocked = emptyStats,
+    errored = emptyStats,
+  ): void {
+    httpMock
+      .expectOne(
+        (r) => r.url === `${base}/stats` && r.params.has('from') && !r.params.has('details'),
+      )
+      .flush(day);
+    httpMock
+      .expectOne((r) => r.url === `${base}/stats` && r.params.get('details') === 'blocked=true')
+      .flush(blocked);
+    httpMock
+      .expectOne((r) => r.url === `${base}/stats` && r.params.get('details') === 'error=')
+      .flush(errored);
   }
 
   it('should create and load the first page on init', () => {
@@ -77,10 +101,9 @@ describe('AuditComponent', () => {
     httpMock
       .expectOne((r) => r.url === `${base}/search`)
       .flush({ content: [], page: 0, size: 20, totalElements: 0, totalPages: 0, last: true });
-    httpMock
-      .expectOne((r) => r.url === `${base}/stats`)
-      .flush({ total: 0, byAction: [], byEntityType: [] });
+    filteredStats().flush(emptyStats);
     flushTimeline();
+    flushKpis();
     httpMock
       .expectOne((r) => r.url === `${environment.auditApiUrl}/api/v1/meta/features`)
       .flush({ demoData: false });
@@ -123,14 +146,13 @@ describe('AuditComponent', () => {
     expect(demo.request.body).toEqual({ count: 5 });
     demo.flush({ created: 5 });
 
-    // Success triggers a reload so the new rows appear immediately.
+    // Success triggers a reload (and a KPI refresh) so the new rows appear immediately.
     httpMock
       .expectOne((r) => r.url === `${base}/search`)
       .flush({ content: [], page: 0, size: 20, totalElements: 5, totalPages: 1, last: true });
-    httpMock
-      .expectOne((r) => r.url === `${base}/stats`)
-      .flush({ total: 5, byAction: [], byEntityType: [] });
+    filteredStats().flush({ total: 5, byAction: [], byEntityType: [] });
     flushTimeline();
+    flushKpis();
 
     expect(component.demoMessage()).toBe('Added 5 demo logs.');
     expect(component.demoBusy()).toBeFalse();
@@ -194,9 +216,8 @@ describe('AuditComponent', () => {
     httpMock
       .expectOne((r) => r.url === `${base}/search`)
       .flush({ content: [], page: 0, size: 20, totalElements: 0, totalPages: 0, last: true });
-    httpMock
-      .expectOne((r) => r.url === `${base}/stats`)
-      .flush({ total: 3, byAction: [], byEntityType: [] });
+    filteredStats().flush({ total: 3, byAction: [], byEntityType: [] });
+    flushKpis();
     flushTimeline([
       { bucket: new Date(anchor).toISOString(), count: 2 },
       { bucket: new Date(anchor + 2 * 3_600_000).toISOString(), count: 1 },
@@ -212,6 +233,41 @@ describe('AuditComponent', () => {
     expect(bars[22].count).toBe(0); // the gap hour, zero-filled
     expect(bars[23].count).toBe(1); // the second bucket
     expect(component.maxTimelineCount()).toBe(2);
+  });
+
+  it('computes the KPI cards from the 24h aggregations', () => {
+    fixture.detectChanges();
+    httpMock
+      .expectOne((r) => r.url === `${base}/search`)
+      .flush({ content: [], page: 0, size: 20, totalElements: 0, totalPages: 0, last: true });
+    filteredStats().flush(emptyStats);
+    flushTimeline();
+    flushKpis(
+      {
+        total: 40,
+        byAction: [
+          { key: 'CHAT', count: 25 },
+          { key: 'LOGIN', count: 10 },
+          { key: 'SEARCH', count: 5 },
+        ],
+        byEntityType: [
+          { key: 'Assistant', count: 25 },
+          { key: 'User', count: 15 },
+        ],
+      },
+      { total: 3, byAction: [], byEntityType: [] },
+      { total: 1, byAction: [], byEntityType: [] },
+    );
+    httpMock
+      .expectOne((r) => r.url === `${environment.auditApiUrl}/api/v1/meta/features`)
+      .flush({ demoData: false });
+
+    const k = component.kpis();
+    expect(k?.total).toBe(40);
+    expect(k?.busiest).toBe('Assistant'); // top byEntityType bucket
+    expect(k?.eventTypes).toBe(3); // distinct actions
+    expect(k?.blockedRate).toBeCloseTo(0.1); // (3 blocked + 1 errored) / 40
+    expect(component.blockedRateLabel(k!)).toBe('10%');
   });
 
   it('refetches with day granularity when the 7d window is selected', () => {
