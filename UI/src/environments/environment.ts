@@ -14,5 +14,5 @@ export const environment = {
   gaMeasurementId: 'G-Q84781MSCE',
   // Sentry DSN (publishable, not a secret — it can only ingest events, not read them).
   // Empty string disables Sentry entirely: no init, default Angular ErrorHandler.
-  sentryDsn: '',
+  sentryDsn: 'https://2df193ee7a26145965f701b8916b812a@o4511723457282048.ingest.us.sentry.io/4511723478253568',
 };
