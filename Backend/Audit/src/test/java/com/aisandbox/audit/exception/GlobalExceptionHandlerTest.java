@@ -4,10 +4,12 @@ import com.aisandbox.common.ratelimit.ActiveRequestRegistry;
 import com.aisandbox.common.ratelimit.RateLimitInterceptor;
 import com.aisandbox.common.ratelimit.RateLimitProperties;
 import com.aisandbox.common.ratelimit.RequestDiscardedException;
+import io.sentry.Sentry;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.MockedStatic;
 import org.slf4j.MDC;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -21,7 +23,10 @@ import org.springframework.web.servlet.resource.NoResourceFoundException;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.when;
 
 class GlobalExceptionHandlerTest {
@@ -153,6 +158,18 @@ class GlobalExceptionHandlerTest {
 	}
 
 	@Test
+	void handleAll_reportsTheUnexpectedExceptionToSentry() {
+		// The catch-all must capture explicitly: the SDK's own SentryExceptionResolver runs at
+		// LOWEST_PRECEDENCE, but this @ControllerAdvice resolves the exception first and stops
+		// DispatcherServlet's resolver chain, so without this the SDK sees no controller 500.
+		RuntimeException boom = new RuntimeException("boom");
+		try (MockedStatic<Sentry> sentry = mockStatic(Sentry.class)) {
+			handler.handleAll(boom, new MockHttpServletResponse());
+			sentry.verify(() -> Sentry.captureException(boom));
+		}
+	}
+
+	@Test
 	void handleAll_returns429NotA500WhenTheCurrentRequestWasSuperseded() throws Exception {
 		// A superseded request whose worker thread was interrupted mid-work can throw a generic
 		// exception; the handler must surface that as 429 (graceful shedding), not a 500. Drive
@@ -163,7 +180,7 @@ class GlobalExceptionHandlerTest {
 		HttpServletRequest request = mock(HttpServletRequest.class);
 		when(request.getMethod()).thenReturn("POST");
 		when(request.getRequestURI()).thenReturn("/api/v1/audit-logs");
-		try {
+		try (MockedStatic<Sentry> sentry = mockStatic(Sentry.class)) {
 			interceptor.preHandle(request, mock(HttpServletResponse.class), new Object());
 			registry.register("anonymous|POST|/api/v1/audit-logs"); // supersedes and discards the request above
 			Thread.interrupted(); // clear the interrupt discard() raised; not under test
@@ -173,6 +190,8 @@ class GlobalExceptionHandlerTest {
 
 			assertThat(response.getStatusCode()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS);
 			assertThat(response.getBody()).containsEntry("status", 429);
+			// A graceful rate-limit shed is expected load-shedding, not an error — it must NOT page Sentry.
+			sentry.verify(() -> Sentry.captureException(any()), never());
 		} finally {
 			interceptor.afterCompletion(request, mock(HttpServletResponse.class), new Object(), null);
 		}

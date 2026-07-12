@@ -121,6 +121,13 @@ empty — local clicks never pollute the real analytics, local errors never page
   (compose maps `SENTRY_DSN_AUTH`/`SENTRY_DSN_AUDIT` per container), tagged with the active
   Spring profile as the Sentry environment. Performance tracing stays off — Tempo owns
   tracing; `send-default-pii=false`.
+  **Gotcha handled:** the SDK's `SentryExceptionResolver` runs at `LOWEST_PRECEDENCE`, but
+  each service has a `@RestControllerAdvice` catch-all (`handleAll`) that resolves the
+  exception first and stops DispatcherServlet's resolver chain — so the SDK would never see a
+  single controller 500. The catch-all therefore calls `Sentry.captureException(ex)`
+  explicitly, positioned after the rate-limit discard check so only genuine 500s report
+  (400/403/404/503 have their own handlers; a 429 shed is expected load-shedding, not an
+  error). A unit test asserts both the capture and the no-capture-on-429.
 
 **Sentry in Grafana:** the official `grafana-sentry-datasource` plugin is installed
 (`GF_INSTALL_PLUGINS`) and a `Sentry` datasource is provisioned with `SENTRY_ORG_SLUG` +

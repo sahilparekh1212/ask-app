@@ -4,6 +4,7 @@ import com.aisandbox.common.ratelimit.ActiveRequest;
 import com.aisandbox.common.ratelimit.DiscardContext;
 import com.aisandbox.common.ratelimit.RateLimitProperties;
 import com.aisandbox.common.ratelimit.RequestDiscardedException;
+import io.sentry.Sentry;
 import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -93,6 +94,12 @@ public class GlobalExceptionHandler {
 			return handleDiscarded(new RequestDiscardedException(current.getKey()), response);
 		}
 		logException(ex);
+		// Report to Sentry from HERE, not just via the SDK's SentryExceptionResolver: that resolver
+		// runs at LOWEST_PRECEDENCE, but this @ControllerAdvice resolves the exception first and stops
+		// DispatcherServlet's resolver chain, so the SDK would never see a single controller 500.
+		// Only genuine unexpected 500s reach this catch-all (the 400/403/404/429 paths have their own
+		// handlers), so this is exactly the right signal. No-op when SENTRY_DSN is unset.
+		Sentry.captureException(ex);
 		return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorBody(500, "Internal Server Error", ex));
 	}
 
