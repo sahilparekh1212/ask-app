@@ -105,6 +105,8 @@ jobs:
           ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }}
           VOYAGE_API_KEY=${{ secrets.VOYAGE_API_KEY }}
           GRAFANA_ADMIN_PASSWORD=${{ secrets.GRAFANA_ADMIN_PASSWORD }}
+          SENTRY_ORG_SLUG=${{ vars.SENTRY_ORG_SLUG }}
+          SENTRY_AUTH_TOKEN=${{ secrets.SENTRY_AUTH_TOKEN }}
           AI_SANDBOX_TAG=latest
           EOF
           printf '%s\n' "${{ secrets.AUTH_RSA_PRIVATE_KEY }}" > auth_key.pem

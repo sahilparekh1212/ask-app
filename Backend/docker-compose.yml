@@ -117,6 +117,12 @@ services:
       - GF_SERVER_SERVE_FROM_SUB_PATH=true
       - GF_AUTH_ANONYMOUS_ENABLED=true
       - GF_AUTH_ANONYMOUS_ORG_ROLE=Viewer
+      # Official Sentry datasource plugin (downloaded at container start), provisioned in
+      # datasources.yml with credentials from these env vars — empty locally unless you
+      # export them, in which case the Sentry datasource lights up in Explore.
+      - GF_INSTALL_PLUGINS=grafana-sentry-datasource
+      - SENTRY_ORG_SLUG=${SENTRY_ORG_SLUG:-}
+      - SENTRY_AUTH_TOKEN=${SENTRY_AUTH_TOKEN:-}
     volumes:
       - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
       - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro

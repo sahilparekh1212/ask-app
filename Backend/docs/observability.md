@@ -102,6 +102,27 @@ label mapping needed).
 5. Back on the app's Dashboard tab: the same login is a `User / LOGIN` row — the domain view of
    the event you just traced through the system view.
 
+## Frontend monitoring (Google Analytics + Sentry)
+
+The SPA carries two browser-side signals, both config-driven off `UI/src/environments/` and
+**fully dormant when their IDs are empty** (dev is always empty — local clicks never pollute
+the real property, local errors never page anyone):
+
+- **Google Analytics 4** — a hand-rolled gtag loader (`core/analytics/analytics.service.ts`)
+  reports a `page_view` per router navigation (`send_page_view` disabled — a SPA has exactly
+  one full page load). Only route paths are reported; the app puts no PII in URLs. View at
+  https://analytics.google.com (GA's own UI — deliberately not bound into Grafana; the only
+  Grafana paths are unmaintained community plugins).
+- **Sentry** — `@sentry/angular` error monitoring (no performance/replay integrations),
+  initialized before bootstrap in `main.ts`; Sentry's `ErrorHandler` replaces Angular's
+  default only when a DSN is configured.
+
+**Sentry in Grafana:** the official `grafana-sentry-datasource` plugin is installed
+(`GF_INSTALL_PLUGINS`) and a `Sentry` datasource is provisioned with `SENTRY_ORG_SLUG` +
+`SENTRY_AUTH_TOKEN` from the environment (repo variable + secret in prod; export them locally
+to light it up). Explore → Sentry → query issues/events from the UI project next to the
+Prometheus/Loki/Tempo signals.
+
 ## Operating notes
 
 - Dashboards and datasources are **provisioned from the repo** (`monitoring/grafana/…`) and

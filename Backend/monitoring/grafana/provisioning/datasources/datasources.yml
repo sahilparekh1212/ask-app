@@ -15,6 +15,21 @@ datasources:
     access: proxy
     url: http://loki:3100
 
+  # Frontend error tracking (the UI's Sentry project), via the official Sentry datasource
+  # plugin (GF_INSTALL_PLUGINS on the grafana service). Credentials come from the
+  # environment so this file stays committed: SENTRY_ORG_SLUG + SENTRY_AUTH_TOKEN are set
+  # on the grafana container from .env (empty locally by default — the datasource then
+  # exists but its queries fail with "unauthorized", the usual not-configured posture).
+  - name: Sentry
+    uid: Sentry
+    type: grafana-sentry-datasource
+    access: proxy
+    jsonData:
+      url: https://sentry.io
+      orgSlug: $SENTRY_ORG_SLUG
+    secureJsonData:
+      authToken: $SENTRY_AUTH_TOKEN
+
   - name: Tempo
     uid: Tempo
     type: tempo
