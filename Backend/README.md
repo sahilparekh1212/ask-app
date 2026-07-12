@@ -1,7 +1,8 @@
 # AI-Sandbox Backend
 
-A Spring Boot 3.4 / Java 17 multi-module microservice backend, built with Gradle and
-deployable to OpenShift. Each service is an independently buildable, runnable and
+A Spring Boot 3.5 / Java 17 multi-module microservice backend, built with Gradle and deployed
+live at https://ai-sandbox.sahilparekh1212.com (GCE VM, deployed from GitHub Actions; OpenShift
+manifests also provided). Each service is an independently buildable, runnable and
 scalable Gradle subproject.
 
 ## Services
@@ -43,10 +44,14 @@ provider data-flow is documented in
 
 The Audit service is also a [Model Context Protocol](https://modelcontextprotocol.io) server:
 `POST /mcp` exposes semantic search over this repo's own documentation (this README, the ADRs,
-`docs/`), backed by a real vector database — pgvector on the stack's Postgres — with Voyage AI
-embeddings. Point any MCP client at it and ask about the project:
+`docs/`) *and its bundled source code*, backed by a real vector database — pgvector on the
+stack's Postgres — with Voyage AI embeddings. Point any MCP client at the live deployment (or a
+local stack) and ask about the project:
 
 ```bash
+# the public deployment — no setup needed
+claude mcp add --transport http ai-sandbox https://ai-sandbox.sahilparekh1212.com/audit-api/mcp
+# or a locally-running stack
 claude mcp add --transport http ai-sandbox http://localhost:8083/mcp
 # then, inside Claude Code: "why is there no API gateway?" → grounded in ADR-0005
 ```

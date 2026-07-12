@@ -1,13 +1,32 @@
 # AI-Sandbox
 
-A portfolio project demonstrating production-shaped backend engineering: Spring Boot
+A production-shaped fullstack portfolio project, **live at
+[ai-sandbox.sahilparekh1212.com](https://ai-sandbox.sahilparekh1212.com)**: Spring Boot
 microservices with Google OAuth2/JWT auth (including RBAC), an event-driven audit pipeline over
-Kafka, a full observability stack, and CI with SAST/CVE/secret scanning — all deployable to
-OpenShift. It's a sandbox for practicing the patterns a real backend needs, not a toy CRUD demo.
+Kafka, an Angular SPA, a Claude-powered assistant grounded by RAG over this repo's own docs and
+source (pgvector + Voyage embeddings), a public MCP server, a full observability stack, and CI/CD
+with SAST/CVE/secret scanning, signed images, and keyless GitHub-Actions→GCP deployment. It's a
+sandbox for practicing the patterns a real system needs, not a toy CRUD demo.
 
-**Status:** the backend is real and hardened (see below). The Angular UI in [`UI/`](UI/) hasn't
-been built yet — the [backend TODO](Backend/TODO.md) tracks it honestly rather than pretending
-it's further along than it is.
+## Try it live
+
+- **App:** https://ai-sandbox.sahilparekh1212.com — sign in with the demo account
+  (`demo` / `demo`, pick `ROLE_ADMIN` to try the admin-gated features). Google sign-in works too,
+  but its OAuth consent screen is in testing mode, so it's limited to registered test users — the
+  demo login is the intended door.
+- **Ask the app about itself:** the Chat tab answers questions about the architecture, the ADRs,
+  and even the deployed source code (the RAG corpus bundles the backend + UI source at build
+  time, so the assistant quotes the exact code that's running).
+- **Public MCP server** — point any MCP client at the deployment and search its knowledge base:
+
+  ```bash
+  claude mcp add --transport http ai-sandbox https://ai-sandbox.sahilparekh1212.com/audit-api/mcp
+  # then, inside Claude Code: "why is there no API gateway?" → grounded in ADR-0005
+  ```
+
+**Status:** the backend, the Angular UI, and the GCP deployment are all real and current; the
+[backend TODO](Backend/TODO.md) tracks what's still open honestly rather than pretending it's
+further along than it is.
 
 ---
 
@@ -48,8 +67,11 @@ flowchart LR
 Auth issues RSA-signed JWTs and publishes a JWKS endpoint; Audit (and any future service)
 verifies tokens against that endpoint without ever holding a signing secret. The two services
 never call each other directly for the audit trail — Auth publishes to Kafka and moves on
-whether or not the broker is up, and Audit consumes idempotently. Full writeups of these
-tradeoffs (and the ones this diagram doesn't show) are in
+whether or not the broker is up, and Audit consumes idempotently. The Audit service also hosts
+the AI surface: the Claude chat/flashcards proxy, the RAG index, and the MCP server. In the live
+deployment the browser reaches all of it through Caddy (TLS) → the UI's nginx, which
+same-origin-proxies `/auth-api` and `/audit-api` to the services — the diagram shows the logical
+flow. Full writeups of these tradeoffs (and the ones this diagram doesn't show) are in
 [`Backend/docs/adr/`](Backend/docs/adr/README.md).
 
 ---
@@ -58,20 +80,24 @@ tradeoffs (and the ones this diagram doesn't show) are in
 
 | Layer            | Choice                                                              |
 |-------------------|----------------------------------------------------------------------|
-| Language / runtime | Java 17, Spring Boot 3.4                                             |
+| Language / runtime | Java 17, Spring Boot 3.5                                             |
 | Build             | Gradle, multi-module (`common` / `Audit` / `Auth`)                   |
 | Auth              | Google OAuth2, JWT (RSA-signed), JWKS, role-based access control     |
 | Messaging         | Apache Kafka (Redpanda locally) — event-driven audit trail           |
-| Database          | PostgreSQL (DEV/SIT/UAT/PROD), H2 (LOCAL/tests), Liquibase migrations |
-| Observability     | Prometheus (metrics), Loki (logs), Grafana (dashboards)              |
+| Database          | PostgreSQL + pgvector (DEV/SIT/UAT/PROD), H2 (LOCAL/tests), Liquibase migrations |
+| AI                | Claude chat assistant + flashcards (official Anthropic Java SDK, server-side key, guardrailed), RAG over the repo's own docs *and source* (Voyage AI embeddings, pgvector), hand-rolled MCP server (`/mcp`) |
+| Observability     | Prometheus (metrics), Loki (logs), Tempo (traces), Grafana (dashboards) |
 | CI                | GitHub Actions — build/test/coverage, k6 load test, Playwright E2E against the full compose stack, API contract gate (openapi-diff), PIT mutation testing, CodeQL, Trivy (deps + images), Dependabot, secret scanning, conventional commits |
 | CD / supply chain | Versioned images to GHCR on every merge (SemVer + git SHA + latest), cosign keyless signing, syft SBOM attestations |
-| Deployment        | Docker (multi-stage builds), OpenShift manifests (HPA, PVCs, routes)  |
-| Frontend          | Angular 19 SPA (`UI/`) — nginx-served, same-origin proxies to the APIs |
+| Deployment        | Live: GCE VM, deployed by GitHub Actions via Workload Identity Federation (keyless), Caddy TLS. Also: Docker multi-stage builds, OpenShift manifests (HPA, PVCs, routes) |
+| Frontend          | Angular 21 SPA (`UI/`) — nginx-served, same-origin proxies, hand-rolled i18n (9 languages) |
 
 ---
 
-## Run it
+## Run it yourself
+
+The live deployment above needs nothing from you — this section is for running the same stack
+locally:
 
 ```bash
 cd Backend
@@ -79,8 +105,10 @@ docker compose up --build
 ```
 
 Brings up the Angular UI (http://localhost:4200, demo login `demo`/`demo`), Postgres, Kafka,
-both services, and the full observability stack. Or try the API immediately with the zero-setup
-demo login — no Google OAuth credentials needed:
+both services, and the full observability stack. The AI features additionally need provider keys
+(`ANTHROPIC_API_KEY` for chat/flashcards, `VOYAGE_API_KEY` for RAG indexing) exported before
+starting — without them those endpoints degrade cleanly and everything else works. Or try the
+API immediately with the zero-setup demo login — no Google OAuth credentials needed:
 
 ```bash
 curl -X POST http://localhost:8085/auth/login \

@@ -63,12 +63,20 @@ alternative" treatment as ADR-0005/0008.
       scroll and one-row nav everywhere. Frontend-CI gates all green (prod build, ESLint,
       Prettier, 49 unit tests). Still open as honest follow-ups (not blockers): a Playwright
       mobile-emulation e2e and a Lighthouse mobile score for a measured number.
-- [ ] **Update README for public use.** Lead with the live URL
-      (https://ai-sandbox.sahilparekh1212.com), the demo login (`demo`/`demo`), and the
-      public MCP endpoint (`claude mcp add --transport http ai-sandbox
-      https://ai-sandbox.sahilparekh1212.com/audit-api/mcp`); reframe the local
-      `docker compose up` instructions as the "run it yourself" alternative; consider a
-      screenshot/GIF of the live dashboard now that one exists.
+- [x] **Update README for public use — done.** The root README now leads with the live URL and a
+      "Try it live" section: demo login (`demo`/`demo`, with the honest note that Google sign-in
+      is test-users-only until the consent screen is published), the ask-the-app-about-itself
+      chat pitch, and the public MCP endpoint (`claude mcp add --transport http ai-sandbox
+      https://ai-sandbox.sahilparekh1212.com/audit-api/mcp` — re-verified answering `ping` live
+      before publishing the claim). The stale "the Angular UI hasn't been built yet" status line
+      (long false) is replaced with an honest current status; the tech-stack table gained the AI
+      row (Claude assistant/flashcards, RAG over docs+source, MCP), Tempo, pgvector, the live
+      GCE/WIF/Caddy deployment row, and version corrections (Boot 3.5, Angular 21); "Run it"
+      reframed as "Run it yourself" with the provider-key note. `Backend/README.md`'s intro and
+      MCP section got the live-URL treatment too. Deliberately skipped: the dashboard
+      screenshot/GIF ("consider" in the item) — the dashboard is about to change again (KPI
+      cards, item 3), so a screenshot now would be stale on arrival; capture one when the
+      dashboard settles.
 - [ ] **Load test the deployed stack + record results.** Decide scope deliberately: the k6
       suite currently runs against a LOADTEST-profile CI stack; prod is one shared 8GB VM
       with the rate limiter ON and real provider keys (assistant/RAG endpoints cost money
