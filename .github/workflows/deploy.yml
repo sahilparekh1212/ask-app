@@ -126,13 +126,16 @@ jobs:
       # was first created with stays. Resetting via grafana-cli on every deploy makes the
       # secret authoritative regardless of the DB's history (first deploy, recreated
       # container, or a value that drifted). Reads the password from the .env just shipped,
-      # so it can't disagree with what compose passed to the container.
+      # so it can't disagree with what compose passed to the container. Plain `docker exec`
+      # on the fixed container name, NOT `docker compose exec` — compose would re-interpolate
+      # the files and trip the AUTH_RSA_PRIVATE_KEY :? fail-fast, which only the restart
+      # step's shell exports (that's exactly how this step failed on its first run).
       - name: Reset Grafana admin password to the current secret
         run: |
           gcloud compute ssh "$GCP_VM" --zone="$GCP_ZONE" --quiet --command \
             "cd $APP_DIR && set -a && . ./.env && set +a && \
-             sudo -E docker compose -f docker-compose.yml -f docker-compose.ghcr.yml -f docker-compose.prod.yml \
-               exec -T grafana grafana cli admin reset-admin-password \"\$GRAFANA_ADMIN_PASSWORD\" >/dev/null && \
+             sudo docker exec aisandbox-grafana \
+               grafana cli admin reset-admin-password \"\$GRAFANA_ADMIN_PASSWORD\" >/dev/null && \
              echo 'Grafana admin password reset to the deployed secret'"
 
       - name: Smoke-check through the public origin
