@@ -61,8 +61,10 @@ describe('HomeComponent', () => {
 
   it('links the live read-only Grafana from the observability decision and the dashboard feature', () => {
     const el = fixture.nativeElement as HTMLElement;
-    const grafanaLinks = Array.from(el.querySelectorAll<HTMLAnchorElement>('a')).filter((a) =>
-      a.href.startsWith(component.grafanaUrl),
+    // getAttribute, not .href — the environment URL is same-origin relative ('/grafana')
+    // and .href would resolve it against the test origin.
+    const grafanaLinks = Array.from(el.querySelectorAll<HTMLAnchorElement>('a')).filter(
+      (a) => a.getAttribute('href') === component.grafanaUrl,
     );
     // one in the design-decision entry, one in the feature tour
     expect(grafanaLinks.length).toBe(2);

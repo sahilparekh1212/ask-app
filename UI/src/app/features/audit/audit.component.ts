@@ -12,6 +12,7 @@ import {
 } from './audit.models';
 import { TranslatePipe } from '../../core/i18n/translate.pipe';
 import { TranslateService } from '../../core/i18n/translate.service';
+import { environment } from '../../../environments/environment';
 
 type SortDir = 'asc' | 'desc';
 type SortField = 'createdAt' | 'entityType' | 'action';
@@ -46,9 +47,10 @@ export class AuditComponent implements OnInit {
   private readonly audit = inject(AuditService);
   private readonly translate = inject(TranslateService);
 
-  // The production deployment's read-only Grafana — the system-view counterpart to this
-  // page's domain view (linked from the sticky bottom bar).
-  readonly grafanaUrl = 'https://ai-sandbox.sahilparekh1212.com/grafana';
+  // The deployment's read-only Grafana — the system-view counterpart to this page's domain
+  // view (linked from the sticky bottom bar). Environment-driven so the demo user on the
+  // local compose stack and the SSO test user on prod both land on *their* Grafana.
+  readonly grafanaUrl = environment.grafanaUrl;
 
   readonly filterForm = this.fb.nonNullable.group({
     entityType: [''],

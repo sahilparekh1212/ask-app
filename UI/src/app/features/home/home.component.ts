@@ -1,5 +1,6 @@
 import { Component, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { environment } from '../../../environments/environment';
 
 interface TechGroup {
   area: string;
@@ -37,9 +38,10 @@ interface Feature {
 export class HomeComponent {
   readonly repoUrl = 'https://github.com/sahilparekh1212/AI-Sandbox';
   readonly linkedInUrl = 'https://www.linkedin.com/in/sahilparekh1212/';
-  // The production deployment's read-only Grafana (anonymous Viewer behind Caddy's
-  // /grafana route) — the live "system view" the observability decision talks about.
-  readonly grafanaUrl = 'https://ai-sandbox.sahilparekh1212.com/grafana';
+  // The deployment's read-only Grafana (anonymous Viewer) — the live "system view" the
+  // observability decision talks about. Environment-driven: same-origin /grafana in the
+  // served builds (Caddy in prod, the ui nginx locally), direct Grafana under ng serve.
+  readonly grafanaUrl = environment.grafanaUrl;
 
   // Which "Design decisions" group is shown; the others stay in the DOM but hidden, so
   // switching is instant (no re-render) and there's no long scroll through every group.

@@ -6,4 +6,6 @@ export const environment = {
   production: false,
   authApiUrl: 'http://localhost:8085',
   auditApiUrl: 'http://localhost:8083',
+  // The dev server has no /grafana proxy — link straight to the compose stack's Grafana.
+  grafanaUrl: 'http://localhost:3000/grafana',
 };

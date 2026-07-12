@@ -8,7 +8,7 @@
 #   UI:                http://localhost:4200            (demo login: demo / demo)
 #   Auth Swagger:      http://localhost:8085/swagger-ui.html
 #   Audit Swagger:     http://localhost:8083/swagger-ui.html
-#   Grafana:           http://localhost:3000            (admin / admin)
+#   Grafana:           http://localhost:4200/grafana    (anonymous read-only; admin / admin to edit)
 #   Redpanda console:  http://localhost:8080
 #   Postgres:          localhost:5432                    (audit / audit, db "auditdb")
 #
@@ -108,6 +108,15 @@ services:
       - GF_SECURITY_ADMIN_USER=admin
       - GF_SECURITY_ADMIN_PASSWORD=admin
       - GF_USERS_ALLOW_SIGN_UP=false
+      # Serve under /grafana so the UI's same-origin system-view links work through the ui
+      # nginx proxy (http://localhost:4200/grafana) exactly like prod's Caddy route; direct
+      # http://localhost:3000 redirects to :3000/grafana, so the old URL still lands right.
+      # Anonymous Viewer mirrors the prod posture (read-only without a login); admin/admin
+      # remains for editing dashboards locally. Prod overrides root_url + admin password.
+      - GF_SERVER_ROOT_URL=http://localhost:4200/grafana
+      - GF_SERVER_SERVE_FROM_SUB_PATH=true
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Viewer
     volumes:
       - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
       - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
@@ -193,6 +202,9 @@ services:
       auth:
         condition: service_started
       audit:
+        condition: service_started
+      # nginx resolves the /grafana proxy upstream at startup — the container must exist.
+      grafana:
         condition: service_started
 
   audit:
