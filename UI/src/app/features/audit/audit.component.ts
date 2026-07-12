@@ -2,12 +2,29 @@ import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
 import { AuditService } from './audit.service';
-import { AuditLog, AuditLogFilter, AuditLogStats, PagedResponse } from './audit.models';
+import {
+  AuditLog,
+  AuditLogFilter,
+  AuditLogStats,
+  AuditLogTimeBucket,
+  PagedResponse,
+} from './audit.models';
 import { TranslatePipe } from '../../core/i18n/translate.pipe';
 import { TranslateService } from '../../core/i18n/translate.service';
 
 type SortDir = 'asc' | 'desc';
 type SortField = 'createdAt' | 'entityType' | 'action';
+type TimelineWindow = '24h' | '7d';
+
+/** One zero-filled column of the events-over-time chart. */
+interface TimelineBar {
+  time: number; // bucket start, epoch ms
+  count: number;
+  label: string; // locale-formatted tooltip text
+}
+
+const HOUR_MS = 3_600_000;
+const DAY_MS = 24 * HOUR_MS;
 
 @Component({
   selector: 'app-audit',
@@ -49,6 +66,13 @@ export class AuditComponent implements OnInit {
   // Hidden until the backend confirms the demo endpoint exists (LOCAL/DEV only), so a PROD
   // deployment never shows a button whose click would 404. Starts false → never flashes.
   readonly demoAvailable = signal(false);
+
+  // Events-over-time chart: window picks both the span and the bucket granularity.
+  readonly timelineWindow = signal<TimelineWindow>('24h');
+  readonly timelineBars = signal<TimelineBar[]>([]);
+  readonly maxTimelineCount = computed(() =>
+    this.timelineBars().reduce((m, b) => Math.max(m, b.count), 0),
+  );
 
   readonly page = signal(0);
   readonly size = signal(20);
@@ -116,6 +140,69 @@ export class AuditComponent implements OnInit {
     return max > 0 ? `${Math.round((count / max) * 100)}%` : '0%';
   }
 
+  setTimelineWindow(window: TimelineWindow): void {
+    if (this.timelineWindow() === window) {
+      return;
+    }
+    this.timelineWindow.set(window);
+    this.loadTimeline();
+  }
+
+  private loadTimeline(): void {
+    const hourly = this.timelineWindow() === '24h';
+    const stepMs = hourly ? HOUR_MS : DAY_MS;
+    const now = Date.now();
+    const form = this.buildFilter();
+    // The chart's span is the toggle window intersected with the form's date range,
+    // so it honours the same filters as the table and the other charts.
+    const windowStart = Math.max(
+      now - (hourly ? DAY_MS : 7 * DAY_MS),
+      form.from ? Date.parse(form.from) : 0,
+    );
+    const windowEnd = Math.min(form.to ? Date.parse(form.to) : now, now);
+
+    this.audit
+      .timeline({ ...form, from: new Date(windowStart).toISOString() }, hourly ? 'hour' : 'day')
+      .subscribe({
+        next: (buckets) =>
+          this.timelineBars.set(this.zeroFill(buckets, windowStart, windowEnd, stepMs)),
+        error: () => this.timelineBars.set([]),
+      });
+  }
+
+  /**
+   * Empty buckets are absent from the API response; rebuild the full axis so quiet
+   * periods render as gaps rather than disappearing. The axis is anchored on the first
+   * returned bucket — the server truncates in its own session time zone, so client-side
+   * "top of the UTC hour" assumptions could misalign with the real bucket boundaries.
+   */
+  private zeroFill(
+    buckets: AuditLogTimeBucket[],
+    windowStart: number,
+    windowEnd: number,
+    stepMs: number,
+  ): TimelineBar[] {
+    const counts = new Map(buckets.map((b) => [Date.parse(b.bucket), b.count]));
+    const anchor = buckets.length ? Date.parse(buckets[0].bucket) : windowStart;
+    const bars: TimelineBar[] = [];
+    for (
+      let n = Math.floor((windowStart - anchor) / stepMs);
+      anchor + n * stepMs < windowEnd;
+      n++
+    ) {
+      const time = anchor + n * stepMs;
+      bars.push({ time, count: counts.get(time) ?? 0, label: this.barLabel(time, stepMs) });
+    }
+    return bars;
+  }
+
+  private barLabel(time: number, stepMs: number): string {
+    const date = new Date(time);
+    return stepMs === HOUR_MS
+      ? date.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric' })
+      : date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  }
+
   private reload(): void {
     const filter = this.buildFilter();
     this.loading.set(true);
@@ -141,6 +228,8 @@ export class AuditComponent implements OnInit {
       },
       error: () => this.stats.set(null),
     });
+
+    this.loadTimeline();
   }
 
   private mergeOptions(stats: AuditLogStats): void {

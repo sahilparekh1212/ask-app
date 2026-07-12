@@ -75,6 +75,45 @@
           }
         </div>
       </div>
+      <div class="chart timeline">
+        <div class="timeline-head">
+          <h3>{{ 'audit.overTime' | t }}</h3>
+          <div class="window-toggle" role="group" [attr.aria-label]="'audit.overTime' | t">
+            <button
+              type="button"
+              [class.active]="timelineWindow() === '24h'"
+              (click)="setTimelineWindow('24h')"
+            >
+              {{ 'audit.last24h' | t }}
+            </button>
+            <button
+              type="button"
+              [class.active]="timelineWindow() === '7d'"
+              (click)="setTimelineWindow('7d')"
+            >
+              {{ 'audit.last7d' | t }}
+            </button>
+          </div>
+        </div>
+        @if (maxTimelineCount() > 0) {
+          <div class="columns">
+            @for (bar of timelineBars(); track bar.time) {
+              <span class="col" [title]="bar.label + ': ' + bar.count">
+                <span
+                  class="col-fill"
+                  [style.height]="barWidth(bar.count, maxTimelineCount())"
+                ></span>
+              </span>
+            }
+          </div>
+          <div class="axis">
+            <span>{{ timelineBars()[0].label }}</span>
+            <span>{{ timelineBars()[timelineBars().length - 1].label }}</span>
+          </div>
+        } @else {
+          <p class="timeline-empty">{{ 'audit.noTimelineEvents' | t }}</p>
+        }
+      </div>
     </div>
   }
 

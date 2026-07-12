@@ -152,8 +152,9 @@ alternative" treatment as ADR-0005/0008.
 ### Dashboard — make it meaningful and relevant (NEXT UP)
 The prod dashboard is sparse because the audit trail only records Auth's `LOGIN` events; for
 a project that's fundamentally an AI sandbox (chat, flashcards, RAG, MCP) it should show what
-the app actually does. Four items; item 1 (the headline that unblocks the rest) has landed —
-the AI features now emit domain events, so item 2 (a time dimension) is next up. Context: the
+the app actually does. Four items; items 1 (AI features emit domain events) and 2 (the time
+dimension) have landed, so item 3 (KPI cards — cheap now the aggregations exist) is next up.
+Context: the
 "Add demo logs" button is now hidden in prod (a LOCAL/DEV-only affordance — see the
 `/api/v1/meta/features` capability probe), so prod won't be padded with dummy rows; real usage
 should populate it instead.
@@ -183,11 +184,31 @@ should populate it instead.
       `McpControllerTest`; full Audit suite + 90% coverage gate + Spotless all green locally. Not
       yet seen populating a live dashboard (needs the deploy) — but the pipeline it rides is the
       same one the E2E suite already asserts end-to-end for LOGIN.
-- [ ] **2. Add a time dimension.** Today only by-action/by-entityType bars exist. Add an
-      "events over the last 24h/7d" line or sparkline (dependency-free, matching the existing
-      CSS bar-chart style) so usage trends are visible — needs a backend time-bucket
-      aggregation (`GROUP BY date_trunc(...)`), built from the same `AuditLogSpecifications`
-      as search/stats so it honours the same filters.
+- [x] **2. Add a time dimension — implemented.** Backend: `GET /api/v1/audit-logs/stats/timeline`
+      (same filter params as `/search` + an `interval=hour|day` enum) runs a database-side
+      `GROUP BY date_trunc(...)` Criteria query reusing the identical `AuditLogSpecifications`
+      predicate as search/stats, so the trend counts exactly the rows the table shows; the unit
+      string is whitelisted by the `TimelineInterval` enum, never request text. Three honest
+      findings along the way: (1) `date_trunc` works on H2 as well as Postgres, but truncates in
+      the *DB session's* time zone — UTC in the prod containers, local on a dev machine — so the
+      integration tests compute expected buckets via `ZoneId.systemDefault()` (documented on the
+      service) and the UI anchors its axis on the returned buckets instead of assuming UTC tops;
+      (2) a bad query param (`interval=week`, garbage `from` date) fell into the catch-all → 500,
+      the exact bug class fixed twice before — added the `MethodArgumentTypeMismatchException`
+      handler → 400 + tests; (3) caught only in the live click-through, not by the unit tests
+      that call the controller method directly: Spring's default `@RequestParam` enum binding is
+      case-sensitive `Enum.valueOf`, so the documented `interval=hour` (and even the
+      `defaultValue`) 400'd on the wire — fixed with a case-insensitive `TimelineInterval.from()`
+      registered as the String→enum converter in `WebConfig`. UI: an "Events over time" column
+      chart in the stats panel
+      (dependency-free, same token palette as the bar charts) with a Last 24h (hourly) / Last 7d
+      (daily) toggle; empty buckets are zero-filled client-side so quiet periods render as gaps;
+      per-column tooltips + first/last axis labels; four new i18n keys translated in all nine
+      dictionaries. The chart honours the live filter form (window intersected with the form's
+      date range). Tested both sides: 3 timeline integration tests + controller/handler tests
+      (Audit suite, 90% gate, Spotless green); 3 new UI specs incl. a zero-fill axis assertion
+      (52 unit tests green, lint/format/prod build clean — `anyComponentStyle` warning budget
+      bumped 4→6kB since the audit dashboard's legitimate styles now exceed it; error stays 8kB).
 - [ ] **3. KPI summary cards on top.** A headline row: total events (24h), busiest feature,
       blocked/error rate, unique event types — instant "what's happening", the standard
       dashboard pattern. Cheap once the aggregation endpoints exist.

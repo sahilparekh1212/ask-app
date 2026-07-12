@@ -3,6 +3,8 @@ package com.aisandbox.audit.service;
 import com.aisandbox.audit.dto.AuditLogCount;
 import com.aisandbox.audit.dto.AuditLogFilter;
 import com.aisandbox.audit.dto.AuditLogStats;
+import com.aisandbox.audit.dto.AuditLogTimeBucket;
+import com.aisandbox.audit.dto.TimelineInterval;
 import com.aisandbox.audit.model.AuditLog;
 import com.aisandbox.audit.repository.AuditLogRepository;
 import com.aisandbox.audit.repository.AuditLogSpecifications;
@@ -21,6 +23,7 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Set;
 
@@ -61,6 +64,37 @@ public class AuditLogService {
 		Specification<AuditLog> spec = AuditLogSpecifications.matching(filter);
 		long total = repository.count(spec);
 		return new AuditLogStats(total, groupedCount(filter, "action"), groupedCount(filter, "entityType"));
+	}
+
+	/**
+	 * Events-over-time: database-side {@code GROUP BY date_trunc(interval, createdAt)}
+	 * with the filter applied, ordered chronologically. Reuses the same
+	 * {@link AuditLogSpecifications} as {@link #search}/{@link #aggregate}, so the
+	 * trend line counts exactly the rows the table shows. {@code date_trunc} exists
+	 * natively on both PostgreSQL (prod) and H2 (tests), and the unit string comes
+	 * from the {@link TimelineInterval} whitelist, never from request text. Bucket
+	 * boundaries follow the database session's time zone (the JVM default — UTC in
+	 * the prod containers). Empty buckets are simply absent — zero-filling is a
+	 * presentation concern, and the client should anchor its axis on the returned
+	 * bucket values rather than assume UTC boundaries.
+	 */
+	@Transactional(readOnly = true)
+	public List<AuditLogTimeBucket> timeline(AuditLogFilter filter, TimelineInterval interval) {
+		CriteriaBuilder cb = entityManager.getCriteriaBuilder();
+		CriteriaQuery<AuditLogTimeBucket> query = cb.createQuery(AuditLogTimeBucket.class);
+		Root<AuditLog> root = query.from(AuditLog.class);
+
+		Expression<Instant> bucket = cb.function("date_trunc", Instant.class,
+			cb.literal(interval.unit()), root.get("createdAt"));
+		Predicate where = AuditLogSpecifications.matching(filter).toPredicate(root, query, cb);
+
+		query.select(cb.construct(AuditLogTimeBucket.class, bucket, cb.count(root)));
+		if (where != null) {
+			query.where(where);
+		}
+		query.groupBy(bucket).orderBy(cb.asc(bucket));
+
+		return entityManager.createQuery(query).getResultList();
 	}
 
 	/**

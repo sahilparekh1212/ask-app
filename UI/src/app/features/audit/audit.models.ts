@@ -33,6 +33,15 @@ export interface AuditLogStats {
   byEntityType: AuditLogCount[];
 }
 
+/** One events-over-time bucket from /stats/timeline. Empty buckets are omitted by the API. */
+export interface AuditLogTimeBucket {
+  bucket: string; // ISO instant of the bucket start (server-side date_trunc boundary)
+  count: number;
+}
+
+/** Granularity of the /stats/timeline aggregation. */
+export type TimelineInterval = 'hour' | 'day';
+
 /** Filters shared by /search and /stats. */
 export interface AuditLogFilter {
   entityType?: string | null;

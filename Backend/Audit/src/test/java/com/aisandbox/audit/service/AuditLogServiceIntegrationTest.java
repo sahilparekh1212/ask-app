@@ -4,18 +4,23 @@ import com.aisandbox.audit.config.JpaAuditingConfig;
 import com.aisandbox.audit.dto.AuditLogCount;
 import com.aisandbox.audit.dto.AuditLogFilter;
 import com.aisandbox.audit.dto.AuditLogStats;
+import com.aisandbox.audit.dto.AuditLogTimeBucket;
+import com.aisandbox.audit.dto.TimelineInterval;
 import com.aisandbox.audit.model.AuditLog;
 import com.aisandbox.audit.repository.AuditLogRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
+import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager;
 import org.springframework.context.annotation.Import;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 
 import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 
@@ -30,6 +35,9 @@ class AuditLogServiceIntegrationTest {
 
 	@Autowired
 	private AuditLogRepository repository;
+
+	@Autowired
+	private TestEntityManager entityManager;
 
 	@BeforeEach
 	void seed() {
@@ -197,6 +205,85 @@ class AuditLogServiceIntegrationTest {
 		assertThat(stats.byEntityType()).containsExactly(new AuditLogCount("User", 3));
 		assertThat(stats.byAction())
 			.containsExactlyInAnyOrder(new AuditLogCount("CREATE", 2), new AuditLogCount("UPDATE", 1));
+	}
+
+	// Timeline buckets are truncated in the database session's time zone (the JVM default —
+	// UTC in the prod containers, whatever the developer machine runs locally). The expected
+	// values are therefore computed with the same system-default zone rather than hardcoded
+	// UTC instants, and the fixture timestamps sit mid-slot so any real-world offset
+	// (a multiple of 15 minutes) buckets them identically.
+
+	@Test
+	void timeline_bucketsByHourHonouringTheSameFilterAsSearch() {
+		// Pin distinct createdAt values (JPA auditing stamps "now" on persist, and the
+		// entity is immutable) so rows land in known hour buckets.
+		backdate("u1", "2026-07-10T10:16:00Z");
+		backdate("u2", "2026-07-10T10:29:00Z");
+		backdate("u3", "2026-07-10T11:16:00Z");
+		backdate("o1", "2026-07-10T11:29:00Z");
+
+		List<AuditLogTimeBucket> hourly = service.timeline(
+			filter(null, null, null, null, false), TimelineInterval.HOUR);
+		List<AuditLogTimeBucket> usersOnly = service.timeline(
+			filter("User", null, null, null, false), TimelineInterval.HOUR);
+
+		assertThat(hourly).containsExactly(
+			bucket("2026-07-10T10:16:00Z", ChronoUnit.HOURS, 2),
+			bucket("2026-07-10T11:16:00Z", ChronoUnit.HOURS, 2));
+		assertThat(usersOnly).containsExactly(
+			bucket("2026-07-10T10:16:00Z", ChronoUnit.HOURS, 2),
+			bucket("2026-07-10T11:16:00Z", ChronoUnit.HOURS, 1));
+	}
+
+	@Test
+	void timeline_bucketsByDayAndExcludesSoftDeletedByDefault() {
+		backdate("u1", "2026-07-09T12:16:00Z");
+		backdate("u2", "2026-07-10T12:16:00Z");
+		backdate("u3", "2026-07-10T12:29:00Z");
+		backdate("o1", "2026-07-10T13:16:00Z");
+		backdate("o2", "2026-07-10T14:16:00Z"); // soft-deleted in seed()
+
+		List<AuditLogTimeBucket> daily = service.timeline(
+			filter(null, null, null, null, false), TimelineInterval.DAY);
+
+		assertThat(daily).containsExactly(
+			bucket("2026-07-09T12:16:00Z", ChronoUnit.DAYS, 1),
+			bucket("2026-07-10T12:16:00Z", ChronoUnit.DAYS, 3));
+	}
+
+	@Test
+	void timeline_appliesTheCreatedAtRangeLikeSearch() {
+		backdate("u1", "2026-07-10T10:16:00Z");
+		backdate("u2", "2026-07-10T11:16:00Z");
+		backdate("u3", "2026-07-10T12:16:00Z");
+		backdate("o1", "2026-07-10T13:16:00Z");
+
+		List<AuditLogTimeBucket> windowed = service.timeline(
+			filter(null, null, Instant.parse("2026-07-10T11:00:00Z"),
+				Instant.parse("2026-07-10T13:00:00Z"), false),
+			TimelineInterval.HOUR);
+
+		assertThat(windowed).containsExactly(
+			bucket("2026-07-10T11:16:00Z", ChronoUnit.HOURS, 1),
+			bucket("2026-07-10T12:16:00Z", ChronoUnit.HOURS, 1));
+	}
+
+	/** Pin a row's audited createdAt via SQL — the immutable entity offers no setter. */
+	private void backdate(String details, String createdAt) {
+		entityManager.getEntityManager()
+			.createNativeQuery("UPDATE audit_logs SET created_at = :ts WHERE details = :details")
+			.setParameter("ts", Instant.parse(createdAt))
+			.setParameter("details", details)
+			.executeUpdate();
+		entityManager.clear();
+	}
+
+	/** The bucket the given instant truncates into under the session (system-default) zone. */
+	private AuditLogTimeBucket bucket(String instant, ChronoUnit unit, long count) {
+		Instant start = ZonedDateTime.ofInstant(Instant.parse(instant), ZoneId.systemDefault())
+			.truncatedTo(unit)
+			.toInstant();
+		return new AuditLogTimeBucket(start, count);
 	}
 
 	@Test

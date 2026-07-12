@@ -40,6 +40,14 @@ describe('AuditService', () => {
     req.flush({ total: 0, byAction: [], byEntityType: [] });
   });
 
+  it('requests the timeline with the filter params and the interval', () => {
+    service.timeline({ action: 'LOGIN' }, 'day').subscribe();
+    const req = httpMock.expectOne((r) => r.url === `${base}/stats/timeline`);
+    expect(req.request.params.get('action')).toBe('LOGIN');
+    expect(req.request.params.get('interval')).toBe('day');
+    req.flush([]);
+  });
+
   it('posts the demo count to the demo endpoint', () => {
     service.addDemoLogs(7).subscribe();
     const req = httpMock.expectOne(`${base}/demo`);

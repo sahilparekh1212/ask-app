@@ -15,6 +15,7 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.time.Instant;
@@ -98,6 +99,19 @@ public class GlobalExceptionHandler {
 			.map(fe -> fe.getField() + " " + fe.getDefaultMessage())
 			.collect(Collectors.joining("; "));
 		return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorBody(400, "Bad Request", message));
+	}
+
+	/**
+	 * A query/path param failed type conversion (e.g. {@code interval=week} on the timeline
+	 * endpoint, or an unparseable {@code from} date). Same bug class as the two validation
+	 * handlers above: without this, a client typo falls into the catch-all and 500s instead
+	 * of 400ing.
+	 */
+	@ExceptionHandler(MethodArgumentTypeMismatchException.class)
+	public ResponseEntity<Map<String, Object>> handleTypeMismatch(MethodArgumentTypeMismatchException ex) {
+		logException(ex);
+		return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+			.body(errorBody(400, "Bad Request", "Invalid value for parameter '" + ex.getName() + "'"));
 	}
 
 	/**

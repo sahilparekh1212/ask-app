@@ -3,7 +3,9 @@ package com.aisandbox.audit.controller;
 import com.aisandbox.audit.dto.AuditLogCount;
 import com.aisandbox.audit.dto.AuditLogFilter;
 import com.aisandbox.audit.dto.AuditLogStats;
+import com.aisandbox.audit.dto.AuditLogTimeBucket;
 import com.aisandbox.audit.dto.PagedResponse;
+import com.aisandbox.audit.dto.TimelineInterval;
 import com.aisandbox.audit.exception.ResourceNotFoundException;
 import com.aisandbox.audit.model.AuditLog;
 import com.aisandbox.audit.ratelimit.TransactionalRequestExecutor;
@@ -172,6 +174,34 @@ class AuditLogControllerTest {
 
 		assertThat(result).isSameAs(stats);
 		verify(auditLogService).aggregate(new AuditLogFilter("User", null, "demo", null, null, false));
+	}
+
+	@Test
+	void timeline_returnsTheServiceBucketsForwardingFilterAndInterval() {
+		List<AuditLogTimeBucket> buckets = List.of(
+			new AuditLogTimeBucket(Instant.parse("2026-07-10T10:00:00Z"), 2),
+			new AuditLogTimeBucket(Instant.parse("2026-07-10T11:00:00Z"), 1));
+		when(auditLogService.timeline(any(AuditLogFilter.class), any(TimelineInterval.class)))
+			.thenReturn(buckets);
+
+		List<AuditLogTimeBucket> result =
+			controller.timeline("User", null, "demo", null, null, false, TimelineInterval.DAY);
+
+		assertThat(result).isSameAs(buckets);
+		verify(auditLogService).timeline(
+			new AuditLogFilter("User", null, "demo", null, null, false), TimelineInterval.DAY);
+	}
+
+	@Test
+	void timelineInterval_parsesTheDocumentedLowercaseForms() {
+		// The API documents interval=hour|day; WebConfig registers this parse as the
+		// String→enum converter because default @RequestParam binding is case-sensitive
+		// and would 400 exactly the documented values.
+		assertThat(TimelineInterval.from("hour")).isEqualTo(TimelineInterval.HOUR);
+		assertThat(TimelineInterval.from("day")).isEqualTo(TimelineInterval.DAY);
+		assertThat(TimelineInterval.from(" HOUR ")).isEqualTo(TimelineInterval.HOUR);
+		assertThatThrownBy(() -> TimelineInterval.from("week"))
+			.isInstanceOf(IllegalArgumentException.class);
 	}
 
 	@Test

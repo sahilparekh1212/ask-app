@@ -2,7 +2,9 @@ package com.aisandbox.audit.controller;
 
 import com.aisandbox.audit.dto.AuditLogFilter;
 import com.aisandbox.audit.dto.AuditLogStats;
+import com.aisandbox.audit.dto.AuditLogTimeBucket;
 import com.aisandbox.audit.dto.PagedResponse;
+import com.aisandbox.audit.dto.TimelineInterval;
 import com.aisandbox.audit.exception.ResourceNotFoundException;
 import com.aisandbox.audit.model.AuditLog;
 import com.aisandbox.audit.ratelimit.TransactionalRequestExecutor;
@@ -88,6 +90,22 @@ public class AuditLogController {
 		AuditLogFilter filter = new AuditLogFilter(entityType, action, details, from, to, includeDeleted);
 		log.info("Aggregating audit logs filter={}", filter);
 		return auditLogService.aggregate(filter);
+	}
+
+	@GetMapping("/stats/timeline")
+	@Operation(summary = "Events-over-time buckets (hour or day granularity) over the same filters as /search. "
+		+ "Empty buckets are omitted; bucket boundaries follow the server session's time zone (UTC in prod).")
+	public List<AuditLogTimeBucket> timeline(
+			@RequestParam(required = false) String entityType,
+			@RequestParam(required = false) String action,
+			@RequestParam(required = false) String details,
+			@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant from,
+			@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant to,
+			@RequestParam(defaultValue = "false") boolean includeDeleted,
+			@RequestParam(defaultValue = "hour") TimelineInterval interval) {
+		AuditLogFilter filter = new AuditLogFilter(entityType, action, details, from, to, includeDeleted);
+		log.info("Timeline aggregation filter={} interval={}", filter, interval);
+		return auditLogService.timeline(filter, interval);
 	}
 
 	@GetMapping("/{id}")

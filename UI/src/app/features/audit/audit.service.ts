@@ -6,10 +6,12 @@ import {
   AuditLog,
   AuditLogFilter,
   AuditLogStats,
+  AuditLogTimeBucket,
   DemoDataResponse,
   FeaturesResponse,
   PageRequest,
   PagedResponse,
+  TimelineInterval,
 } from './audit.models';
 
 /** Calls the Audit service's paginated search and aggregation endpoints. */
@@ -35,6 +37,13 @@ export class AuditService {
   stats(filter: AuditLogFilter): Observable<AuditLogStats> {
     return this.http.get<AuditLogStats>(`${this.base}/stats`, {
       params: this.filterParams(filter),
+    });
+  }
+
+  /** Events-over-time buckets, same filters as /search plus the bucket granularity. */
+  timeline(filter: AuditLogFilter, interval: TimelineInterval): Observable<AuditLogTimeBucket[]> {
+    return this.http.get<AuditLogTimeBucket[]>(`${this.base}/stats/timeline`, {
+      params: this.filterParams(filter).set('interval', interval),
     });
   }
 

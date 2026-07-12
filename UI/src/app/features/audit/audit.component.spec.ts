@@ -54,10 +54,15 @@ describe('AuditComponent', () => {
         byAction: [{ key: 'LOGIN', count: 1 }],
         byEntityType: [{ key: 'User', count: 1 }],
       });
+    flushTimeline();
     // ngOnInit also probes the capability endpoint to decide whether to show the demo button.
     httpMock
       .expectOne((r) => r.url === `${environment.auditApiUrl}/api/v1/meta/features`)
       .flush({ demoData: true });
+  }
+
+  function flushTimeline(buckets: { bucket: string; count: number }[] = []): void {
+    httpMock.expectOne((r) => r.url === `${base}/stats/timeline`).flush(buckets);
   }
 
   it('should create and load the first page on init', () => {
@@ -75,6 +80,7 @@ describe('AuditComponent', () => {
     httpMock
       .expectOne((r) => r.url === `${base}/stats`)
       .flush({ total: 0, byAction: [], byEntityType: [] });
+    flushTimeline();
     httpMock
       .expectOne((r) => r.url === `${environment.auditApiUrl}/api/v1/meta/features`)
       .flush({ demoData: false });
@@ -101,6 +107,7 @@ describe('AuditComponent', () => {
         byAction: [{ key: 'CREATE', count: 1 }],
         byEntityType: [{ key: 'Order', count: 1 }],
       });
+    flushTimeline();
 
     expect(component.entityTypeOptions()).toEqual(['Order', 'User']);
     expect(component.actionOptions()).toEqual(['CREATE', 'LOGIN']);
@@ -123,6 +130,7 @@ describe('AuditComponent', () => {
     httpMock
       .expectOne((r) => r.url === `${base}/stats`)
       .flush({ total: 5, byAction: [], byEntityType: [] });
+    flushTimeline();
 
     expect(component.demoMessage()).toBe('Added 5 demo logs.');
     expect(component.demoBusy()).toBeFalse();
@@ -149,6 +157,11 @@ describe('AuditComponent', () => {
     const stats = httpMock.expectOne((r) => r.url === `${base}/stats`);
     expect(stats.request.params.get('details')).toBe('sales report');
     stats.flush({ total: 0, byAction: [], byEntityType: [] });
+
+    // The timeline honours the same filters as the table and the other charts.
+    const timeline = httpMock.expectOne((r) => r.url === `${base}/stats/timeline`);
+    expect(timeline.request.params.get('details')).toBe('sales report');
+    timeline.flush([]);
   });
 
   it('toggles sort direction when the same column is clicked twice', () => {
@@ -170,5 +183,45 @@ describe('AuditComponent', () => {
     httpMock
       .expectOne((r) => r.url === `${base}/stats`)
       .flush({ total: 0, byAction: [], byEntityType: [] });
+    flushTimeline();
+  });
+
+  it('zero-fills the timeline axis between and around the returned buckets', () => {
+    // Anchor mid-slot (…:30) so the ~ms between the test's "now" and the component's
+    // "now" can never flip a bar across the window boundary.
+    const anchor = Date.now() - 3.5 * 3_600_000;
+    fixture.detectChanges();
+    httpMock
+      .expectOne((r) => r.url === `${base}/search`)
+      .flush({ content: [], page: 0, size: 20, totalElements: 0, totalPages: 0, last: true });
+    httpMock
+      .expectOne((r) => r.url === `${base}/stats`)
+      .flush({ total: 3, byAction: [], byEntityType: [] });
+    flushTimeline([
+      { bucket: new Date(anchor).toISOString(), count: 2 },
+      { bucket: new Date(anchor + 2 * 3_600_000).toISOString(), count: 1 },
+    ]);
+    httpMock
+      .expectOne((r) => r.url === `${environment.auditApiUrl}/api/v1/meta/features`)
+      .flush({ demoData: false });
+
+    const bars = component.timelineBars();
+    // 24h window on an hourly grid anchored 3.5h ago: 21 slots back + 4 forward.
+    expect(bars.length).toBe(25);
+    expect(bars[21].count).toBe(2); // the anchor bucket
+    expect(bars[22].count).toBe(0); // the gap hour, zero-filled
+    expect(bars[23].count).toBe(1); // the second bucket
+    expect(component.maxTimelineCount()).toBe(2);
+  });
+
+  it('refetches with day granularity when the 7d window is selected', () => {
+    flushInitialLoad();
+
+    component.setTimelineWindow('7d');
+
+    const req = httpMock.expectOne((r) => r.url === `${base}/stats/timeline`);
+    expect(req.request.params.get('interval')).toBe('day');
+    req.flush([]);
+    expect(component.timelineWindow()).toBe('7d');
   });
 });

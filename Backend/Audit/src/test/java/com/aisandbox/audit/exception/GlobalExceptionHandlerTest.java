@@ -15,6 +15,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.util.Map;
@@ -108,6 +109,23 @@ class GlobalExceptionHandlerTest {
 			.containsEntry("status", 403)
 			.containsEntry("error", "Forbidden")
 			.containsEntry("message", "nope");
+	}
+
+	@Test
+	void handleTypeMismatch_returns400NotA500ForABadQueryParam() {
+		// e.g. GET /stats/timeline?interval=week — the enum conversion fails before the
+		// controller runs; a client typo must read as their error, not a server fault.
+		MethodArgumentTypeMismatchException ex = new MethodArgumentTypeMismatchException(
+			"week", com.aisandbox.audit.dto.TimelineInterval.class, "interval", null,
+			new IllegalArgumentException("no enum constant"));
+
+		ResponseEntity<Map<String, Object>> response = handler.handleTypeMismatch(ex);
+
+		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+		assertThat(response.getBody())
+			.containsEntry("status", 400)
+			.containsEntry("error", "Bad Request")
+			.containsEntry("message", "Invalid value for parameter 'interval'");
 	}
 
 	@Test
