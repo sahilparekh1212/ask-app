@@ -7,4 +7,8 @@ dependencies {
 	// Shared, cross-replica refresh-token store (auth.refresh-token.store=redis — see ADR-0007).
 	// Lettuce connects lazily, so this is inert under the default in-memory store.
 	implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+	// Sentry error monitoring: captures unhandled exceptions. An empty SENTRY_DSN (the
+	// default — see application.properties) disables the SDK entirely, so this is inert
+	// everywhere until the deployment provides a DSN.
+	implementation 'io.sentry:sentry-spring-boot-starter-jakarta:8.16.0'
 }

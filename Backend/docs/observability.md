@@ -102,6 +102,39 @@ label mapping needed).
 5. Back on the app's Dashboard tab: the same login is a `User / LOGIN` row — the domain view of
    the event you just traced through the system view.
 
+## Error tracking + analytics (Sentry across the stack, GA4 in the SPA)
+
+All of these are config-driven and **fully dormant when their IDs are empty** (dev is always
+empty — local clicks never pollute the real analytics, local errors never page anyone):
+
+- **Google Analytics 4** (SPA) — a hand-rolled gtag loader
+  (`core/analytics/analytics.service.ts`) reports a `page_view` per router navigation
+  (`send_page_view` disabled — a SPA has exactly one full page load). Only route paths are
+  reported; the app puts no PII in URLs. View at https://analytics.google.com (GA's own UI —
+  deliberately not bound into Grafana; the only Grafana paths are unmaintained community
+  plugins).
+- **Sentry, frontend** — `@sentry/angular` error monitoring (no performance/replay
+  integrations), initialized before bootstrap in `main.ts`; Sentry's `ErrorHandler` replaces
+  Angular's default only when a DSN is configured (`environment.ts`).
+- **Sentry, backend** — `sentry-spring-boot-starter-jakarta` in both services captures
+  unhandled exceptions. One Sentry project per service; the DSN arrives as `SENTRY_DSN`
+  (compose maps `SENTRY_DSN_AUTH`/`SENTRY_DSN_AUDIT` per container), tagged with the active
+  Spring profile as the Sentry environment. Performance tracing stays off — Tempo owns
+  tracing; `send-default-pii=false`.
+  **Gotcha handled:** the SDK's `SentryExceptionResolver` runs at `LOWEST_PRECEDENCE`, but
+  each service has a `@RestControllerAdvice` catch-all (`handleAll`) that resolves the
+  exception first and stops DispatcherServlet's resolver chain — so the SDK would never see a
+  single controller 500. The catch-all therefore calls `Sentry.captureException(ex)`
+  explicitly, positioned after the rate-limit discard check so only genuine 500s report
+  (400/403/404/503 have their own handlers; a 429 shed is expected load-shedding, not an
+  error). A unit test asserts both the capture and the no-capture-on-429.
+
+**Sentry in Grafana:** the official `grafana-sentry-datasource` plugin is installed
+(`GF_INSTALL_PLUGINS`) and a `Sentry` datasource is provisioned with `SENTRY_ORG_SLUG` +
+`SENTRY_AUTH_TOKEN` from the environment (repo variable + secret in prod; export them locally
+to light it up). The token is org-scoped, so Explore → Sentry can query issues/events from
+all three projects (UI, Auth, Audit) next to the Prometheus/Loki/Tempo signals.
+
 ## Operating notes
 
 - Dashboards and datasources are **provisioned from the repo** (`monitoring/grafana/…`) and

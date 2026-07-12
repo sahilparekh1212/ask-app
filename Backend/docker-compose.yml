@@ -117,6 +117,12 @@ services:
       - GF_SERVER_SERVE_FROM_SUB_PATH=true
       - GF_AUTH_ANONYMOUS_ENABLED=true
       - GF_AUTH_ANONYMOUS_ORG_ROLE=Viewer
+      # Official Sentry datasource plugin (downloaded at container start), provisioned in
+      # datasources.yml with credentials from these env vars — empty locally unless you
+      # export them, in which case the Sentry datasource lights up in Explore.
+      - GF_INSTALL_PLUGINS=grafana-sentry-datasource
+      - SENTRY_ORG_SLUG=${SENTRY_ORG_SLUG:-}
+      - SENTRY_AUTH_TOKEN=${SENTRY_AUTH_TOKEN:-}
     volumes:
       - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
       - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
@@ -171,6 +177,8 @@ services:
       # fails OAuth2ClientProperties validation ("Client id ... must not be empty") at startup.
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-your-client-id}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-your-client-secret}
+      # Sentry (per-service project). Empty (the default) = SDK disabled.
+      SENTRY_DSN: ${SENTRY_DSN_AUTH:-}
     ports:
       - "8085:8085"
     depends_on:
@@ -237,6 +245,8 @@ services:
       # in this stack (LOCAL/tests default to the in-memory store instead).
       VOYAGE_API_KEY: ${VOYAGE_API_KEY:-}
       RAG_VECTOR_STORE: pgvector
+      # Sentry (per-service project). Empty (the default) = SDK disabled.
+      SENTRY_DSN: ${SENTRY_DSN_AUDIT:-}
     ports:
       - "8083:8083"
     depends_on:

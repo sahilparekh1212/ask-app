@@ -14,6 +14,10 @@ dependencies {
 	implementation('com.anthropic:anthropic-java:2.34.0') {
 		exclude group: 'io.swagger.core.v3', module: 'swagger-annotations'
 	}
+	// Sentry error monitoring: captures unhandled exceptions. An empty SENTRY_DSN (the
+	// default — see application.properties) disables the SDK entirely, so this is inert
+	// everywhere until the deployment provides a DSN.
+	implementation 'io.sentry:sentry-spring-boot-starter-jakarta:8.16.0'
 	runtimeOnly 'com.h2database:h2'
 	// DEV/SIT/UAT/PROD point SPRING_DATASOURCE_URL at a real Postgres (see the root
 	// docker-compose.yml and README's "External database" section) — LOCAL/tests still use H2.
