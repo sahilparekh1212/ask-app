@@ -359,6 +359,10 @@ The production deployment publishes its Grafana **read-only** at
 `/grafana` route — dashboards and Explore work, nothing is editable). Prometheus, Loki and
 Tempo themselves stay unpublished.
 
+**Usage guide with example queries** (PromQL, LogQL, tracing a login across the Kafka hop, a
+2-minute end-to-end walkthrough): [docs/observability.md](docs/observability.md). Every example
+query in it was verified against the running stack.
+
 | Tool       | Role                                | Source from each service                        |
 |------------|-------------------------------------|---------------------------------------------------|
 | Prometheus | Scrapes metrics                     | Micrometer `/actuator/prometheus`                |

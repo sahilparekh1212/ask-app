@@ -1,0 +1,114 @@
+# Using the observability stack (Grafana, Prometheus, Loki, Tempo)
+
+This is the **system view** of the deployment — how the servers are performing. (The app's own
+audit dashboard is the **domain view** — what users and agents did. Two questions, two views;
+the About page in the UI explains the split.)
+
+## Where to find it
+
+| Environment | Grafana | Access |
+|---|---|---|
+| Local compose stack | http://localhost:4200/grafana (old http://localhost:3000 redirects here) | Anonymous read-only; `admin` / `admin` to edit dashboards |
+| Production | https://ai-sandbox.sahilparekh1212.com/grafana | Anonymous read-only; admin password is the `GRAFANA_ADMIN_PASSWORD` repo secret |
+
+Grafana is the only published window. Prometheus, Loki and Tempo are never exposed directly in
+prod (locally they happen to have host ports — `:9090`, `:3100`, `:3200` — for direct poking);
+their data is reachable through Grafana's **Explore** (compass icon → datasource dropdown), and
+anonymous visitors hold the Viewer role: dashboards and Explore work, nothing is editable.
+
+**Start here:** Dashboards → AI-Sandbox → **AI-Sandbox Overview** — request/error rates, p95/p99
+latency, JVM heap, and a live logs panel on one screen.
+
+## Prometheus (metrics) — Explore → *Prometheus*
+
+Both services expose Micrometer metrics at `/actuator/prometheus`; Prometheus discovers every
+replica via Docker DNS (`dns_sd_configs`), so a scaled service is scraped per-pod. All series
+are tagged `application` (service) and `podName` (replica).
+
+```promql
+# Are both services up? (expect one series per replica, value 1)
+up
+
+# Request throughput per service (req/s)
+sum by (application) (rate(http_server_requests_seconds_count[1m]))
+
+# p95 latency per endpoint (switch 0.95 → 0.99 for p99)
+histogram_quantile(0.95, sum by (le, application, uri) (rate(http_server_requests_seconds_bucket[5m])))
+
+# 5xx error rate per service
+sum by (application) (rate(http_server_requests_seconds_count{status=~"5.."}[1m]))
+
+# Rate-limiter sheds: 429s on the audit search endpoint
+sum (rate(http_server_requests_seconds_count{status="429", uri="/api/v1/audit-logs/search"}[5m]))
+
+# JVM heap in use per service
+sum by (application) (jvm_memory_used_bytes{area="heap"})
+
+# Kafka consumer throughput (audit events persisted from the topic)
+rate(spring_kafka_listener_seconds_count[5m])
+```
+
+## Loki (logs) — Explore → *Loki*
+
+Each service ships its logs via a logback Loki appender (active in DEV/SIT/UAT/PROD; the LOCAL
+profile stays console-only). The only stream label is `app`; everything else in a line —
+`traceId`, `spanId`, `requestId`, `userId`, `pod`, `url` — is searched with line filters
+(`|=` contains, `|~` regex, `!=` excludes).
+
+```logql
+# Everything from one service
+{app="audit-service"}
+
+# Both services at once
+{app=~".+-service"}
+
+# Errors only
+{app=~".+-service"} |~ "ERROR|WARN"
+
+# Follow one user's requests (MDC userId is stamped on every line)
+{app="audit-service"} |= "userId=demo-user"
+
+# Follow one request across log lines (requestId from the MDC correlation filter)
+{app="auth-service"} |= "requestId=<paste-id>"
+
+# The structured AUDIT access-log lines, with their duration measurements
+{app="audit-service"} |= "AUDIT" |= "durationMs"
+
+# All log lines belonging to one trace (paste a traceId from Tempo)
+{app=~".+-service"} |= "<traceId>"
+```
+
+## Tempo (traces) — Explore → *Tempo*
+
+Traces are exported via OTLP (Micrometer Tracing → OpenTelemetry). The one to look at: **a login
+crossing the Kafka hop** — sign in on the app, then search recent traces for service
+`auth-service`. The trace shows the HTTP server span, the `audit.events send` producer span, and
+the `audit.events receive` consumer span in **one** trace, because the `@Async` fire-and-forget
+publish propagates the trace context (a real bug once — see the backend README's observability
+war stories).
+
+Trace → logs is wired: the log icon on any span jumps to the matching Loki lines, since every
+log line carries `traceId=` in plain text (the datasource does a substring search — no custom
+label mapping needed).
+
+## Try it end-to-end (2 minutes)
+
+1. Sign in at the app (demo / demo) and click around the dashboard, chat, flashcards.
+2. Open Grafana → **AI-Sandbox Overview**: the request-rate panel ticks up.
+3. Explore → Loki → `{app="auth-service"} |= "LOGIN"`: your login's log line, with its
+   `traceId` and `userId`.
+4. Copy that `traceId` → Explore → Tempo → paste: the whole login → Kafka → persist flow as one
+   trace.
+5. Back on the app's Dashboard tab: the same login is a `User / LOGIN` row — the domain view of
+   the event you just traced through the system view.
+
+## Operating notes
+
+- Dashboards and datasources are **provisioned from the repo** (`monitoring/grafana/…`) and
+  mounted read-only — edits made in the Grafana UI don't survive a container recreate; change
+  the JSON in the repo instead.
+- Config lives under `monitoring/` (`prometheus/`, `loki/`, `tempo/`, `grafana/`). The compose
+  stack uses `prometheus-compose.yml` (Docker-DNS discovery); the sibling `prometheus.yml` is
+  for the narrower `monitoring/docker-compose.yml` + `gradlew bootRun` loop, where Grafana is
+  plain http://localhost:3000.
+- Prod exposure details (Caddy route, anonymous Viewer, admin secret): `docs/deployment.md` §10.
