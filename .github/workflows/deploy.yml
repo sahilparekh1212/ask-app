@@ -134,13 +134,24 @@ jobs:
       # on the fixed container name, NOT `docker compose exec` — compose would re-interpolate
       # the files and trip the AUTH_RSA_PRIVATE_KEY :? fail-fast, which only the restart
       # step's shell exports (that's exactly how this step failed on its first run).
+      #
+      # Retry + non-fatal: the stack was just recreated, so Grafana may still be starting (the
+      # container not yet exec-able) or holding the sqlite DB (reset-admin-password then hits a
+      # transient "database is locked"). Retry a few times; if it still can't run, warn rather
+      # than fail the whole deploy — the password is idempotent (the previous value stays in
+      # effect) and anonymous read-only access, the actual published feature, is unaffected.
       - name: Reset Grafana admin password to the current secret
         run: |
           gcloud compute ssh "$GCP_VM" --zone="$GCP_ZONE" --quiet --command \
             "cd $APP_DIR && set -a && . ./.env && set +a && \
-             sudo docker exec aisandbox-grafana \
-               grafana cli admin reset-admin-password \"\$GRAFANA_ADMIN_PASSWORD\" >/dev/null && \
-             echo 'Grafana admin password reset to the deployed secret'"
+             for i in 1 2 3 4 5 6; do \
+               if sudo docker exec aisandbox-grafana \
+                    grafana cli admin reset-admin-password \"\$GRAFANA_ADMIN_PASSWORD\" >/dev/null 2>&1; then \
+                 echo 'Grafana admin password reset to the deployed secret'; exit 0; \
+               fi; \
+               echo \"reset attempt \$i failed (Grafana still starting / DB locked); retrying in 10s...\"; sleep 10; \
+             done; \
+             echo '::warning::Grafana admin password reset did not succeed after retries; the previously-set password remains in effect'"
 
       - name: Smoke-check through the public origin
         run: |

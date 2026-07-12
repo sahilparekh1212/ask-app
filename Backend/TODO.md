@@ -329,6 +329,30 @@ should populate it instead.
       `VOYAGE_API_KEY`, `docker compose up -d --build`, then the `claude mcp add` line above.
 
 ### Product/UI roadmap (portfolio presentation)
+
+#### VS Code-style nav shell — polish (the shell shipped in PR #92; these are follow-ups)
+The three-panel shell (activity rail + contextual sidebar with collapsible groups + top bar,
+profile pinned bottom-left) is live. Requested refinements:
+- [ ] **Drop the "Related" group from the sidebar.** The second panel's per-section "Related"
+      cross-links (to other sections) mostly duplicate the activity rail — remove them so the
+      sidebar carries only genuine per-page context (About/Observability keep "On this page";
+      About keeps "Connect").
+- [ ] **Move the GitHub + LinkedIn links into the top bar, left of the language switcher.**
+      Promote them out of About's "Connect" sidebar group into the always-visible top bar (as
+      small icon links) so they're reachable from every page, sitting just left of the language
+      switcher.
+- [ ] **Active-highlight the current "On this page" item.** Clicking an anchor scrolls the
+      section under the sticky top bar, so it isn't obvious you landed on it — the section
+      heading is hidden. Give the clicked/active sidebar item a persistent background highlight
+      (ideally scroll-spy: highlight whichever section is currently in view). `scroll-margin-top`
+      already keeps the target clear of the top bar; this is about the *sidebar* feedback.
+- [ ] **Enlarge the activity rail (1st vertical menu).** Widen it and bump the icon/label size —
+      it currently reads a bit small/cramped.
+- [ ] **Refactor each "On this page" section into its own subcomponent.** Split the long pages
+      (About, Observability) into a dedicated component per section (Overview, Tech stack, …;
+      Filters, Summary, Trends, Log) so each sidebar anchor maps to a real component that's
+      rendered independently — cleaner structure and room for lazy/independent rendering later.
+
 - [x] **Internationalization (i18n) — implemented, hand-rolled + JSON-driven.** The UI text is
       driven from per-language JSON dictionaries (`UI/public/i18n/<code>.json`) through a tiny
       no-framework runtime: a `TranslateService` (current-language signal, English bundled as the
