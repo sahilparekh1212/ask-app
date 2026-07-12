@@ -24,29 +24,29 @@ describe('AppComponent', () => {
 
   it('should create the app', () => {
     const fixture = TestBed.createComponent(AppComponent);
-    const app = fixture.componentInstance;
-    expect(app).toBeTruthy();
+    expect(fixture.componentInstance).toBeTruthy();
   });
 
   it(`should have the 'AI-Sandbox' title`, () => {
     const fixture = TestBed.createComponent(AppComponent);
-    const app = fixture.componentInstance;
-    expect(app.title).toEqual('AI-Sandbox');
+    expect(fixture.componentInstance.title).toEqual('AI-Sandbox');
   });
 
-  it('should order the tabs About, Chat, Flashcards, Observability with matching URLs', () => {
+  it('orders the activity rail About, Chat, Flashcards, Observability with matching URLs', () => {
     const fixture = TestBed.createComponent(AppComponent);
     fixture.detectChanges();
-    const compiled = fixture.nativeElement as HTMLElement;
-    const tabs = [...compiled.querySelectorAll<HTMLAnchorElement>('.tabs a')];
-    expect(tabs.map((a) => a.textContent?.trim())).toEqual([
+    const rail = [
+      ...(fixture.nativeElement as HTMLElement).querySelectorAll<HTMLAnchorElement>(
+        '.rail-items .rail-item',
+      ),
+    ];
+    expect(rail.map((a) => a.textContent?.trim())).toEqual([
       'About',
       'Chat',
       'Flashcards',
       'Observability',
     ]);
-    // each tab's URL mirrors its (English) label
-    expect(tabs.map((a) => a.getAttribute('href'))).toEqual([
+    expect(rail.map((a) => a.getAttribute('href'))).toEqual([
       '/about',
       '/chat',
       '/flashcards',
@@ -54,24 +54,40 @@ describe('AppComponent', () => {
     ]);
   });
 
-  it('should show a Login link (and no avatar) when signed out', () => {
+  it('pins a Sign-in entry (and no Profile) at the rail bottom when signed out', () => {
     const fixture = TestBed.createComponent(AppComponent);
     fixture.detectChanges();
-    const compiled = fixture.nativeElement as HTMLElement;
-    expect(compiled.querySelector('.sign-in')?.textContent).toContain('Login');
-    expect(compiled.querySelector('.avatar')).toBeNull();
+    const bottom = (fixture.nativeElement as HTMLElement).querySelector<HTMLAnchorElement>(
+      '.rail-bottom .rail-item',
+    );
+    expect(bottom?.getAttribute('aria-label')).toBe('Login');
+    expect(bottom?.getAttribute('href')).toBe('/login');
   });
 
-  it('should show the circular Profile avatar (and no Sign in link) when signed in', () => {
+  it('pins the Profile entry (icon, /profile) at the rail bottom when signed in', () => {
     authenticated.set(true);
     const fixture = TestBed.createComponent(AppComponent);
     fixture.detectChanges();
-    const compiled = fixture.nativeElement as HTMLElement;
-    const avatar = compiled.querySelector('a.avatar');
-    expect(avatar).withContext('avatar link should render').not.toBeNull();
-    expect(avatar?.getAttribute('aria-label')).toBe('Profile');
-    expect(avatar?.getAttribute('href')).toBe('/profile');
-    expect(avatar?.querySelector('svg')).withContext('icon, not a text link').not.toBeNull();
-    expect(compiled.querySelector('.sign-in')).toBeNull();
+    const bottom = (fixture.nativeElement as HTMLElement).querySelector<HTMLAnchorElement>(
+      '.rail-bottom .rail-item',
+    );
+    expect(bottom?.getAttribute('aria-label')).toBe('Profile');
+    expect(bottom?.getAttribute('href')).toBe('/profile');
+    expect(bottom?.querySelector('svg')).withContext('icon, not a text link').not.toBeNull();
+  });
+
+  it('renders the contextual sidebar with collapsible dropdown groups', () => {
+    const fixture = TestBed.createComponent(AppComponent);
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+
+    // Default route → About section → its sidebar groups render, each with items visible.
+    const groupsBefore = el.querySelectorAll('.sb-items').length;
+    expect(groupsBefore).toBeGreaterThan(0);
+
+    // Collapsing a group's header hides that group's item list (the "dropdown").
+    el.querySelector<HTMLButtonElement>('.sb-group-head')!.click();
+    fixture.detectChanges();
+    expect(el.querySelectorAll('.sb-items').length).toBe(groupsBefore - 1);
   });
 });

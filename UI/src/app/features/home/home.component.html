@@ -1,5 +1,5 @@
 <section class="home">
-  <header class="hero">
+  <header class="hero" id="overview">
     <p class="lead">
       A production-shaped backend engineering project: two Spring Boot microservices — Google OAuth2
       → JWT auth and an event-driven audit trail over Kafka — with rate limiting, RBAC, a full
@@ -13,7 +13,7 @@
     <a class="repo" [href]="repoUrl" target="_blank" rel="noopener">View the source on GitHub →</a>
   </header>
 
-  <h2 class="section-title">Tech stack</h2>
+  <h2 class="section-title" id="tech-stack">Tech stack</h2>
   <div class="stack">
     @for (group of stack; track group.area) {
       <div class="stack-group">
@@ -27,7 +27,7 @@
     }
   </div>
 
-  <h2 class="section-title">Design decisions — the why &amp; how</h2>
+  <h2 class="section-title" id="design-decisions">Design decisions — the why &amp; how</h2>
   <div class="decision-tabs" role="tablist">
     @for (group of decisionGroups; track group.heading; let i = $index) {
       <button
@@ -66,7 +66,7 @@
     <code>Backend/docs/adr/</code> — what was chosen, what else was considered, and the tradeoff.
   </p>
 
-  <h2 class="section-title">Features</h2>
+  <h2 class="section-title" id="features">Features</h2>
   <div class="features">
     @for (f of features; track f.title) {
       <article class="feature">

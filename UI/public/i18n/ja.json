@@ -5,6 +5,10 @@
   "nav.about": "概要",
   "nav.login": "ログイン",
   "nav.profile": "プロフィール",
+  "nav.sections": "セクション",
+  "nav.onThisPage": "このページ内",
+  "nav.related": "関連",
+  "nav.connect": "リンク",
 
   "lang.label": "言語",
   "lang.google": "Google 翻訳…",

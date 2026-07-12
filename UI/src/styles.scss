@@ -44,6 +44,12 @@ html {
   color-scheme: dark;
 }
 
+/* Sidebar "On this page" links scroll to element ids; offset the landing so the target clears
+   the 56px sticky top bar instead of hiding beneath it. */
+[id] {
+  scroll-margin-top: 72px;
+}
+
 body {
   /* No default 8px ring — the sticky app header and full-bleed pages span edge to edge. */
   margin: 0;
