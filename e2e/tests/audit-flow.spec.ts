@@ -16,8 +16,10 @@ async function loginAsDemo(page: Page): Promise<void> {
 }
 
 async function openAudit(page: Page): Promise<void> {
-  await page.getByRole('link', { name: 'Dashboard' }).click();
-  await page.waitForURL('**/audit');
+  // Scope to the activity rail: the VS Code-style shell also surfaces an "Observability"
+  // link inside some sections' contextual sidebar, so an unscoped role locator is ambiguous.
+  await page.locator('.rail-item[href="/observability"]').click();
+  await page.waitForURL('**/observability');
   // The seeder guarantees data on first run, so the initial unfiltered load must show rows.
   await expect(page.locator('tbody tr').first()).toBeVisible();
   await expect(page.locator('.stats .total')).toBeVisible();

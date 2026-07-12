@@ -205,17 +205,17 @@ export class HomeComponent {
 
   readonly features: Feature[] = [
     {
-      title: 'Dashboard',
+      title: 'Observability',
       blurb:
         'The domain view of the system — what users and agents did. KPI cards, events-over-time, and database-side aggregations over the event-sourced audit trail, complementing the Grafana/Prometheus/Loki/Tempo stack’s system view of how the servers are performing.',
-      link: { label: 'Open the dashboard →', to: '/audit' },
+      link: { label: 'Open the audit dashboard →', to: '/observability' },
       extLink: { label: 'Open the system view (Grafana) →', href: this.grafanaUrl },
     },
     {
       title: 'Chat',
       blurb:
         'Ask a Claude model about this application. Answers are grounded via RAG — each question retrieves the most relevant chunks of the repo’s own docs (README, ADRs) from a pgvector index using Voyage embeddings — plus role-scoped audit data, with server-side guardrails. The same index is exposed to any MCP client as a Model Context Protocol server.',
-      link: { label: 'Open the chat →', to: '/assistant' },
+      link: { label: 'Open the chat →', to: '/chat' },
     },
     {
       title: 'Flashcards',

@@ -1,37 +1,124 @@
-<header class="app-header">
-  <nav class="tabs">
-    <a routerLink="/audit" routerLinkActive="active">{{ 'nav.dashboard' | t }}</a>
-    <a routerLink="/assistant" routerLinkActive="active">{{ 'nav.chat' | t }}</a>
-    <a routerLink="/flashcards" routerLinkActive="active">{{ 'nav.flashcards' | t }}</a>
-    <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">{{
-      'nav.about' | t
-    }}</a>
+<div class="shell">
+  <!-- Activity rail: primary sections up top, account pinned to the bottom (VS Code style). -->
+  <nav class="rail" [attr.aria-label]="'nav.sections' | t">
+    <div class="rail-items">
+      @for (s of sections; track s.key) {
+        <a
+          class="rail-item"
+          [routerLink]="s.route"
+          routerLinkActive="active"
+          [attr.aria-label]="s.labelKey | t"
+          [title]="s.labelKey | t"
+        >
+          <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+            <path [attr.d]="s.icon" />
+          </svg>
+          <span class="rail-label">{{ s.labelKey | t }}</span>
+        </a>
+      }
+    </div>
+
+    <div class="rail-bottom">
+      @if (isAuthenticated()) {
+        <a
+          class="rail-item"
+          routerLink="/profile"
+          routerLinkActive="active"
+          [attr.aria-label]="'nav.profile' | t"
+          [title]="'nav.profile' | t"
+        >
+          <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+            <path [attr.d]="profileIcon" />
+          </svg>
+          <span class="rail-label">{{ 'nav.profile' | t }}</span>
+        </a>
+      } @else {
+        <a
+          class="rail-item"
+          routerLink="/login"
+          routerLinkActive="active"
+          [attr.aria-label]="'nav.login' | t"
+          [title]="'nav.login' | t"
+        >
+          <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+            <path [attr.d]="signinIcon" />
+          </svg>
+          <span class="rail-label">{{ 'nav.login' | t }}</span>
+        </a>
+      }
+    </div>
   </nav>
 
-  <div class="header-right">
-    <app-language-switcher />
-    <!-- Google Website Translator renders here when the visitor picks "Google Translate" -->
-    <div id="google_translate_element" hidden></div>
+  <!-- Secondary panel: the active section's collapsible groups (dropdowns). -->
+  @if (activeSidebar(); as sb) {
+    <aside class="sidebar" [attr.aria-label]="sb.titleKey | t">
+      <div class="sidebar-title">{{ sb.titleKey | t }}</div>
+      @for (g of sb.groups; track g.id) {
+        <div class="sb-group">
+          <button
+            type="button"
+            class="sb-group-head"
+            (click)="toggleGroup(g.id)"
+            [attr.aria-expanded]="!isCollapsed(g.id)"
+          >
+            <svg
+              class="chevron"
+              [class.collapsed]="isCollapsed(g.id)"
+              viewBox="0 0 16 16"
+              aria-hidden="true"
+              focusable="false"
+            >
+              <path
+                d="m4.427 7.427 3.396 3.396a.25.25 0 0 0 .354 0l3.396-3.396A.25.25 0 0 0 11.396 7H4.604a.25.25 0 0 0-.177.427Z"
+              />
+            </svg>
+            {{ g.titleKey | t }}
+          </button>
+          @if (!isCollapsed(g.id)) {
+            <ul class="sb-items">
+              @for (it of g.items; track it.route || it.href || it.fragment || it.text) {
+                <li>
+                  @if (it.href) {
+                    <a [href]="it.href" target="_blank" rel="noopener">{{
+                      it.labelKey ? (it.labelKey | t) : it.text
+                    }}</a>
+                  } @else if (it.fragment) {
+                    <a [routerLink]="currentPath()" [fragment]="it.fragment">{{
+                      it.labelKey ? (it.labelKey | t) : it.text
+                    }}</a>
+                  } @else {
+                    <a [routerLink]="it.route" routerLinkActive="active">{{
+                      it.labelKey ? (it.labelKey | t) : it.text
+                    }}</a>
+                  }
+                </li>
+              }
+            </ul>
+          }
+        </div>
+      }
+    </aside>
+  }
 
-    @if (isAuthenticated()) {
-      <a
-        class="avatar"
-        routerLink="/profile"
-        routerLinkActive="active"
-        [attr.aria-label]="'nav.profile' | t"
-      >
-        <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
-          <path
-            d="M10.561 8.073a6 6 0 0 1 3.432 5.142.75.75 0 1 1-1.498.07 4.5 4.5 0 0 0-8.99 0 .75.75 0 0 1-1.498-.07 6 6 0 0 1 3.431-5.142 3.999 3.999 0 1 1 5.123 0ZM10.5 5a2.5 2.5 0 1 0-5 0 2.5 2.5 0 0 0 5 0Z"
-          />
-        </svg>
-      </a>
-    } @else {
-      <a class="sign-in" routerLink="/login" routerLinkActive="active">{{ 'nav.login' | t }}</a>
-    }
+  <!-- Content column: top bar + the routed page. -->
+  <div class="content" [class.no-sidebar]="!activeSidebar()">
+    <header class="topbar">
+      <span class="topbar-title">
+        @if (activeSidebar(); as sb) {
+          {{ sb.titleKey | t }}
+        } @else {
+          {{ title }}
+        }
+      </span>
+      <div class="topbar-right">
+        <app-language-switcher />
+        <!-- Google Website Translator renders here when the visitor picks "Google Translate" -->
+        <div id="google_translate_element" hidden></div>
+      </div>
+    </header>
+
+    <main class="app-main">
+      <router-outlet />
+    </main>
   </div>
-</header>
-
-<main class="app-main">
-  <router-outlet />
-</main>
+</div>

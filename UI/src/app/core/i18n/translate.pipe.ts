@@ -2,7 +2,7 @@ import { Pipe, PipeTransform, inject } from '@angular/core';
 import { TranslateService } from './translate.service';
 
 /**
- * Template shortcut for {@link TranslateService.t}: {@code {{ 'nav.dashboard' | t }}}.
+ * Template shortcut for {@link TranslateService.t}: {@code {{ 'nav.about' | t }}}.
  *
  * <p>Impure by design so it re-evaluates on every change-detection pass — a language switch
  * writes the service's language signal, which triggers CD, and the pipe then returns the string

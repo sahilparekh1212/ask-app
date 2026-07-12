@@ -1,5 +1,5 @@
 <section class="audit">
-  <form class="filters" [formGroup]="filterForm" (ngSubmit)="applyFilters()">
+  <form id="filters" class="filters" [formGroup]="filterForm" (ngSubmit)="applyFilters()">
     <label
       >{{ 'audit.entityType' | t }}
       <select formControlName="entityType">
@@ -47,7 +47,7 @@
   }
 
   @if (kpis(); as k) {
-    <div class="kpis">
+    <div class="kpis" id="summary">
       <div class="kpi">
         <span class="kpi-value">{{ k.total }}</span>
         <span class="kpi-label">{{ 'audit.kpiEvents24h' | t }}</span>
@@ -96,7 +96,7 @@
           }
         </div>
       </div>
-      <div class="chart timeline">
+      <div class="chart timeline" id="trends">
         <div class="timeline-head">
           <h3>{{ 'audit.overTime' | t }}</h3>
           <div class="window-toggle" role="group" [attr.aria-label]="'audit.overTime' | t">
@@ -142,7 +142,7 @@
     <p class="error" role="alert">{{ error() }}</p>
   }
 
-  <table>
+  <table id="log">
     <thead>
       <tr>
         <th class="sortable" (click)="sortBy('createdAt')">

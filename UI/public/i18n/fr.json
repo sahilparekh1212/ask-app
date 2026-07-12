@@ -1,10 +1,14 @@
 {
-  "nav.dashboard": "Tableau de bord",
+  "nav.observability": "Observabilité",
   "nav.chat": "Chat",
   "nav.flashcards": "Fiches",
   "nav.about": "À propos",
   "nav.login": "Connexion",
   "nav.profile": "Profil",
+  "nav.sections": "Sections",
+  "nav.onThisPage": "Sur cette page",
+  "nav.related": "Associés",
+  "nav.connect": "Liens",
 
   "lang.label": "Langue",
   "lang.google": "Google Traduction…",

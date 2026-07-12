@@ -1,10 +1,14 @@
 {
-  "nav.dashboard": "대시보드",
+  "nav.observability": "옵저버빌리티",
   "nav.chat": "채팅",
   "nav.flashcards": "플래시카드",
   "nav.about": "소개",
   "nav.login": "로그인",
   "nav.profile": "프로필",
+  "nav.sections": "섹션",
+  "nav.onThisPage": "이 페이지",
+  "nav.related": "관련",
+  "nav.connect": "링크",
 
   "lang.label": "언어",
   "lang.google": "Google 번역…",

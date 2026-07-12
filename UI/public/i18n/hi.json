@@ -1,10 +1,14 @@
 {
-  "nav.dashboard": "डैशबोर्ड",
+  "nav.observability": "ऑब्ज़र्वेबिलिटी",
   "nav.chat": "चैट",
   "nav.flashcards": "फ़्लैशकार्ड",
   "nav.about": "परिचय",
   "nav.login": "लॉगिन",
   "nav.profile": "प्रोफ़ाइल",
+  "nav.sections": "अनुभाग",
+  "nav.onThisPage": "इस पृष्ठ पर",
+  "nav.related": "संबंधित",
+  "nav.connect": "लिंक",
 
   "lang.label": "भाषा",
   "lang.google": "Google अनुवाद…",

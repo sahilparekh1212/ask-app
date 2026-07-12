@@ -1,10 +1,14 @@
 {
-  "nav.dashboard": "仪表板",
+  "nav.observability": "可观测性",
   "nav.chat": "聊天",
   "nav.flashcards": "闪卡",
   "nav.about": "关于",
   "nav.login": "登录",
   "nav.profile": "个人资料",
+  "nav.sections": "章节",
+  "nav.onThisPage": "本页",
+  "nav.related": "相关",
+  "nav.connect": "链接",
 
   "lang.label": "语言",
   "lang.google": "谷歌翻译…",

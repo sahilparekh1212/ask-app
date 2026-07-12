@@ -8,14 +8,22 @@ import { AssistantComponent } from './features/assistant/assistant.component';
 import { FlashcardsComponent } from './features/flashcards/flashcards.component';
 import { authGuard } from './core/auth/auth.guard';
 
+// URLs mirror the nav labels (About, Chat, Flashcards, Observability). The old paths
+// (/, /audit, /assistant) stay as redirects so bookmarks and inbound links keep working,
+// and anything unrecognized lands on About rather than a dead end.
 export const routes: Routes = [
-  { path: '', component: HomeComponent, title: 'AI-Sandbox' },
+  { path: 'about', component: HomeComponent, title: 'AI-Sandbox' },
   { path: 'login', component: LoginComponent, title: 'Sign in' },
   { path: 'login/callback', component: AuthCallbackComponent, title: 'Signing in…' },
   { path: 'profile', component: ProfileComponent, title: 'Profile', canActivate: [authGuard] },
-  { path: 'audit', component: AuditComponent, title: 'Dashboard', canActivate: [authGuard] },
   {
-    path: 'assistant',
+    path: 'observability',
+    component: AuditComponent,
+    title: 'Observability',
+    canActivate: [authGuard],
+  },
+  {
+    path: 'chat',
     component: AssistantComponent,
     title: 'Chat',
     canActivate: [authGuard],
@@ -26,5 +34,9 @@ export const routes: Routes = [
     title: 'Flashcards',
     canActivate: [authGuard],
   },
-  { path: '**', redirectTo: '' },
+  // Legacy paths from before the URL/label alignment.
+  { path: 'audit', redirectTo: 'observability' },
+  { path: 'assistant', redirectTo: 'chat' },
+  { path: '', redirectTo: 'about', pathMatch: 'full' },
+  { path: '**', redirectTo: 'about' },
 ];
