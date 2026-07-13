@@ -67,6 +67,37 @@ hand-rolled and unauthenticated — are in [ADR-0010](docs/adr/0010-rag-mcp-serv
 
 ---
 
+## Concepts & design decisions — what & how
+
+A map of the ideas this backend is built to demonstrate, each as **what** (the concept / the
+decision and why) and **how** (the concrete technology or mechanism that implements it). Deeper
+writeups live in [`docs/adr/`](docs/adr/README.md); the sections below and the `docs/` folder
+carry the detail.
+
+| Concept — *what & why* | How — *technology / mechanism* |
+|---|---|
+| **Statelessness** — services keep no server-side session, so any pod can serve any request and Auth scales horizontally | JWTs verified locally against Auth's JWKS (no per-request call back to Auth); the one piece of state, the single-use refresh token, is a `RefreshTokenStore` **Strategy** — in-memory for dev, **Redis** (atomic `GETDEL`) when scaled ([ADR-0007](docs/adr/0007-redis-refresh-token-store-for-statelessness.md)). The rate limiter stays *per-pod* on purpose (it's a thread-interrupt dedup, not a counter) |
+| **RBAC & token security** — verifiers must check identity + role locally and must not be able to mint tokens | **Google OAuth2** → **RSA-signed JWT** (asymmetric: verifiers hold only the public key) published at a **JWKS** endpoint; `roles` claim → Spring authorities; admin actions gated with `@PreAuthorize` ([ADR-0001](docs/adr/README.md)) |
+| **Event-driven architecture** — recording an audit trail is a side effect of an action, not part of it; the producer shouldn't block on or be coupled to the sink | Auth (and the Audit service's own AI features) publish `AuditEvent`s to a **Kafka** topic `audit.events` `@Async` fire-and-forget; Audit consumes them. Kafka API via **Redpanda** locally, managed/multi-broker in prod ([ADR-0006](docs/adr/README.md)) |
+| **Idempotency** — at-least-once delivery means the consumer *will* occasionally see a duplicate | Consumer dedups by `eventId` backed by a **unique index** (`idx_audit_event_id`); retries, then dead-letters to `audit.events.DLT`. So a redelivered event is a no-op, never a double row |
+| **RDBMS** — audit rows are relational and queried by filters / ranges / grouped aggregations that want real indexes and durability | **PostgreSQL 16** via **Spring Data JPA**; the same `AuditLogSpecifications` builds *both* the paginated search and the database-side `GROUP BY` stats, so rows and counts can never disagree; **H2** only for tests / the LOCAL profile |
+| **Database schema management** — the schema should be a versioned, reviewable artifact, not silent Hibernate DDL that drifts between environments | **Liquibase** owns the schema (`ddl-auto=none`); changesets are **expand/contract** (add before remove) so a rolling deploy and a rollback stay safe |
+| **Rate limiting** — under burst load a user's newest request should win, shedding gracefully instead of queueing | Newest-wins per `userId+method+path`: a superseded request's thread is interrupted and its `@Transactional` work **rolled back**, then it returns **429 + `Retry-After`**. Lock-free `ConcurrentHashMap` registry, no global locks (see [Rate limiting](#rate-limiting)) |
+| **Guarded LLM proxy** — sending app data to a third-party model makes the *data flow* the security boundary | A server-side proxy holds the `ANTHROPIC_API_KEY` (never the browser), screens inbound text for secrets/PII, forwards no auth headers, and scopes context by role in a single allowlist class ([ADR-0009](docs/adr/0009-llm-chat-assistant-data-flow.md)) |
+| **RAG + vector search** — ground the assistant in the repo's own docs *and* source so it quotes the code that's actually deployed | **pgvector** (`vector(1024)`) on the existing Postgres + **Voyage** embeddings; heading-based chunking, content-hash incremental indexing at startup; corpus bundled into the jar at build time ([ADR-0010](docs/adr/0010-rag-mcp-server.md)) |
+| **MCP server** — expose that knowledge base to any MCP client | A hand-rolled stateless **Model Context Protocol** JSON-RPC endpoint (`/mcp`): `initialize` / `tools/list` / `tools/call` for `search_knowledge` + `list_sources` — the SDK's session/SSE machinery isn't needed |
+| **Metrics** — answer "how are the servers performing?" | **Micrometer** → **Prometheus** (`/actuator/prometheus`), scraped per-service; request rates, p95/p99 latency (see [Observability](#observability-prometheus--loki--tempo--grafana)) |
+| **Log aggregation** — searchable, structured logs across pods | **Structured JSON** logs shipped to **Loki**, labelled per service; correlated with traces |
+| **Distributed tracing** — follow one request across the async Kafka hop | **OpenTelemetry** → **Tempo**; a login trace spans `http post /auth/login` → `audit.events send` → `audit.events receive` |
+| **Domain analytics** — "what did users & agents *do*?" is a different question from server health | The **event-sourced audit trail** feeds an in-app dashboard (KPI cards, events-over-time, DB-side aggregations); the Grafana/Prometheus/Loki/Tempo stack answers the *system* question — two views, deliberately separate |
+| **API contract safety** — a breaking API change shouldn't merge silently | springdoc emits OpenAPI from the running code; an **openapi-diff** PR gate fails only on incompatible changes |
+| **Testing depth** — coverage as a gate, plus proof the tests actually assert | **JUnit** + **90% JaCoCo** line gate per module, `diff-cover` on changed lines, **PIT** mutation testing (report-only baseline), **Playwright** E2E against the compose stack, **k6** load tests |
+| **CI** — nothing reaches `main` unproven | **GitHub Actions**: build/test/coverage, CodeQL SAST, Trivy (deps + images), Dependabot, gitleaks secret scan, conventional-commit lint, branch protection |
+| **CD & supply chain** — build once, promote by digest, prove provenance | Versioned images to **GHCR** on merge (SemVer + git SHA + `latest`), **cosign** keyless signing (OIDC, Rekor), **syft** SBOM attestations; keyless **Workload Identity Federation** deploy to the GCE VM |
+| **Config & secrets** — same artifact everywhere, secrets never in the image | A profile matrix (LOCAL/DEV/…/PROD) selects behaviour; provider keys and DB passwords come from the environment; nothing sensitive is committed (see [Secrets](#secrets)) |
+
+---
+
 ## Prerequisites
 
 - JDK 17 (`java -version` should report 17.x)
@@ -285,6 +316,26 @@ captured directly instead of pulled from a CI artifact.
 | `http_req_duration` p95 | 7.31 ms (threshold: < 800 ms) |
 | `http_req_duration` avg | 3.62 ms |
 | Failed requests | 0.00% |
+
+**Production smoke** (`prod-smoke.js` — the *live* GCE VM through the public origin
+`https://ai-sandbox.sahilparekh1212.com`, rate limiter **on**, read-only, ramping to 5 VUs over
+45s; off-peak run 2026-07-13). This is the honest "how does the shared 8 GB / ~\$50 VM hold up
+over public TLS with real data" number — higher than the CI figures above (real internet round
+trip + TLS termination + one shared VM), still comfortably sub-100 ms:
+
+| Metric | Value |
+|--------|-------|
+| Requests | 597 (12.7 req/s at 5 VUs) |
+| Read latency **p95** (200s only) | **96.7 ms** (threshold: < 1500 ms) |
+| Read latency avg / median | 69.6 ms / 62.2 ms |
+| Failed requests | 0.00% |
+| Server errors (`5xx`) | 0 |
+| Rate-limited (`429`) | 0 |
+
+Concurrency is deliberately modest: the demo login mints a single user id and prod's newest-wins
+limiter buckets per user, so a higher-VU same-user run would measure the limiter's shedding (that
+is the `rate-limit.js` test below) rather than the VM's read latency. At 5 VUs with think time the
+limiter never trips (0 × 429) and no request 5xx'd.
 
 **Rate-limit behavior** (`rate-limit.js` — limiter on, 30 VUs hammering the same key for 20s):
 

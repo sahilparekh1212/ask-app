@@ -12,14 +12,18 @@ to change to revisit that.
 
 ## What's inside
 
-| Route                       | What it does                                                           | Auth    |
-| --------------------------- | ---------------------------------------------------------------------- | ------- |
-| `/`                         | About — tech stack, design decisions, feature tour                     | public  |
-| `/login`, `/login/callback` | Demo login form, Google OAuth fragment handoff                         | public  |
-| `/audit`                    | Server-side paginated/sorted/filtered audit table + CSS-only stat bars | guarded |
-| `/assistant`                | Chat over the server-side Claude proxy                                 | guarded |
-| `/flashcards`               | Generated Q&A study deck with flip/next/shuffle                        | guarded |
-| `/profile`                  | `/auth/me` profile view (avatar icon, top-right)                       | guarded |
+| Route                       | What it does                                                                                             | Auth    |
+| --------------------------- | -------------------------------------------------------------------------------------------------------- | ------- |
+| `/about`                    | About — tech stack, design decisions, feature tour                                                       | public  |
+| `/login`, `/login/callback` | Demo login form, Google OAuth fragment handoff                                                           | public  |
+| `/observability`            | Server-side paginated/sorted/filtered audit table, KPI cards, events-over-time chart, CSS-only stat bars | guarded |
+| `/chat`                     | Chat over the server-side Claude proxy (RAG-grounded)                                                    | guarded |
+| `/flashcards`               | Generated Q&A study deck with flip/next/shuffle                                                          | guarded |
+| `/profile`                  | `/auth/me` profile view (avatar icon, top-right)                                                         | guarded |
+
+(The old `/audit` and `/assistant` paths still redirect to `/observability` and `/chat` so
+bookmarks keep working.) The chrome is a **VS Code-style nav shell**: an activity rail, a
+contextual "on this page" sidebar with scroll-spy highlighting, and a top bar.
 
 The auth plumbing lives in [`src/app/core/auth/`](src/app/core/auth/): a functional HTTP
 interceptor that attaches `Authorization: Bearer` (our APIs only) and does a single silent
@@ -27,6 +31,26 @@ refresh-and-retry on 401, a route guard with `returnUrl`, the OAuth `#access_tok
 consumption (followed by `history.replaceState` so tokens don't linger in history), and a
 localStorage token store — an explicit tradeoff vs httpOnly cookies, documented where it's
 implemented.
+
+## Concepts & design decisions — what & how
+
+Each idea this SPA demonstrates, as **what** (the decision and why) and **how** (the concrete
+Angular/web mechanism):
+
+| Concept — _what & why_                                                                                                                         | How — _technology / mechanism_                                                                                                                                                                                                                                                                                                                                                           |
+| ---------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **SPA, not a microfrontend federation** — one team, two features: the shell/remote-loading cost is immediate while every MFE benefit is latent | A single **Angular 21** app of **standalone components** with lazy routes for code-splitting ([ADR-0008](../Backend/docs/adr/0008-no-microfrontend-split.md))                                                                                                                                                                                                                            |
+| **Reactive state without a store library** — local, fine-grained reactivity beats a global store for an app this size                          | Angular **signals** + `computed` for state; **RxJS** only at the HTTP edge; the shell's scroll-spy is a signal driven by a scroll listener                                                                                                                                                                                                                                               |
+| **Stateless client auth** — the SPA holds no session, just a bearer token, and recovers from expiry invisibly                                  | A **functional HTTP interceptor** attaches `Authorization: Bearer` (our APIs only) and does a single **silent refresh-and-retry on 401**; a **functional route guard** with `returnUrl`; the OAuth `#access_token` fragment is consumed then wiped with `history.replaceState`. Token in **localStorage** — a documented tradeoff vs httpOnly cookies                                    |
+| **No CORS in production** — the deployed SPA shouldn't hardcode a backend host or need cross-origin                                            | nginx **same-origin reverse proxies** `/auth-api` + `/audit-api` into the compose network; the prod build uses relative paths, the dev build calls `:8085`/`:8083` directly (with `X-Forwarded-*` so Google OAuth's redirect URI survives the proxy)                                                                                                                                     |
+| **Theming as one source of truth** — change a colour once, it flows everywhere; no framework weight                                            | A single **CSS custom-property design-token** layer in [`src/styles.scss`](src/styles.scss) (GitHub Primer dark palette), hand-rolled — no UI framework                                                                                                                                                                                                                                  |
+| **Internationalization (i18n)** — text driven from data, not hardcoded, so a language is one file away                                         | A hand-rolled runtime: a `TranslateService` (current-language signal, English bundled as fallback) + an impure `t` pipe with `{token}` interpolation, fed by `public/i18n/<code>.json`. **Currently English-only by decision** — the runtime + header switcher (and a Google Translate escape hatch) are kept, so re-adding a language is dropping one JSON file + one `LANGUAGES` entry |
+| **Product analytics** — know which features get used, without a wrapper lib                                                                    | **Google Analytics 4** (`gtag.js`, hand-rolled + typed) reporting SPA route changes as `page_view`s; a no-op when the Measurement ID is empty (dev/forks)                                                                                                                                                                                                                                |
+| **Error & performance monitoring** — see real user-facing errors and web-vitals from production                                                | **Sentry** (browser SDK) behind a publishable DSN; disabled entirely when the DSN is empty (falls back to the default Angular `ErrorHandler`)                                                                                                                                                                                                                                            |
+| **Dependency-free data viz** — a dashboard shouldn't pull a charting library for bar/column charts                                             | CSS-only stat bars + a hand-built SVG-free events-over-time column chart, sharing the same design tokens                                                                                                                                                                                                                                                                                 |
+| **CI** — every UI change is format/lint/build/test-gated                                                                                       | **Frontend CI** (`frontend-ci.yml`): Prettier check, angular-eslint, prod build, headless Karma/Jasmine unit tests on every `UI/**` PR                                                                                                                                                                                                                                                   |
+| **End-to-end where the seams are** — the interesting failures live between the SPA and the system, not inside it                               | **Playwright** in the top-level [`e2e/`](../e2e/) package drives the real compose stack (login through nginx, Kafka-produced audit rows appearing in the table)                                                                                                                                                                                                                          |
+| **Container** — serve a static bundle, cache it correctly                                                                                      | Two-stage **Docker** build (Node 22 build → `nginx:1.28-alpine`): SPA fallback, immutable cache headers on content-hashed bundles, `no-cache` on `index.html`                                                                                                                                                                                                                            |
 
 ## Run it
 

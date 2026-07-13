@@ -20,12 +20,6 @@ alternative" treatment as ADR-0005/0008.
       `caddy` service in `docker-compose.prod.yml` + `deploy/Caddyfile` (auto Let's Encrypt
       for `$DOMAIN` in front of the ui nginx). Prod origin:
       `https://ai-sandbox.sahilparekh1212.com`.
-- [ ] **Google OAuth prod client — URIs done, consent screen pending.** Both redirect URIs
-      (prod + localhost) are on "Web client 1" and real client id/secret are deployed. Still
-      open: the consent screen is in Testing mode, so Google sign-in works only for listed
-      test users — publish the app (or add recruiters as test users) before sharing; the
-      demo login works for everyone regardless. Also untested: a live Google sign-in
-      click-through on the prod domain.
 - [x] **Secrets + arm the deploy — done.** All 8 repo secrets + `DEPLOY_DOMAIN`/
       `DEPLOY_ENABLED` variables set; WIF pool/provider/SA created and verified (first
       attempt failed with `iam.serviceAccounts.getAccessToken` denied — the
@@ -77,13 +71,15 @@ alternative" treatment as ADR-0005/0008.
       screenshot/GIF ("consider" in the item) — the dashboard is about to change again (KPI
       cards, item 3), so a screenshot now would be stale on arrival; capture one when the
       dashboard settles.
-- [ ] **Load test the deployed stack + record results.** Decide scope deliberately: the k6
-      suite currently runs against a LOADTEST-profile CI stack; prod is one shared 8GB VM
-      with the rate limiter ON and real provider keys (assistant/RAG endpoints cost money
-      per call — exclude them). A short off-peak k6 smoke against
-      https://ai-sandbox.sahilparekh1212.com (search/stats endpoints, modest VUs) answers
-      "how does the $50 VM hold up" honestly; publish p95/throughput in the README next to
-      the CI numbers.
+- [x] **Load test the deployed stack + record results — done.** New read-only
+      `load-test/prod-smoke.js` logs in once and GETs `/search` + `/stats` through the public
+      origin (paid AI endpoints excluded, as this item required). Off-peak run against the live
+      8GB VM: **p95 96.7 ms, avg 69.6 ms, 0.00% errors, 0 × 5xx, 0 × 429** over 597 reqs at 5 VUs
+      — a clean sub-100 ms answer to "how does the $50 VM hold up" over public TLS. Concurrency is
+      kept modest on purpose: the demo login mints one user id and prod's newest-wins limiter
+      buckets per user, so a higher-VU same-user run would measure the limiter's shedding (the
+      existing `rate-limit.js` CI test) rather than read latency. Published in `Backend/README.md`
+      §"Measured numbers" next to the CI figures, with a one-line summary in the root README.
 - [x] **Set up the observability stack for prod — done, verified against the live deployment
       (PR #86).** Exposure: read-only Grafana published at
       `https://ai-sandbox.sahilparekh1212.com/grafana` — a Caddy `handle /grafana*` route on the
@@ -368,16 +364,6 @@ profile pinned bottom-left) is live. Requested refinements:
 - [x] **Enlarge the activity rail — done.** Rail width 68→84px, icons 22→26px, labels 0.62→0.72rem,
       the active accent bar 2→3px, with a touch more padding/gap. The sidebar offset and content
       margin key off the same `$rail-width` var, so they tracked automatically.
-- [ ] **Refactor each "On this page" section into its own subcomponent.** Split the long pages
-      (About, Observability) into a dedicated component per section (Overview, Tech stack, …;
-      Filters, Summary, Trends, Log) so each sidebar anchor maps to a real component that's
-      rendered independently — cleaner structure and room for lazy/independent rendering later.
-- [ ] **Mention Liquibase on the About page (more prominently).** Liquibase already appears in the
-      tech-stack list (`Messaging & data`) and in a dedicated "Data & migrations — schema as code
-      (Liquibase)" design-decision group — but that group is behind a tab (`activeDecision`), hidden
-      by default, so a first-time visitor may miss it. Surface it more prominently: e.g. call out
-      "schema as code (Liquibase)" in the overview/hero or the feature tour, or default the design
-      decisions to that group, so the migrations story reads without a click.
 
 - [x] **Internationalization (i18n) — implemented, hand-rolled + JSON-driven.** The UI text is
       driven from per-language JSON dictionaries (`UI/public/i18n/<code>.json`) through a tiny
@@ -412,13 +398,6 @@ profile pinned bottom-left) is live. Requested refinements:
       input (e.g. *Samjavo* → explain)" idea was also dropped as not needed. Rationale: maintaining
       hand-translations of the dense technical About prose across many languages wasn't worth the
       quality/maintenance cost; Google Translate covers ad-hoc translation on demand.
-- [ ] **Mobile design round 2 — cut the scrolling (hamburger / drawers).** The responsive pass made
-      everything usable on phones but *tall*: the nav, the stacked full-width filter form, and the
-      card-per-row audit table mean a lot of vertical scrolling. Collapse the nav into a hamburger
-      menu (the language switcher + avatar can live in it too), make the dashboard filters a
-      collapsible "Filters" drawer/accordion instead of an always-expanded stacked form, and
-      condense the stat charts on small screens. Re-verify with Playwright mobile emulation +
-      Lighthouse.
 - [x] **Bug: header still shows "Login" after signing in via a returnUrl — fixed via the
       token-driven option.** Root cause exactly as diagnosed here: `AuthService.isAuthenticated`
       was a computed over the `_profile` signal plus the *non-reactive* `storage.accessToken`,

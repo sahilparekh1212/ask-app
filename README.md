@@ -29,7 +29,9 @@ sandbox for practicing the patterns a real system needs, not a toy CRUD demo.
 
 **Status:** the backend, the Angular UI, and the GCP deployment are all real and current; the
 [backend TODO](Backend/TODO.md) tracks what's still open honestly rather than pretending it's
-further along than it is.
+further along than it is. A live off-peak k6 smoke of the read API on the shared VM measured
+**p95 ≈ 97 ms with 0 errors** over public TLS — numbers and method in
+[`Backend/README.md`](Backend/README.md#measured-numbers-k6-local-run-2026-07-01).
 
 ---
 
@@ -93,7 +95,7 @@ flow. Full writeups of these tradeoffs (and the ones this diagram doesn't show) 
 | CI                | GitHub Actions — build/test/coverage, k6 load test, Playwright E2E against the full compose stack, API contract gate (openapi-diff), PIT mutation testing, CodeQL, Trivy (deps + images), Dependabot, secret scanning, conventional commits |
 | CD / supply chain | Versioned images to GHCR on every merge (SemVer + git SHA + latest), cosign keyless signing, syft SBOM attestations |
 | Deployment        | Live: GCE VM, deployed by GitHub Actions via Workload Identity Federation (keyless), Caddy TLS. Also: Docker multi-stage builds, OpenShift manifests (HPA, PVCs, routes) |
-| Frontend          | Angular 21 SPA (`UI/`) — nginx-served, same-origin proxies, hand-rolled i18n (9 languages) |
+| Frontend          | Angular 21 SPA (`UI/`) — standalone components + signals, nginx same-origin proxies, hand-rolled i18n runtime (currently English-only), GA4 analytics + Sentry monitoring |
 
 ---
 
