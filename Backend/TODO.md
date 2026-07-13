@@ -128,10 +128,17 @@ alternative" treatment as ADR-0005/0008.
       recruiter demo login stays, it's property-gated not profile-gated); real-domain
       CORS/FRONTEND_URL; `DB_PASSWORD` for Postgres + Audit; restart policies. Redpanda
       already runs `--mode=dev-container --smp=1` — no further trimming needed.
-- [ ] **Backups.** Nightly `pg_dump` to a GCS bucket (one cron line — the honest "backups
-      exist" answer). Note the volume also now carries the pgvector `rag_chunk` index; a
-      lost index self-heals on restart via the content-hash indexer, so audit rows are the
-      only data that actually needs the backup.
+- [x] **Backups — script + retention built; VM cron is a one-time install.**
+      [`deploy/backup.sh`](deploy/backup.sh) streams a consistent `pg_dump` of `auditdb` straight
+      to GCS (`pg_dump | gzip | gsutil cp -` — no temp file, no downtime) and **excludes
+      `rag_chunk`** exactly as this item noted: the pgvector index self-heals from the bundled
+      corpus on restart, so audit rows are the only data that needs the backup. Retention is a
+      bucket **lifecycle rule** (delete after 30 days), not script logic. The dump command is
+      **verified locally** against the running compose Postgres (~12 KB gzipped snapshot;
+      `audit_logs` present, `rag_chunk` absent — 0 references). The bucket-create + lifecycle +
+      one cron line + restore command are documented in
+      [docs/deployment.md §5.1](docs/deployment.md). Remaining: run those three install commands
+      on the GCE VM (needs SSH + a service account with `storage.objectAdmin`).
 - [x] **Make RAG indexing non-blocking on startup (audit availability on deploy) — implemented.**
       `RagIndexer.run()` now just spawns a named daemon thread (`rag-indexer`) and returns, so the
       `ApplicationRunner` no longer holds the Audit service's readiness hostage to hundreds of
@@ -157,11 +164,18 @@ alternative" treatment as ADR-0005/0008.
       the non-blocking-indexing Java change, which trips the required checks normally. Belt and
       suspenders with the async fix — the patience covers any future slow-boot cause, not just
       this one.
-- [ ] **Post-deploy verification + surface decisions.** Live click-through: Google OAuth,
-      demo login, audit dashboard, `/mcp` handshake (`claude mcp add --transport http
-      ai-sandbox https://<domain>/mcp`), Grafana. Decide deliberately: keep `demo`/`demo`
-      in prod (recruiter-friendly) vs drop it; the demo-log generator and seeder already
-      don't exist outside LOCAL/DEV.
+- [x] **Post-deploy verification + surface decisions — done (Google OAuth click-through still
+      blocked).** Verified live against `https://ai-sandbox.sahilparekh1212.com` right after the
+      PR-#95 deploy: **demo login** issues a JWT; the **audit dashboard** data loads
+      (`/audit-logs/search` + `/stats` → 200 with the token); the **MCP** handshake works end to
+      end (`initialize` → `tools/list` returns `[search_knowledge, list_sources]` →
+      `search_knowledge` call → 200; `claude mcp add --transport http ai-sandbox
+      https://ai-sandbox.sahilparekh1212.com/audit-api/mcp`); **Grafana** `/grafana/api/health` →
+      200. **Decision surfaced: keep `demo`/`demo` in prod** — it's the zero-setup recruiter path
+      and is property-gated (the seeder + demo-log generator already don't exist outside
+      LOCAL/DEV, so prod isn't padded with dummy rows). Still blocked: a live **Google OAuth**
+      click-through — the consent screen is in Testing mode (tracked by the "Google OAuth prod
+      client" item above); the demo login covers everyone in the meantime.
 
 ### Dashboard — make it meaningful and relevant (DONE)
 The prod dashboard is sparse because the audit trail only records Auth's `LOGIN` events; for
@@ -358,6 +372,12 @@ profile pinned bottom-left) is live. Requested refinements:
       (About, Observability) into a dedicated component per section (Overview, Tech stack, …;
       Filters, Summary, Trends, Log) so each sidebar anchor maps to a real component that's
       rendered independently — cleaner structure and room for lazy/independent rendering later.
+- [ ] **Mention Liquibase on the About page (more prominently).** Liquibase already appears in the
+      tech-stack list (`Messaging & data`) and in a dedicated "Data & migrations — schema as code
+      (Liquibase)" design-decision group — but that group is behind a tab (`activeDecision`), hidden
+      by default, so a first-time visitor may miss it. Surface it more prominently: e.g. call out
+      "schema as code (Liquibase)" in the overview/hero or the feature tour, or default the design
+      decisions to that group, so the migrations story reads without a click.
 
 - [x] **Internationalization (i18n) — implemented, hand-rolled + JSON-driven.** The UI text is
       driven from per-language JSON dictionaries (`UI/public/i18n/<code>.json`) through a tiny

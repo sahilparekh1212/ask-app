@@ -117,6 +117,38 @@ Vault / Sealed Secrets / External Secrets Operator) rather than hand-applied fil
 
 These three are the remaining "no SPOF" items tracked under the statelessness task in the TODO.
 
+### 5.1 Backups  [built: script + retention; VM cron is a one-time install]
+
+The audit rows are the only durable state that needs backing up. The pgvector `rag_chunk`
+index self-heals on restart (the content-hash indexer re-embeds from the bundled corpus), so
+it's deliberately excluded from the dump — nothing to restore, nothing to re-embed.
+
+[`deploy/backup.sh`](../deploy/backup.sh) streams a consistent `pg_dump` of `auditdb` (minus
+`rag_chunk`) straight to GCS — `pg_dump | gzip | gsutil cp -`, no temp file, no downtime. Set up
+on the single GCE VM:
+
+```bash
+# 1. Create the bucket once (uniform access, same region as the VM).
+gcloud storage buckets create gs://ai-sandbox-backups --location=us-east1 --uniform-bucket-level-access
+
+# 2. Retention = a bucket lifecycle rule (delete objects after 30 days), not script logic.
+cat > /tmp/lifecycle.json <<'JSON'
+{ "rule": [ { "action": {"type": "Delete"}, "condition": {"age": 30} } ] }
+JSON
+gcloud storage buckets update gs://ai-sandbox-backups --lifecycle-file=/tmp/lifecycle.json
+
+# 3. One cron line — nightly at 03:15 UTC (off-peak), logging to the VM.
+( crontab -l 2>/dev/null; \
+  echo "15 3 * * * BACKUP_BUCKET=gs://ai-sandbox-backups /opt/ai-sandbox/deploy/backup.sh >> /var/log/ai-sandbox-backup.log 2>&1" ) \
+  | crontab -
+```
+
+The VM's service account needs `roles/storage.objectAdmin` on the bucket. **Restore** is
+`gsutil cp gs://ai-sandbox-backups/auditdb-<stamp>.sql.gz - | gunzip | docker exec -i
+aisandbox-postgres psql -U audit -d auditdb`. The dump command is verified locally against the
+running compose Postgres (a ~12 KB gzipped snapshot with `audit_logs` present and `rag_chunk`
+absent); the GCS upload + cron is the one-time VM install above.
+
 ---
 
 ## 6. Orchestration — OpenShift manifests  [built]
