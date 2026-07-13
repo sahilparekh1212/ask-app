@@ -24,7 +24,9 @@ export class LanguageSwitcherComponent {
   private readonly translate = inject(TranslateService);
   private readonly host = inject(ElementRef<HTMLElement>);
 
-  readonly languages = this.translate.languages;
+  // Sorted ascending by endonym for the dropdown (localeCompare groups the Latin-script names
+  // alphabetically, then the other scripts) — the canonical LANGUAGES order stays as authored.
+  readonly languages = [...this.translate.languages].sort((a, b) => a.label.localeCompare(b.label));
   readonly current = this.translate.lang;
   readonly open = signal(false);
 

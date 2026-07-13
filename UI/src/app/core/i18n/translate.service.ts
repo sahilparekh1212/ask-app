@@ -10,16 +10,20 @@ export interface LanguageOption {
 }
 
 /**
- * The languages offered in the switcher. English is the source language (bundled below as the
- * fallback); the other eight are fetched as JSON from {@code public/i18n/<code>.json} on demand.
+ * The languages offered in the switcher, each labelled by its endonym. English is the source
+ * language (bundled below as the fallback); every other entry is fetched as JSON from
+ * {@code public/i18n/<code>.json} on demand. The switcher sorts this list for display.
  */
 export const LANGUAGES: readonly LanguageOption[] = [
   { code: 'en', label: 'English' },
   { code: 'fr', label: 'Français' },
   { code: 'es', label: 'Español' },
+  { code: 'id', label: 'Bahasa Indonesia' },
+  { code: 'ms', label: 'Bahasa Melayu' },
   { code: 'hi', label: 'हिन्दी' },
   { code: 'gu', label: 'ગુજરાતી' },
   { code: 'pa', label: 'ਪੰਜਾਬੀ' },
+  { code: 'as', label: 'অসমীয়া' },
   { code: 'zh', label: '中文' },
   { code: 'ko', label: '한국어' },
   { code: 'ja', label: '日本語' },

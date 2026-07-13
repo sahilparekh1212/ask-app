@@ -388,6 +388,13 @@ profile pinned bottom-left) is live. Requested refinements:
       Kannada, Malayalam, Marathi, Bangla (Bengali), Urdu** (Korean and Spanish already ship).
       Note: Arabic, Hebrew and Urdu are **RTL** — set `dir` on the document alongside `lang` and
       re-check the layout (sticky header, filter form, chat bubbles, the mobile card table) in RTL.
+      *Progress (locales half):* added **Indonesian (`id`), Malay (`ms`), Assamese (`as`)**
+      dictionaries + `LANGUAGES` entries (Gujarati/Hindi/Punjabi already shipped), and the switcher
+      dropdown now **sorts by endonym ascending** (`localeCompare` — Latin names first, then the
+      other scripts). All three verified live (fetch → apply → `<html lang>` → persisted). Still
+      open: the LLM-output-language threading, and the specific RTL locales listed above (Arabic/
+      Hebrew/Urdu need the `dir` work). Pre-existing gap noticed: every non-English dictionary omits
+      the `flashcards.range` key (falls back to English) — worth a sweep when the RTL set lands.
 - [ ] **Mobile design round 2 — cut the scrolling (hamburger / drawers).** The responsive pass made
       everything usable on phones but *tall*: the nav, the stacked full-width filter form, and the
       card-per-row audit table mean a lot of vertical scrolling. Collapse the nav into a hamburger
