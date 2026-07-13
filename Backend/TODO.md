@@ -379,22 +379,19 @@ profile pinned bottom-left) is live. Requested refinements:
       previously read ambiguously as a caption on the first chart), and confirmed the "Add demo
       logs" input+button stay hidden in PROD (the `/api/v1/meta/features` probe derives `demoData`
       from the LOCAL/DEV-only `DemoDataController` bean's presence).
-- [ ] **Assistant + flashcards answer in the user's selected language; add more locales.** The UI
-      chrome is translated (i18n above), but the LLM features still reply in English. Thread the
-      current UI language (`TranslateService.lang`) into the chat + flashcard requests and have the
-      system prompt instruct the model to answer in that language — grounding/allowlist/screener
-      posture unchanged, only the output language. Also extend the switcher with new
-      `public/i18n/<code>.json` dictionaries + `LANGUAGES` entries: **Arabic, Hebrew, Tamil, Telugu,
-      Kannada, Malayalam, Marathi, Bangla (Bengali), Urdu** (Korean and Spanish already ship).
-      Note: Arabic, Hebrew and Urdu are **RTL** — set `dir` on the document alongside `lang` and
-      re-check the layout (sticky header, filter form, chat bubbles, the mobile card table) in RTL.
-      *Progress (locales half):* added **Indonesian (`id`), Malay (`ms`), Assamese (`as`)**
-      dictionaries + `LANGUAGES` entries (Gujarati/Hindi/Punjabi already shipped), and the switcher
-      dropdown now **sorts by endonym ascending** (`localeCompare` — Latin names first, then the
-      other scripts). All three verified live (fetch → apply → `<html lang>` → persisted). Still
-      open: the LLM-output-language threading, and the specific RTL locales listed above (Arabic/
-      Hebrew/Urdu need the `dir` work). Pre-existing gap noticed: every non-English dictionary omits
-      the `flashcards.range` key (falls back to English) — worth a sweep when the RTL set lands.
+      **Update:** the app is now **English-only** by decision — the non-English dictionaries were
+      removed and `LANGUAGES` trimmed to English, but this whole runtime (pipe, switcher, Google
+      Translate hatch) stays in place (see the "dropped by decision" note below).
+- [x] **Multi-language + LLM-answers-in-language — dropped by decision; the app is English-only.**
+      After briefly shipping nine (then twelve) locales, the direction was reversed: the project is
+      **English only**. All non-English `public/i18n/*.json` dictionaries were deleted and `LANGUAGES`
+      trimmed to just English. The **i18n machinery is kept intact** (the `TranslateService`, the `t`
+      pipe, `en.json`, the header language switcher — still visible, now listing only English — and
+      the on-demand Google Translate escape hatch), so re-adding a language later is just dropping a
+      `<code>.json` + one `LANGUAGES` entry. The "reply in the user's language / accept romanized
+      input (e.g. *Samjavo* → explain)" idea was also dropped as not needed. Rationale: maintaining
+      hand-translations of the dense technical About prose across many languages wasn't worth the
+      quality/maintenance cost; Google Translate covers ad-hoc translation on demand.
 - [ ] **Mobile design round 2 — cut the scrolling (hamburger / drawers).** The responsive pass made
       everything usable on phones but *tall*: the nav, the stacked full-width filter form, and the
       card-per-row audit table mean a lot of vertical scrolling. Collapse the nav into a hamburger
