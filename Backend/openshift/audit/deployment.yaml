@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: audit-service
-  namespace: ai-sandbox
+  namespace: ask-app
   labels:
     app: audit-service
 spec:
@@ -20,7 +20,7 @@ spec:
     spec:
       containers:
         - name: audit-service
-          image: image-registry.openshift-image-registry.svc:5000/ai-sandbox/audit-service:latest
+          image: image-registry.openshift-image-registry.svc:5000/ask-app/audit-service:latest
           ports:
             - containerPort: 8083
           envFrom:

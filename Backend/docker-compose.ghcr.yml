@@ -12,13 +12,13 @@
 # (repo → Packages → package settings) or you must `docker login ghcr.io` first.
 services:
   auth:
-    image: ghcr.io/sahilparekh1212/ai-sandbox/auth:${AI_SANDBOX_TAG:-latest}
+    image: ghcr.io/sahilparekh1212/ask-app/auth:${AI_SANDBOX_TAG:-latest}
     pull_policy: always
 
   audit:
-    image: ghcr.io/sahilparekh1212/ai-sandbox/audit:${AI_SANDBOX_TAG:-latest}
+    image: ghcr.io/sahilparekh1212/ask-app/audit:${AI_SANDBOX_TAG:-latest}
     pull_policy: always
 
   ui:
-    image: ghcr.io/sahilparekh1212/ai-sandbox/ui:${AI_SANDBOX_TAG:-latest}
+    image: ghcr.io/sahilparekh1212/ask-app/ui:${AI_SANDBOX_TAG:-latest}
     pull_policy: always

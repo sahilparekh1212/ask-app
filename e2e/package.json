@@ -1,5 +1,5 @@
 {
-  "name": "ai-sandbox-e2e",
+  "name": "ask-app-e2e",
   "version": "0.0.1",
   "private": true,
   "description": "Playwright end-to-end suite that drives the full docker-compose stack: browser -> nginx -> Auth -> Kafka -> Audit -> Postgres.",

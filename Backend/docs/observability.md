@@ -9,14 +9,14 @@ the About page in the UI explains the split.)
 | Environment | Grafana | Access |
 |---|---|---|
 | Local compose stack | http://localhost:4200/grafana (old http://localhost:3000 redirects here) | Anonymous read-only; `admin` / `admin` to edit dashboards |
-| Production | https://ai-sandbox.sahilparekh1212.com/grafana | Anonymous read-only; admin password is the `GRAFANA_ADMIN_PASSWORD` repo secret |
+| Production | https://ask-app.sahilparekh1212.com/grafana | Anonymous read-only; admin password is the `GRAFANA_ADMIN_PASSWORD` repo secret |
 
 Grafana is the only published window. Prometheus, Loki and Tempo are never exposed directly in
 prod (locally they happen to have host ports — `:9090`, `:3100`, `:3200` — for direct poking);
 their data is reachable through Grafana's **Explore** (compass icon → datasource dropdown), and
 anonymous visitors hold the Viewer role: dashboards and Explore work, nothing is editable.
 
-**Start here:** Dashboards → AI-Sandbox → **AI-Sandbox Overview** — request/error rates, p95/p99
+**Start here:** Dashboards → ask-app → **ask-app Overview** — request/error rates, p95/p99
 latency, JVM heap, and a live logs panel on one screen.
 
 ## Prometheus (metrics) — Explore → *Prometheus*
@@ -93,8 +93,8 @@ label mapping needed).
 
 ## Try it end-to-end (2 minutes)
 
-1. Sign in at the app (demo / demo) and click around the dashboard, chat, flashcards.
-2. Open Grafana → **AI-Sandbox Overview**: the request-rate panel ticks up.
+1. Sign in at the app (demo / demo) and click around the dashboard and chat.
+2. Open Grafana → **ask-app Overview**: the request-rate panel ticks up.
 3. Explore → Loki → `{app="auth-service"} |= "LOGIN"`: your login's log line, with its
    `traceId` and `userId`.
 4. Copy that `traceId` → Explore → Tempo → paste: the whole login → Kafka → persist flow as one

@@ -1,0 +1,5 @@
+# The repository root is only ever used as the `repo` named build context for the UI image
+# (Backend/docker-compose.yml + .github/workflows/cd.yml), which copies just README.md into the
+# About page. Exclude everything else so that context stays tiny — no .git, Backend/, or UI/.
+*
+!README.md

@@ -9,12 +9,12 @@
 // doing its job) and any 5xx are counted separately; p95 latency is measured over 200s only.
 //
 //   docker run --rm -i grafana/k6 run - < Backend/load-test/prod-smoke.js
-//   ... or: k6 run -e BASE_URL=https://ai-sandbox.sahilparekh1212.com Backend/load-test/prod-smoke.js
+//   ... or: k6 run -e BASE_URL=https://ask-app.sahilparekh1212.com Backend/load-test/prod-smoke.js
 import http from 'k6/http';
 import { check, sleep } from 'k6';
 import { Counter, Trend } from 'k6/metrics';
 
-const BASE = __ENV.BASE_URL || 'https://ai-sandbox.sahilparekh1212.com';
+const BASE = __ENV.BASE_URL || 'https://ask-app.sahilparekh1212.com';
 const AUTH = `${BASE}/auth-api`;
 const AUDIT = `${BASE}/audit-api`;
 

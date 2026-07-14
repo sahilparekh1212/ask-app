@@ -1,7 +1,7 @@
-# AI-Sandbox UI
+# ask-app UI
 
-The Angular SPA fronting the AI-Sandbox backend: sign in (demo login or Google OAuth), browse
-the audit dashboard, chat with the guarded LLM assistant, and generate flashcard study decks.
+The Angular SPA fronting the ask-app backend: sign in (demo login or Google OAuth), browse
+the audit dashboard, and chat with the guarded, RAG-grounded LLM assistant.
 Standalone components, signals, no UI framework — the dark theme is a single hand-rolled
 design-token layer in [`src/styles.scss`](src/styles.scss).
 
@@ -18,11 +18,10 @@ to change to revisit that.
 | `/login`, `/login/callback` | Demo login form, Google OAuth fragment handoff                                                           | public  |
 | `/observability`            | Server-side paginated/sorted/filtered audit table, KPI cards, events-over-time chart, CSS-only stat bars | guarded |
 | `/chat`                     | Chat over the server-side Claude proxy (RAG-grounded)                                                    | guarded |
-| `/flashcards`               | Generated Q&A study deck with flip/next/shuffle                                                          | guarded |
 | `/profile`                  | `/auth/me` profile view (avatar icon, top-right)                                                         | guarded |
 
-(The old `/audit` and `/assistant` paths still redirect to `/observability` and `/chat` so
-bookmarks keep working.) The chrome is a **VS Code-style nav shell**: an activity rail, a
+(The old `/audit`, `/assistant`, and `/flashcards` paths redirect to `/observability` and `/chat`
+so bookmarks keep working — flashcards was removed and folded into the chat assistant.) The chrome is a **VS Code-style nav shell**: an activity rail, a
 contextual "on this page" sidebar with scroll-spy highlighting, and a top bar.
 
 The auth plumbing lives in [`src/app/core/auth/`](src/app/core/auth/): a functional HTTP
@@ -77,7 +76,7 @@ proxy rules (including the `X-Forwarded-*` headers Google OAuth needs to survive
 
 ```bash
 npm start            # dev server
-npm run build        # production build → dist/ai-sandbox-ui/browser
+npm run build        # production build → dist/ask-app-ui/browser
 npm test             # Karma/Jasmine, watch mode
 npm run test:ci      # headless single run (what Frontend CI runs)
 npm run lint         # angular-eslint

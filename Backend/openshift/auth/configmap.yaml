@@ -2,7 +2,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: auth-service-config
-  namespace: ai-sandbox
+  namespace: ask-app
 data:
   SPRING_APPLICATION_NAME: auth-service
   SERVER_PORT: "8085"

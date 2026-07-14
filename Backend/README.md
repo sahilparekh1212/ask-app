@@ -1,7 +1,7 @@
-# AI-Sandbox Backend
+# ask-app Backend
 
 A Spring Boot 3.5 / Java 17 multi-module microservice backend, built with Gradle and deployed
-live at https://ai-sandbox.sahilparekh1212.com (GCE VM, deployed from GitHub Actions; OpenShift
+live at https://ask-app.sahilparekh1212.com (GCE VM, deployed from GitHub Actions; OpenShift
 manifests also provided). Each service is an independently buildable, runnable and
 scalable Gradle subproject.
 
@@ -50,9 +50,9 @@ local stack) and ask about the project:
 
 ```bash
 # the public deployment — no setup needed
-claude mcp add --transport http ai-sandbox https://ai-sandbox.sahilparekh1212.com/audit-api/mcp
+claude mcp add --transport http ask-app https://ask-app.sahilparekh1212.com/audit-api/mcp
 # or a locally-running stack
-claude mcp add --transport http ai-sandbox http://localhost:8083/mcp
+claude mcp add --transport http ask-app http://localhost:8083/mcp
 # then, inside Claude Code: "why is there no API gateway?" → grounded in ADR-0005
 ```
 
@@ -282,7 +282,7 @@ Every service enforces **one active request per user per endpoint**, newest-wins
   header — i.e. it may retry after 30 seconds.
 
 Implementation — shared by both services via the `:common` module
-(`com.aisandbox.common.ratelimit`), except `TransactionalRequestExecutor`, which stays in Audit
+(`com.askapp.common.ratelimit`), except `TransactionalRequestExecutor`, which stays in Audit
 since it's JPA-transaction-specific and Auth has no datastore:
 
 | Component                      | Role                                                                 |
@@ -318,7 +318,7 @@ captured directly instead of pulled from a CI artifact.
 | Failed requests | 0.00% |
 
 **Production smoke** (`prod-smoke.js` — the *live* GCE VM through the public origin
-`https://ai-sandbox.sahilparekh1212.com`, rate limiter **on**, read-only, ramping to 5 VUs over
+`https://ask-app.sahilparekh1212.com`, rate limiter **on**, read-only, ramping to 5 VUs over
 45s; off-peak run 2026-07-13). This is the honest "how does the shared 8 GB / ~\$50 VM hold up
 over public TLS with real data" number — higher than the CI figures above (real internet round
 trip + TLS termination + one shared VM), still comfortably sub-100 ms:
@@ -406,7 +406,7 @@ latency, logs, traces). It complements the app's own audit dashboard, which is t
 Same deployment, two different questions.
 
 The production deployment publishes its Grafana **read-only** at
-**https://ai-sandbox.sahilparekh1212.com/grafana** (anonymous Viewer behind the Caddy
+**https://ask-app.sahilparekh1212.com/grafana** (anonymous Viewer behind the Caddy
 `/grafana` route — dashboards and Explore work, nothing is editable). Prometheus, Loki and
 Tempo themselves stay unpublished.
 
@@ -440,7 +440,7 @@ the pre-provisioned datasource correlation.
 
 ### Proven against real traffic
 
-![Grafana AI-Sandbox Overview dashboard during a k6 load run](docs/images/grafana-overview-load.png)
+![Grafana ask-app Overview dashboard during a k6 load run](docs/images/grafana-overview-load.png)
 
 Captured from the full `docker compose` stack — Auth scaled to **2 replicas** (see
 `docker-compose.scale.yml`; Prometheus discovers every replica via Docker DNS
@@ -466,7 +466,7 @@ SPRING_PROFILES_ACTIVE=DEV LOKI_URL=http://localhost:3100/loki/api/v1/push \
   OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318/v1/traces ./gradlew :Audit:bootRun
 ```
 
-Then open **Grafana at http://localhost:3000** (admin / admin) → the *AI-Sandbox Overview*
+Then open **Grafana at http://localhost:3000** (admin / admin) → the *ask-app Overview*
 dashboard shows request/error rates, JVM heap, and live logs; use **Explore → Tempo** to search
 traces. Prometheus UI is at http://localhost:9090.
 
@@ -496,7 +496,7 @@ cp openshift/monitoring/grafana/secret.example.yaml openshift/monitoring/grafana
 oc apply -f openshift/auth/secret.yaml
 
 # 3. Build & push each image (build context is the repo root)
-docker build -f Audit/Dockerfile -t <registry>/ai-sandbox/audit-service:latest .
+docker build -f Audit/Dockerfile -t <registry>/ask-app/audit-service:latest .
 # ...repeat per service, then push
 
 # 4. Shared Redis (Auth's refresh-token store — required before Auth scales past one replica)
@@ -513,7 +513,7 @@ oc apply -f openshift/monitoring/grafana/
 ```
 
 > The Grafana/Loki/Prometheus images may need a relaxed SCC on OpenShift, e.g.
-> `oc adm policy add-scc-to-user anyuid -z default -n ai-sandbox`. Each gets a
+> `oc adm policy add-scc-to-user anyuid -z default -n ask-app`. Each gets a
 > `ReadWriteOnce` `PersistentVolumeClaim` for its data dir (`pvc.yaml` alongside each
 > `deployment.yaml`; sized 5Gi/1Gi/10Gi for Loki/Grafana/Prometheus respectively, no
 > `storageClassName` set so it binds the cluster default — override per environment).
@@ -523,7 +523,7 @@ oc apply -f openshift/monitoring/grafana/
 Scale a service manually at any time:
 
 ```bash
-oc scale deployment audit-service --replicas=3 -n ai-sandbox
+oc scale deployment audit-service --replicas=3 -n ask-app
 ```
 
 > **Auth + scaling:** Auth is stateless and ships at 2 replicas. Two things make that safe, both
@@ -548,7 +548,7 @@ cp openshift/auth/secret.example.yaml openshift/auth/secret.yaml   # edit real v
 oc apply -f openshift/auth/secret.yaml
 
 # Option B — create the Secret imperatively, nothing touches the repo
-oc create secret generic auth-secret -n ai-sandbox \
+oc create secret generic auth-secret -n ask-app \
   --from-literal=GOOGLE_CLIENT_ID=... \
   --from-literal=GOOGLE_CLIENT_SECRET=... \
   --from-file=AUTH_RSA_PRIVATE_KEY=private_pkcs8.pem
@@ -594,15 +594,15 @@ attestation. Verify an image before running or deploying it:
 ```bash
 # Signature: proves the image was built by THIS repo's CD workflow on main
 cosign verify \
-  --certificate-identity-regexp 'https://github.com/sahilparekh1212/AI-Sandbox/\.github/workflows/cd\.yml@.*' \
+  --certificate-identity-regexp 'https://github.com/sahilparekh1212/ask-app/\.github/workflows/cd\.yml@.*' \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
-  ghcr.io/sahilparekh1212/ai-sandbox/audit:latest
+  ghcr.io/sahilparekh1212/ask-app/audit:latest
 
 # SBOM attestation: the dependency inventory attached to the image
 cosign verify-attestation --type spdxjson \
-  --certificate-identity-regexp 'https://github.com/sahilparekh1212/AI-Sandbox/\.github/workflows/cd\.yml@.*' \
+  --certificate-identity-regexp 'https://github.com/sahilparekh1212/ask-app/\.github/workflows/cd\.yml@.*' \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
-  ghcr.io/sahilparekh1212/ai-sandbox/audit:latest
+  ghcr.io/sahilparekh1212/ask-app/audit:latest
 ```
 
 The identity pin is the point of keyless signing: a signature only counts if it was produced by

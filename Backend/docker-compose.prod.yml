@@ -1,4 +1,4 @@
-# Production override for the GCE VM (ai-sandbox.sahilparekh1212.com). Layered last:
+# Production override for the GCE VM (ask-app.sahilparekh1212.com). Layered last:
 #
 #   docker compose -f docker-compose.yml -f docker-compose.ghcr.yml -f docker-compose.prod.yml \
 #     up -d --no-build --remove-orphans
@@ -8,7 +8,7 @@
 #     nginx; every other published port is withdrawn (`!reset`) — the proxy chain is the
 #     only way in. Grafana is published read-only at https://$DOMAIN/grafana (anonymous
 #     Viewer, see its environment below); Prometheus/Loki/Tempo stay SSH-tunnel only, e.g.
-#     `gcloud compute ssh ai-sandbox-vm -- -L 9090:localhost:9090`.
+#     `gcloud compute ssh ask-app-vm -- -L 9090:localhost:9090`.
 #   - PROD Spring profiles: WARN logging, no demo-data seeder, no demo-log endpoint (both
 #     are LOCAL/DEV-gated beans). The recruiter demo login stays — it's property-gated
 #     (auth.demo.enabled, default true), a deliberate keep for a portfolio deployment.
@@ -24,7 +24,7 @@
 services:
   caddy:
     image: caddy:2-alpine
-    container_name: aisandbox-caddy
+    container_name: askapp-caddy
     restart: unless-stopped
     ports:
       - "80:80"
@@ -51,7 +51,7 @@ services:
       CORS_ALLOWED_ORIGINS: https://${DOMAIN:?}
       FRONTEND_URL: https://${DOMAIN:?}
       # Stable signing key so tokens survive restarts and any future second replica agrees
-      # on kid/JWKS. Exported by the deploy script from /opt/ai-sandbox/secrets/auth_key.pem.
+      # on kid/JWKS. Exported by the deploy script from /opt/ask-app/secrets/auth_key.pem.
       AUTH_RSA_PRIVATE_KEY: ${AUTH_RSA_PRIVATE_KEY:?export from secrets/auth_key.pem}
 
   audit:

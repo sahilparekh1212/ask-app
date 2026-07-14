@@ -27,7 +27,7 @@ describe('ProfileComponent', () => {
   it('should create and load the profile on init', () => {
     fixture.detectChanges(); // triggers ngOnInit → GET /auth/me
     const req = httpMock.expectOne(`${environment.authApiUrl}/auth/me`);
-    req.flush({ userId: 'demo-user', email: 'demo@aisandbox.dev', name: 'Demo User' });
+    req.flush({ userId: 'demo-user', email: 'demo@askapp.dev', name: 'Demo User' });
 
     expect(component).toBeTruthy();
     expect(component.profile()?.userId).toBe('demo-user');

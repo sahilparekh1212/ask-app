@@ -2,7 +2,7 @@ apiVersion: route.openshift.io/v1
 kind: Route
 metadata:
   name: auth-service
-  namespace: ai-sandbox
+  namespace: ask-app
   labels:
     app: auth-service
 spec:

@@ -19,10 +19,12 @@ control Y and what endpoint does it hit". All paths are under `UI/src/app/` unle
 
 ## App shell & navigation (header tabs)
 
-- `app.component.html` / `app.component.ts` — the shell. The header `<nav class="tabs">` has the
-  top-level tabs: **Dashboard** → `/audit`, **Chat** → `/assistant`, **Flashcards** →
-  `/flashcards`, **About** → `/`. The far-right slot is a circular avatar link → `/profile` when
-  authenticated (`isAuthenticated()` signal), or a **Sign in** link → `/login` when not. The routed
+- `app.component.html` / `app.component.ts` — the shell, a VS Code-style layout: an **activity rail**
+  (`<nav class="rail">`) with the primary sections **About** → `/about`, **Chat** → `/chat`,
+  **Observability** → `/observability`; the account slot pinned at the rail's bottom is a circular
+  avatar link → `/profile` when authenticated (`isAuthenticated()` signal), or a **Sign in** link →
+  `/login` when not, with the language switcher just above it. A contextual sidebar ("on this page",
+  scroll-spy) and a top bar (page title + GitHub/LinkedIn links) complete the chrome. The routed
   page renders in `<router-outlet>` inside `<main class="app-main">`.
 
 ## Routes → components
@@ -31,18 +33,20 @@ Defined in `app.routes.ts`:
 
 | Route | Component | Guarded |
 | --- | --- | --- |
-| `/` | `features/home/home.component` (About) | no |
+| `/about` | `features/home/home.component` (About) | no |
 | `/login` | `features/login/login.component` | no |
 | `/login/callback` | `features/auth-callback/auth-callback.component` | no |
 | `/profile` | `features/profile/profile.component` | yes |
-| `/audit` | `features/audit/audit.component` (Dashboard) | yes |
-| `/assistant` | `features/assistant/assistant.component` (Chat) | yes |
-| `/flashcards` | `features/flashcards/flashcards.component` | yes |
-| `**` | redirect to `/` | — |
+| `/observability` | `features/audit/audit.component` (Dashboard) | yes |
+| `/chat` | `features/assistant/assistant.component` (Chat) | yes |
+| `**` | redirect to `/about` | — |
+
+Legacy paths `/audit`, `/assistant`, and `/flashcards` redirect to `/observability` and `/chat`
+(flashcards was removed and folded into the chat assistant).
 
 ## Chat (Assistant) page — the chat input line
 
-- Route: `/assistant` (guarded). Component: `features/assistant/assistant.component.ts` +
+- Route: `/chat` (guarded). Component: `features/assistant/assistant.component.ts` +
   `assistant.component.html`.
 - **The chat input line** is the text input in the composer form at the bottom of
   `assistant.component.html`: `<form class="composer" (ngSubmit)="send()">` containing
@@ -53,18 +57,6 @@ Defined in `app.routes.ts`:
   **`POST {auditApiUrl}/api/v1/assistant/chat`** with body `{ message, history }` (history capped at
   the last 20 turns).
 - Backend: `AssistantController.chat()` in the Audit service (`assistant/AssistantController.java`).
-
-## Flashcards page
-
-- Route: `/flashcards` (guarded). Component: `features/flashcards/flashcards.component.ts` +
-  `flashcards.component.html`.
-- Controls: a **Cards** number input (`formControlName="count"`, 1–20), a **Generate deck /
-  Regenerate** submit button, and (once a deck exists) a **Shuffle** button. The deck is a clickable
-  flip **card** (`(click)="flip()"`, question ⇄ answer) with **Prev / Next** navigation and an
-  index counter.
-- Service: `features/flashcards/flashcards.service.ts` → `generate(count)` does
-  **`POST {auditApiUrl}/api/v1/assistant/flashcards`** with body `{ count }`.
-- Backend: `FlashcardController` in the Audit service.
 
 ## Audit dashboard page
 

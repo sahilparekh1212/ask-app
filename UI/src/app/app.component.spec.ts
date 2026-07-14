@@ -27,12 +27,12 @@ describe('AppComponent', () => {
     expect(fixture.componentInstance).toBeTruthy();
   });
 
-  it(`should have the 'AI-Sandbox' title`, () => {
+  it(`should have the 'ask-app' title`, () => {
     const fixture = TestBed.createComponent(AppComponent);
-    expect(fixture.componentInstance.title).toEqual('AI-Sandbox');
+    expect(fixture.componentInstance.title).toEqual('ask-app');
   });
 
-  it('orders the activity rail About, Chat, Flashcards, Observability with matching URLs', () => {
+  it('orders the activity rail Chat, Observability with matching URLs', () => {
     const fixture = TestBed.createComponent(AppComponent);
     fixture.detectChanges();
     const rail = [
@@ -40,65 +40,56 @@ describe('AppComponent', () => {
         '.rail-items .rail-item',
       ),
     ];
-    expect(rail.map((a) => a.textContent?.trim())).toEqual([
-      'About',
-      'Chat',
-      'Flashcards',
-      'Observability',
-    ]);
-    expect(rail.map((a) => a.getAttribute('href'))).toEqual([
-      '/about',
-      '/chat',
-      '/flashcards',
-      '/observability',
-    ]);
+    expect(rail.map((a) => a.textContent?.trim())).toEqual(['Chat', 'Observability']);
+    expect(rail.map((a) => a.getAttribute('href'))).toEqual(['/chat', '/observability']);
   });
 
-  it('pins a Sign-in entry (and no Profile) at the rail bottom when signed out', () => {
+  it('pins About at the top of the rail bottom (above language + account)', () => {
     const fixture = TestBed.createComponent(AppComponent);
     fixture.detectChanges();
-    const bottom = (fixture.nativeElement as HTMLElement).querySelector<HTMLAnchorElement>(
+    const first = (fixture.nativeElement as HTMLElement).querySelector<HTMLAnchorElement>(
       '.rail-bottom .rail-item',
     );
-    expect(bottom?.getAttribute('aria-label')).toBe('Login');
-    expect(bottom?.getAttribute('href')).toBe('/login');
+    expect(first?.getAttribute('href')).toBe('/about');
+    expect(first?.getAttribute('aria-label')).toBe('About');
   });
 
-  it('pins the Profile entry (icon, /profile) at the rail bottom when signed in', () => {
+  it('pins a Sign-in entry (and no Profile) as the bottom account slot when signed out', () => {
+    const fixture = TestBed.createComponent(AppComponent);
+    fixture.detectChanges();
+    const items = [
+      ...(fixture.nativeElement as HTMLElement).querySelectorAll<HTMLAnchorElement>(
+        '.rail-bottom .rail-item',
+      ),
+    ];
+    const account = items[items.length - 1];
+    expect(account?.getAttribute('aria-label')).toBe('Login');
+    expect(account?.getAttribute('href')).toBe('/login');
+  });
+
+  it('pins the Profile entry (icon, /profile) as the bottom account slot when signed in', () => {
     authenticated.set(true);
     const fixture = TestBed.createComponent(AppComponent);
     fixture.detectChanges();
-    const bottom = (fixture.nativeElement as HTMLElement).querySelector<HTMLAnchorElement>(
-      '.rail-bottom .rail-item',
-    );
-    expect(bottom?.getAttribute('aria-label')).toBe('Profile');
-    expect(bottom?.getAttribute('href')).toBe('/profile');
-    expect(bottom?.querySelector('svg')).withContext('icon, not a text link').not.toBeNull();
+    const items = [
+      ...(fixture.nativeElement as HTMLElement).querySelectorAll<HTMLAnchorElement>(
+        '.rail-bottom .rail-item',
+      ),
+    ];
+    const account = items[items.length - 1];
+    expect(account?.getAttribute('aria-label')).toBe('Profile');
+    expect(account?.getAttribute('href')).toBe('/profile');
+    expect(account?.querySelector('svg')).withContext('icon, not a text link').not.toBeNull();
   });
 
-  it('renders the contextual sidebar with collapsible dropdown groups', () => {
+  it('renders About full-width with no contextual sidebar', () => {
     const fixture = TestBed.createComponent(AppComponent);
     fixture.detectChanges();
     const el = fixture.nativeElement as HTMLElement;
 
-    // Default route → About section → its sidebar groups render, each with items visible.
-    const groupsBefore = el.querySelectorAll('.sb-items').length;
-    expect(groupsBefore).toBeGreaterThan(0);
-
-    // Collapsing a group's header hides that group's item list (the "dropdown").
-    el.querySelector<HTMLButtonElement>('.sb-group-head')!.click();
-    fixture.detectChanges();
-    expect(el.querySelectorAll('.sb-items').length).toBe(groupsBefore - 1);
-  });
-
-  it('drops the per-section "Related" cross-links from every sidebar', () => {
-    const fixture = TestBed.createComponent(AppComponent);
-    fixture.detectChanges();
-    const el = fixture.nativeElement as HTMLElement;
-
-    // About keeps only its "On this page" anchors — no "Related"/"Connect" group headers.
-    const headers = [...el.querySelectorAll('.sb-group-head')].map((h) => h.textContent?.trim());
-    expect(headers).toEqual(['On this page']);
+    // Default route → About renders the README on its own; there is no secondary panel.
+    expect(el.querySelector('.sidebar')).toBeNull();
+    expect(el.querySelector('.content')?.classList.contains('no-sidebar')).toBeTrue();
   });
 
   it('promotes GitHub + LinkedIn to always-visible top-bar links', () => {
@@ -111,7 +102,7 @@ describe('AppComponent', () => {
     ];
     expect(links.map((a) => a.getAttribute('aria-label'))).toEqual(['GitHub', 'LinkedIn']);
     expect(links.map((a) => a.getAttribute('href'))).toEqual([
-      'https://github.com/sahilparekh1212/AI-Sandbox',
+      'https://github.com/sahilparekh1212/ask-app',
       'https://www.linkedin.com/in/sahilparekh1212/',
     ]);
     // Each renders an icon and opens in a new tab safely.

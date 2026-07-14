@@ -8,15 +8,15 @@
 # it's safe to run against the live container with no downtime.
 #
 # Install on the VM (one cron line — the honest "backups exist" answer):
-#   BACKUP_BUCKET=gs://ai-sandbox-backups   # created once, see docs/deployment.md §5.1
-#   ( crontab -l 2>/dev/null; echo "15 3 * * * BACKUP_BUCKET=$BACKUP_BUCKET /opt/ai-sandbox/deploy/backup.sh >> /var/log/ai-sandbox-backup.log 2>&1" ) | crontab -
+#   BACKUP_BUCKET=gs://ask-app-backups   # created once, see docs/deployment.md §5.1
+#   ( crontab -l 2>/dev/null; echo "15 3 * * * BACKUP_BUCKET=$BACKUP_BUCKET /opt/ask-app/deploy/backup.sh >> /var/log/ask-app-backup.log 2>&1" ) | crontab -
 #
 # Retention is handled by a bucket lifecycle rule (delete after 30 days), not by this script —
 # see docs/deployment.md §5.1.
 set -euo pipefail
 
-BUCKET="${BACKUP_BUCKET:?set BACKUP_BUCKET, e.g. gs://ai-sandbox-backups}"
-CONTAINER="${PG_CONTAINER:-aisandbox-postgres}"
+BUCKET="${BACKUP_BUCKET:?set BACKUP_BUCKET, e.g. gs://ask-app-backups}"
+CONTAINER="${PG_CONTAINER:-askapp-postgres}"
 DB="${POSTGRES_DB:-auditdb}"
 DB_USER="${POSTGRES_USER:-audit}"
 

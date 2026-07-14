@@ -1,6 +1,6 @@
-# AI-Sandbox — application overview (assistant grounding document)
+# ask-app — application overview (assistant grounding document)
 
-AI-Sandbox is a production-shaped backend engineering portfolio project: two Spring Boot
+ask-app is a production-shaped backend engineering portfolio project: two Spring Boot
 microservices plus an Angular 19 SPA, connected by Kafka, backed by Postgres, and observed by
 Prometheus/Grafana/Loki/Tempo. Everything runs locally with one `docker compose up --build`
 from `Backend/`.
@@ -39,8 +39,8 @@ from `Backend/`.
 - Audit dashboard: server-side paginated/sortable table, filter dropdowns, details
   contains-search, CSS bar-chart stats, demo-log generator button.
 - Assistant chat page: asks questions about the app, answered by a Claude model through a
-  server-side proxy in the Audit service.
-- Flashcards page: generates a Q&A study deck about the app via the same proxy.
+  server-side proxy in the Audit service. It grounds answers on the repo's docs/source (RAG)
+  and, only for questions about the app's live activity, on the audit stats/rows.
 - An HTTP interceptor attaches `Authorization: Bearer <token>` to our APIs only and silently
   refreshes once on 401.
 

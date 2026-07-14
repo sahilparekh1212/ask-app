@@ -5,8 +5,14 @@ name: API contract
 # then openapi-diff fails the job on breaking changes. Additive changes pass; removing or
 # retyping something a client could depend on does not. pull_request-only by design — on a
 # push to main there is no base contract to compare against.
+#
+# Intentional breaking changes: add the `breaking-change-approved` label to the PR. The diff
+# still runs and reports what changed (preserved in the job summary as an audit trail), but the
+# job stops failing on incompatibility. `labeled`/`unlabeled` are in the trigger list so toggling
+# the label re-runs the gate and refreshes the check without needing a new commit.
 on:
   pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
     paths:
       - 'Backend/**'
       - '.github/workflows/api-contract.yml'
@@ -16,6 +22,11 @@ jobs:
   openapi-diff:
     name: Breaking-change gate (openapi-diff)
     runs-on: ubuntu-latest
+    # Enforce (fail on incompatible) unless the PR is explicitly labelled as an approved
+    # breaking change. Computed as the string 'true'/'false' and branched in shell rather than
+    # inlined as a flag, to sidestep GitHub's empty-string-is-falsy `&& '' || x` ternary trap.
+    env:
+      ENFORCE: ${{ !contains(github.event.pull_request.labels.*.name, 'breaking-change-approved') }}
     steps:
       - uses: actions/checkout@v7
 
@@ -32,6 +43,15 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v6
 
+      - name: Note enforcement mode
+        run: |
+          if [ "$ENFORCE" = "true" ]; then
+            echo "Breaking-change gate: **enforcing** — incompatible API changes fail this job." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "::warning::Breaking-change gate is REPORT-ONLY — the 'breaking-change-approved' label is present, so incompatible API changes are reported but do not fail the job."
+            echo "> ⚠️ **Breaking-change gate: report-only** — the \`breaking-change-approved\` label is present. Incompatible changes are listed below but do not fail the job." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
       # Both runs use the head's copy of the script (the base branch may predate it).
       - name: Generate OpenAPI specs (PR head)
         id: gen-head
@@ -43,9 +63,11 @@ jobs:
 
       - name: Diff Auth contract
         run: |
+          FAIL_FLAG=""
+          if [ "$ENFORCE" = "true" ]; then FAIL_FLAG="--fail-on-incompatible"; fi
           docker run --rm -v "$PWD/specs:/specs" openapitools/openapi-diff:2.0.1 \
             /specs/base/auth.json /specs/head/auth.json \
-            --fail-on-incompatible --markdown /specs/auth-diff.md
+            $FAIL_FLAG --markdown /specs/auth-diff.md
           # No markdown is written when the specs are identical.
           if [ -s specs/auth-diff.md ]; then cat specs/auth-diff.md >> "$GITHUB_STEP_SUMMARY"; fi
 
@@ -56,9 +78,11 @@ jobs:
           !cancelled() && steps.gen-head.conclusion == 'success' &&
           steps.gen-base.conclusion == 'success'
         run: |
+          FAIL_FLAG=""
+          if [ "$ENFORCE" = "true" ]; then FAIL_FLAG="--fail-on-incompatible"; fi
           docker run --rm -v "$PWD/specs:/specs" openapitools/openapi-diff:2.0.1 \
             /specs/base/audit.json /specs/head/audit.json \
-            --fail-on-incompatible --markdown /specs/audit-diff.md
+            $FAIL_FLAG --markdown /specs/audit-diff.md
           # No markdown is written when the specs are identical.
           if [ -s specs/audit-diff.md ]; then cat specs/audit-diff.md >> "$GITHUB_STEP_SUMMARY"; fi
 

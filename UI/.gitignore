@@ -6,6 +6,9 @@
 /out-tsc
 /bazel-out
 
+# Generated at build time from the repo root (see scripts/copy-readme.mjs); not a source file.
+/public/README.md
+
 # Node
 /node_modules
 npm-debug.log

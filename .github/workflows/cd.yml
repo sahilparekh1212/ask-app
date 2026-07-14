@@ -41,7 +41,9 @@ jobs:
           - name: ui
             context: UI
             dockerfile: UI/Dockerfile
-            build_contexts: ''
+            # The About page renders the repo README; it lives at the checkout root, outside the
+            # UI/ context, so pass root as the `repo` named context (the Dockerfile COPYs README.md).
+            build_contexts: repo=.
     steps:
       - uses: actions/checkout@v7
 
@@ -56,7 +58,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/${{ github.repository_owner }}/ai-sandbox/${{ matrix.name }}
+          images: ghcr.io/${{ github.repository_owner }}/ask-app/${{ matrix.name }}
           # 0.1.<run_number> is an honest CI-generated SemVer — monotonic per workflow run —
           # until real release tags exist; sha-<short> pins a build to its exact commit.
           tags: |
@@ -81,20 +83,20 @@ jobs:
       # Keyless — no key to store or rotate; the signature binds the image to THIS workflow's
       # OIDC identity and lands in the public Rekor transparency log. Verify with:
       #   cosign verify \
-      #     --certificate-identity-regexp 'https://github.com/sahilparekh1212/AI-Sandbox/\.github/workflows/cd\.yml@.*' \
+      #     --certificate-identity-regexp 'https://github.com/sahilparekh1212/ask-app/\.github/workflows/cd\.yml@.*' \
       #     --certificate-oidc-issuer https://token.actions.githubusercontent.com \
-      #     ghcr.io/sahilparekh1212/ai-sandbox/<name>@<digest>
+      #     ghcr.io/sahilparekh1212/ask-app/<name>@<digest>
       - name: Install cosign
         uses: sigstore/cosign-installer@v3
 
       - name: Sign image (cosign keyless)
-        run: cosign sign --yes "ghcr.io/${{ github.repository_owner }}/ai-sandbox/${{ matrix.name }}@${{ steps.push.outputs.digest }}"
+        run: cosign sign --yes "ghcr.io/${{ github.repository_owner }}/ask-app/${{ matrix.name }}@${{ steps.push.outputs.digest }}"
 
       # syft reads the pushed image (docker login creds from the step above) and emits SPDX.
       - name: Generate SBOM (syft)
         uses: anchore/sbom-action@v0
         with:
-          image: ghcr.io/${{ github.repository_owner }}/ai-sandbox/${{ matrix.name }}@${{ steps.push.outputs.digest }}
+          image: ghcr.io/${{ github.repository_owner }}/ask-app/${{ matrix.name }}@${{ steps.push.outputs.digest }}
           format: spdx-json
           output-file: sbom-${{ matrix.name }}.spdx.json
           artifact-name: sbom-${{ matrix.name }}.spdx.json
@@ -103,4 +105,4 @@ jobs:
         run: >-
           cosign attest --yes --type spdxjson
           --predicate "sbom-${{ matrix.name }}.spdx.json"
-          "ghcr.io/${{ github.repository_owner }}/ai-sandbox/${{ matrix.name }}@${{ steps.push.outputs.digest }}"
+          "ghcr.io/${{ github.repository_owner }}/ask-app/${{ matrix.name }}@${{ steps.push.outputs.digest }}"

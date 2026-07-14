@@ -7,7 +7,7 @@
   },
   "newProjectRoot": "projects",
   "projects": {
-    "ai-sandbox-ui": {
+    "ask-app-ui": {
       "projectType": "application",
       "schematics": {
         "@schematics/angular:component": {
@@ -21,7 +21,7 @@
         "build": {
           "builder": "@angular-devkit/build-angular:application",
           "options": {
-            "outputPath": "dist/ai-sandbox-ui",
+            "outputPath": "dist/ask-app-ui",
             "index": "src/index.html",
             "browser": "src/main.ts",
             "polyfills": ["zone.js"],
@@ -70,10 +70,10 @@
           "builder": "@angular-devkit/build-angular:dev-server",
           "configurations": {
             "production": {
-              "buildTarget": "ai-sandbox-ui:build:production"
+              "buildTarget": "ask-app-ui:build:production"
             },
             "development": {
-              "buildTarget": "ai-sandbox-ui:build:development"
+              "buildTarget": "ask-app-ui:build:development"
             }
           },
           "defaultConfiguration": "development"

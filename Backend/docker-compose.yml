@@ -25,7 +25,7 @@ services:
     # RAG feature's Liquibase changeset enables (CREATE EXTENSION vector). Drop-in compatible
     # with the previous postgres:16-alpine volume.
     image: pgvector/pgvector:pg16
-    container_name: aisandbox-postgres
+    container_name: askapp-postgres
     environment:
       POSTGRES_DB: auditdb
       POSTGRES_USER: audit
@@ -42,7 +42,7 @@ services:
 
   redpanda:
     image: redpandadata/redpanda:v24.2.7
-    container_name: aisandbox-redpanda
+    container_name: askapp-redpanda
     command:
       - redpanda
       - start
@@ -63,7 +63,7 @@ services:
 
   redpanda-console:
     image: redpandadata/console:v2.7.2
-    container_name: aisandbox-redpanda-console
+    container_name: askapp-redpanda-console
     depends_on:
       - redpanda
     ports:
@@ -73,7 +73,7 @@ services:
 
   prometheus:
     image: prom/prometheus:v2.54.1
-    container_name: aisandbox-prometheus
+    container_name: askapp-prometheus
     command:
       - --config.file=/etc/prometheus/prometheus.yml
     volumes:
@@ -84,7 +84,7 @@ services:
 
   loki:
     image: grafana/loki:3.1.1
-    container_name: aisandbox-loki
+    container_name: askapp-loki
     command: -config.file=/etc/loki/loki-config.yaml
     volumes:
       - ./monitoring/loki/loki-config.yaml:/etc/loki/loki-config.yaml:ro
@@ -93,7 +93,7 @@ services:
 
   tempo:
     image: grafana/tempo:2.6.1
-    container_name: aisandbox-tempo
+    container_name: askapp-tempo
     command: -config.file=/etc/tempo/tempo.yaml
     volumes:
       - ./monitoring/tempo/tempo.yaml:/etc/tempo/tempo.yaml:ro
@@ -103,7 +103,7 @@ services:
 
   grafana:
     image: grafana/grafana:11.2.0
-    container_name: aisandbox-grafana
+    container_name: askapp-grafana
     environment:
       - GF_SECURITY_ADMIN_USER=admin
       - GF_SECURITY_ADMIN_PASSWORD=admin
@@ -135,7 +135,7 @@ services:
 
   redis:
     image: redis:7-alpine
-    container_name: aisandbox-redis
+    container_name: askapp-redis
     # Refresh tokens are short-lived and re-mintable, so no persistence is needed — run purely
     # in-memory (disable RDB snapshots and the AOF) for a lean shared store.
     command: ["redis-server", "--save", "", "--appendonly", "no"]
@@ -151,7 +151,7 @@ services:
     build:
       context: .
       dockerfile: Auth/Dockerfile
-    container_name: aisandbox-auth
+    container_name: askapp-auth
     environment:
       SPRING_PROFILES_ACTIVE: DEV
       KAFKA_BOOTSTRAP_SERVERS: redpanda:9092
@@ -203,7 +203,11 @@ services:
   ui:
     build:
       context: ../UI
-    container_name: aisandbox-ui
+      # README.md (repo root) is outside this UI/ context, but the About page renders it, so pass
+      # the repo root as a named context the Dockerfile COPYs README.md from (--from=repo).
+      additional_contexts:
+        repo: ..
+    container_name: askapp-ui
     ports:
       - "4200:80"
     depends_on:
@@ -223,7 +227,7 @@ services:
       # its RAG corpus — so pass it as a named build context the Dockerfile COPYs from (--from=ui).
       additional_contexts:
         ui: ../UI
-    container_name: aisandbox-audit
+    container_name: askapp-audit
     environment:
       SPRING_PROFILES_ACTIVE: DEV
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/auditdb

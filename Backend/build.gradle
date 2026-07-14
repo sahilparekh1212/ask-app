@@ -24,7 +24,7 @@ subprojects {
 		}
 	}
 
-	group = 'com.aisandbox'
+	group = 'com.askapp'
 	version = '0.0.1-SNAPSHOT'
 
 	// Keep build output out of the OneDrive-synced working tree. OneDrive grabs file handles
@@ -33,7 +33,7 @@ subprojects {
 	// Windows), overridable via AI_SANDBOX_BUILD_DIR. In CI/Docker (neither var set) it falls
 	// back to the in-tree default, so container builds are unaffected.
 	def buildHome = System.getenv('AI_SANDBOX_BUILD_DIR') ?:
-		(System.getenv('LOCALAPPDATA') ? "${System.getenv('LOCALAPPDATA')}/ai-sandbox-build" : null)
+		(System.getenv('LOCALAPPDATA') ? "${System.getenv('LOCALAPPDATA')}/ask-app-build" : null)
 	if (buildHome != null) {
 		layout.buildDirectory = file("${buildHome}/${project.name}")
 	}
@@ -111,7 +111,7 @@ subprojects {
 	pitest {
 		junit5PluginVersion = '1.2.1'
 		threads = 4
-		targetClasses = ['com.aisandbox.*']
+		targetClasses = ['com.askapp.*']
 		outputFormats = ['HTML', 'XML']
 		timestampedReports = false
 		// The heavy Spring-context suites (MockMvc e2e, embedded Kafka) dominate wall-clock

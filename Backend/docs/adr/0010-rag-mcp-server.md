@@ -12,7 +12,7 @@ Context Protocol server, so an external agent can ground its answers in this pro
 documentation:
 
 ```
-claude mcp add --transport http ai-sandbox http://localhost:8083/mcp
+claude mcp add --transport http ask-app http://localhost:8083/mcp
 ```
 
 Five decisions were scoped up front (TODO item); each is recorded here.

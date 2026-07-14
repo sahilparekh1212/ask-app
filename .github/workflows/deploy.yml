@@ -9,7 +9,7 @@
 # the repository secrets exist. Flip the variable to arm it; workflow_dispatch triggers a
 # first deploy without waiting for a merge.
 #
-# Secret handling on the VM: everything single-line goes into /opt/ai-sandbox/.env (read by
+# Secret handling on the VM: everything single-line goes into /opt/ask-app/.env (read by
 # docker compose interpolation); the RSA signing key is multi-line PEM, which .env cannot
 # carry, so it ships as a 600-mode file and is exported into the shell that runs
 # `docker compose up` (shell env beats .env in compose precedence).
@@ -27,8 +27,8 @@ concurrency:
 
 env:
   GCP_ZONE: us-east1-b
-  GCP_VM: ai-sandbox-vm
-  APP_DIR: /opt/ai-sandbox
+  GCP_VM: ask-app-vm
+  APP_DIR: /opt/ask-app
 
 permissions:
   contents: read
@@ -145,7 +145,7 @@ jobs:
           gcloud compute ssh "$GCP_VM" --zone="$GCP_ZONE" --quiet --command \
             "cd $APP_DIR && set -a && . ./.env && set +a && \
              for i in 1 2 3 4 5 6; do \
-               if sudo docker exec aisandbox-grafana \
+               if sudo docker exec askapp-grafana \
                     grafana cli admin reset-admin-password \"\$GRAFANA_ADMIN_PASSWORD\" >/dev/null 2>&1; then \
                  echo 'Grafana admin password reset to the deployed secret'; exit 0; \
                fi; \

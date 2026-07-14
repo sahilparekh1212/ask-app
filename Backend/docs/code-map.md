@@ -1,4 +1,4 @@
-# Code map — a file-by-file guide to the AI-Sandbox repository
+# Code map — a file-by-file guide to the ask-app repository
 
 This document is a guide to **what each file in the repository does**, grouped by concern.
 It exists so the built-in assistant (and any reader) can answer questions like "which files
@@ -14,7 +14,7 @@ to the repository root; the backend lives under `Backend/`, the Angular SPA unde
 
 - `Backend/` — two Spring Boot services (Auth, Audit) plus the shared `common` module, the
   Docker/compose stack, monitoring configs, OpenShift manifests, docs, and load tests.
-- `UI/` — the Angular 19 single-page app (the dashboard, chat, flashcards, login).
+- `UI/` — the Angular single-page app (the dashboard, chat, login).
 - `e2e/` — Playwright end-to-end suite that runs against the real compose stack.
 - `.github/` — GitHub Actions workflows (CI, CD, deploy, security scans) and helper scripts.
 - `README.md` (root) — the portfolio-facing overview: live URL, architecture diagram, tech stack.
@@ -87,7 +87,7 @@ tied to the Docker setup?", this is the list:
 - `Backend/monitoring/grafana/provisioning/datasources/datasources.yml` — wires Prometheus/Loki/
   Tempo into Grafana.
 - `Backend/monitoring/grafana/provisioning/dashboards/dashboards.yml` — dashboard provisioning.
-- `Backend/monitoring/grafana/dashboards/aisandbox-overview.json` — the provisioned overview
+- `Backend/monitoring/grafana/dashboards/askapp-overview.json` — the provisioned overview
   dashboard (per-endpoint p95/p99, error rate, etc.).
 - On the app side, tracing/metrics are configured in each service's `application.properties`
   (`management.*`, `spring.kafka.*.observation-enabled`) and log correlation in
@@ -98,16 +98,16 @@ tied to the Docker setup?", this is the list:
 The audit trail is event-sourced: producers publish `AuditEvent`s to the `audit.events` Kafka
 topic and Audit consumes and persists them. Files tied to this pipeline:
 
-- `Backend/common/src/main/java/com/aisandbox/common/event/AuditEvent.java` — the shared Kafka
+- `Backend/common/src/main/java/com/askapp/common/event/AuditEvent.java` — the shared Kafka
   message contract (record) both services use, so there is no per-service copy.
-- `Backend/Auth/src/main/java/com/aisandbox/auth/event/AuditEventPublisher.java` — Auth publishes
+- `Backend/Auth/src/main/java/com/askapp/auth/event/AuditEventPublisher.java` — Auth publishes
   LOGIN/TOKEN_REFRESH/LOGOUT events (`@Async`, fire-and-forget).
-- `Backend/Audit/src/main/java/com/aisandbox/audit/event/AuditEventPublisher.java` — Audit's own
-  publisher for the AI features (Assistant/CHAT, Flashcards/GENERATED, Rag/SEARCH, Mcp/TOOL_CALL);
+- `Backend/Audit/src/main/java/com/askapp/audit/event/AuditEventPublisher.java` — Audit's own
+  publisher for the AI features (Assistant/CHAT, Rag/SEARCH, Mcp/TOOL_CALL);
   same `@Async` fire-and-forget posture, publishing back onto `audit.events`.
-- `Backend/Audit/src/main/java/com/aisandbox/audit/event/AuditEventConsumer.java` — the
+- `Backend/Audit/src/main/java/com/askapp/audit/event/AuditEventConsumer.java` — the
   `@KafkaListener` that persists events as `AuditLog` rows, idempotent by `eventId`.
-- `Backend/Audit/src/main/java/com/aisandbox/audit/config/KafkaConsumerConfig.java` — retry +
+- `Backend/Audit/src/main/java/com/askapp/audit/config/KafkaConsumerConfig.java` — retry +
   dead-letter (`audit.events.DLT`) error handling for the listener.
 - `Backend/kafka/docker-compose.yml` — the local Redpanda broker + console.
 
@@ -166,25 +166,24 @@ topic and Audit consumes and persists them. Files tied to this pipeline:
 - `exception/GlobalExceptionHandler.java` — validation/access/other exceptions → correct statuses.
 - `logging/MdcLoggingFilter.java` — MDC correlation for Audit.
 
-## Audit service — AI features: Assistant (chat) & Flashcards
+## Audit service — AI feature: Assistant (chat)
 
 - `assistant/AssistantController.java` — `POST /api/v1/assistant/chat`, derives role from the JWT.
-- `assistant/AssistantService.java` — orchestrates one chat turn: screen → retrieve (RAG) → call the
-  provider; emits the `Assistant/CHAT` audit event.
+- `assistant/AssistantService.java` — orchestrates one chat turn: screen → retrieve (RAG) → decide
+  whether the question is about live state → call the provider; emits the `Assistant/CHAT` audit event.
 - `assistant/AssistantContextBuilder.java` — **the data-access allowlist and system-prompt builder**:
-  assembles the role-scoped prompt (docs + aggregate stats for USER; also recent raw rows for ADMIN)
-  and appends retrieved doc chunks. This is where the assistant's behavior rules live.
+  assembles the prompt from docs + RAG chunks (always), and attaches role-scoped live audit data
+  (aggregate stats for USER; also recent raw rows for ADMIN) **only when the question is about app
+  state**. This is where the assistant's behavior rules live.
+- `assistant/AuditQueryDetector.java` — keyword heuristic that decides whether a question is about
+  the running system's activity (→ attach live audit data) vs. its design/architecture (→ docs only).
 - `assistant/PromptScreener.java` — blocks credentials/tokens/emails/card-like numbers before any
   provider call, with category-only logging.
 - `assistant/LlmClient.java` — the provider seam (interface) that keeps guardrail logic testable.
 - `assistant/AnthropicLlmClient.java` — the real implementation using the official Anthropic Java SDK.
 - `assistant/AssistantProperties.java` — server-side API key, model, max-tokens config.
 - `assistant/AssistantUnavailableException.java` — maps missing-key / provider failures to 503.
-- `assistant/FlashcardController.java` — `POST /api/v1/assistant/flashcards`.
-- `assistant/FlashcardService.java` — generates a Q&A deck via the same proxy + grounding; emits the
-  `Flashcards/GENERATED` audit event.
-- `assistant/dto/*` — `ChatRequest`, `ChatResponse`, `ChatTurn`, `Flashcard`, `FlashcardDeck`,
-  `FlashcardRequest`.
+- `assistant/dto/*` — `ChatRequest`, `ChatResponse`, `ChatTurn`.
 - `Backend/Audit/src/main/resources/assistant/app-context.md` — the static app-overview document that
   is always included in the assistant's prompt (the "what is this app" grounding).
 
@@ -232,7 +231,7 @@ superseded one.
 - `Backend/Audit/src/main/resources/db/changelog/db.changelog-master.yaml` — the Liquibase changelog
   that owns the schema: creates `audit_logs` + its indexes and the pgvector `rag_chunk` table.
   Hibernate runs `ddl-auto=none` so Liquibase is the single source of truth.
-- `Backend/Audit/src/main/java/com/aisandbox/audit/config/JpaAuditingConfig.java` — enables JPA
+- `Backend/Audit/src/main/java/com/askapp/audit/config/JpaAuditingConfig.java` — enables JPA
   auditing (timestamps).
 
 ## Configuration & profiles
@@ -264,7 +263,6 @@ endpoint each page calls — see [`ui-guide.md`](ui-guide.md). This section is t
 - `src/app/features/audit/*` — the dashboard: `audit.component` (table + filters + stat bar charts),
   `audit.service` (calls `/search` + `/stats`), `audit.models`.
 - `src/app/features/assistant/*` — the chat page: component, `assistant.service`, models.
-- `src/app/features/flashcards/*` — the flip-card study page: component, service, models.
 - `src/app/features/login/*` — the demo-login + Google sign-in page.
 - `src/app/features/auth-callback/*` — reads the OAuth token fragment and stores it.
 - `src/app/features/profile/*` — the signed-in profile page.

@@ -35,8 +35,6 @@ const ICON = {
   about:
     'M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8Zm8-6.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13ZM6.5 7.75A.75.75 0 0 1 7.25 7h1a.75.75 0 0 1 .75.75v2.75h.25a.75.75 0 0 1 0 1.5h-2a.75.75 0 0 1 0-1.5h.25v-2h-.25a.75.75 0 0 1-.75-.75ZM8 6a1 1 0 1 1 0-2 1 1 0 0 1 0 2Z',
   chat: 'M1 2.75C1 1.784 1.784 1 2.75 1h10.5c.966 0 1.75.784 1.75 1.75v7.5A1.75 1.75 0 0 1 13.25 11H9.06l-2.573 2.573A1.458 1.458 0 0 1 4 12.543V11H2.75A1.75 1.75 0 0 1 1 9.25Zm1.75-.25a.25.25 0 0 0-.25.25v6.5c0 .138.112.25.25.25h2a.75.75 0 0 1 .75.75v1.94l2.22-2.22a.75.75 0 0 1 .53-.22h4.25a.25.25 0 0 0 .25-.25v-7.5a.25.25 0 0 0-.25-.25Z',
-  flashcards:
-    'M7.122.392a1.75 1.75 0 0 1 1.756 0l5.003 2.902c.83.481.83 1.68 0 2.162L8.878 8.358a1.75 1.75 0 0 1-1.756 0L2.119 5.456c-.83-.482-.83-1.681 0-2.162Zm1.003 1.297a.25.25 0 0 0-.25 0L3.245 4.374l4.63 2.685a.25.25 0 0 0 .25 0l4.63-2.685ZM1.593 10.365a.75.75 0 0 1 1.025-.273l5.257 3.05a.25.25 0 0 0 .25 0l5.257-3.05a.75.75 0 0 1 .752 1.298l-5.257 3.05a1.75 1.75 0 0 1-1.756 0l-5.257-3.05a.75.75 0 0 1-.274-1.025Zm0-3.192a.75.75 0 0 1 1.025-.273l5.257 3.05a.25.25 0 0 0 .25 0l5.257-3.05a.75.75 0 1 1 .752 1.298l-5.257 3.05a1.75 1.75 0 0 1-1.756 0l-5.257-3.05a.75.75 0 0 1-.274-1.025Z',
   observability:
     'M1.5 1.75V13.5h13.75a.75.75 0 0 1 0 1.5H.75a.75.75 0 0 1-.75-.75V1.75a.75.75 0 0 1 1.5 0Zm14.28 2.53-5.25 5.25a.75.75 0 0 1-1.06 0L7 7.06 4.28 9.78a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042l3.25-3.25a.75.75 0 0 1 1.06 0L10 7.94l4.72-4.72a.751.751 0 0 1 1.042.018.751.751 0 0 1 .018 1.042Z',
   profile:
@@ -61,7 +59,7 @@ export class AppComponent {
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
 
-  readonly title = 'AI-Sandbox';
+  readonly title = 'ask-app';
   readonly isAuthenticated = this.auth.isAuthenticated;
 
   /** External links promoted into the always-visible top bar (reachable from every page). */
@@ -69,7 +67,7 @@ export class AppComponent {
     {
       key: 'github',
       label: 'GitHub',
-      href: 'https://github.com/sahilparekh1212/AI-Sandbox',
+      href: 'https://github.com/sahilparekh1212/ask-app',
       viewBox: '0 0 16 16',
       icon: ICON.github,
     },
@@ -95,7 +93,6 @@ export class AppComponent {
   readonly section = computed(() => {
     const u = this.url().split('?')[0].split('#')[0];
     if (u.startsWith('/chat')) return 'chat';
-    if (u.startsWith('/flashcards')) return 'flashcards';
     if (u.startsWith('/observability')) return 'observability';
     if (u.startsWith('/profile')) return 'profile';
     if (u.startsWith('/login')) return 'login';
@@ -104,9 +101,7 @@ export class AppComponent {
 
   /** The rail: primary sections. Profile/sign-in are rendered separately at the rail's bottom. */
   readonly sections: Section[] = [
-    { key: 'about', labelKey: 'nav.about', route: '/about', icon: ICON.about },
     { key: 'chat', labelKey: 'nav.chat', route: '/chat', icon: ICON.chat },
-    { key: 'flashcards', labelKey: 'nav.flashcards', route: '/flashcards', icon: ICON.flashcards },
     {
       key: 'observability',
       labelKey: 'nav.observability',
@@ -115,31 +110,15 @@ export class AppComponent {
     },
   ];
 
+  readonly aboutIcon = ICON.about;
   readonly profileIcon = ICON.profile;
   readonly signinIcon = ICON.signin;
 
-  // Per-section sidebar content. Only sections with genuine per-page context carry a sidebar —
-  // the old per-section "Related" cross-links merely duplicated the activity rail and were
-  // dropped. About/Observability keep their "On this page" anchors (the About prose is English
-  // by design — Google Translate covers it); chat/flashcards/profile have no on-page context, so
-  // they render with no contextual sidebar at all. The Connect links (GitHub/LinkedIn) moved to
-  // the always-visible top bar. The `grafanaUrl` external link now lives on the About page.
+  // Per-section sidebar content. Only sections with genuine per-page context carry a sidebar.
+  // About renders the repository README full-width (its own source of truth), so it has no
+  // contextual sidebar; chat/profile have none either. Observability keeps its "On this page"
+  // anchors. The Connect links (GitHub/LinkedIn) live in the always-visible top bar.
   private readonly sidebars: Record<string, { titleKey: string; groups: SidebarGroup[] }> = {
-    about: {
-      titleKey: 'nav.about',
-      groups: [
-        {
-          id: 'about-sections',
-          titleKey: 'nav.onThisPage',
-          items: [
-            { text: 'Overview', fragment: 'overview' },
-            { text: 'Tech stack', fragment: 'tech-stack' },
-            { text: 'Design decisions', fragment: 'design-decisions' },
-            { text: 'Features', fragment: 'features' },
-          ],
-        },
-      ],
-    },
     observability: {
       titleKey: 'nav.observability',
       groups: [
@@ -167,7 +146,6 @@ export class AppComponent {
     const keys: Record<string, string> = {
       about: 'nav.about',
       chat: 'nav.chat',
-      flashcards: 'nav.flashcards',
       observability: 'nav.observability',
       profile: 'nav.profile',
     };

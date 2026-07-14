@@ -1,6 +1,6 @@
 # End-to-end deployment plan
 
-How AI-Sandbox goes from a commit to a running system. This is the design doc for deploying the
+How ask-app goes from a commit to a running system. This is the design doc for deploying the
 whole application — the two Spring Boot services, the Angular SPA, and their backing
 infrastructure — end to end. It ties together artifacts that already exist in the repo
 (Dockerfiles, `docker-compose.yml`, `openshift/`, GitHub Actions) and names the gaps that the
@@ -52,7 +52,7 @@ publishes them:
 1. **[built]** On merge to `main`, the `CD` workflow (`.github/workflows/cd.yml`) builds each
    image (audit, auth, ui) once and pushes it to **GitHub Container Registry** with three tags:
    a generated SemVer (`0.1.<run>` — monotonic until real release tags exist), the git SHA
-   (`ghcr.io/<owner>/ai-sandbox/audit:sha-<short>`), and `latest`.
+   (`ghcr.io/<owner>/ask-app/audit:sha-<short>`), and `latest`.
 2. **[env]** Deployments should reference images **by digest** (`@sha256:…`) or at least the
    `sha-` tag, not `:latest`, so a rollout is reproducible and a rollback is "point at the
    previous digest".
@@ -66,9 +66,9 @@ publishes them:
    and as a signed cosign attestation on the image. Verify before deploying:
    ```
    cosign verify \
-     --certificate-identity-regexp 'https://github.com/sahilparekh1212/AI-Sandbox/\.github/workflows/cd\.yml@.*' \
+     --certificate-identity-regexp 'https://github.com/sahilparekh1212/ask-app/\.github/workflows/cd\.yml@.*' \
      --certificate-oidc-issuer https://token.actions.githubusercontent.com \
-     ghcr.io/sahilparekh1212/ai-sandbox/<name>@<digest>
+     ghcr.io/sahilparekh1212/ask-app/<name>@<digest>
    ```
    Wiring that verification into an actual deploy step stays **[planned]** with the deploy half
    of CD.
@@ -92,7 +92,7 @@ environment, provide:
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Auth | Google OAuth2; the exact redirect URI must be registered in the Google console |
 | DB username/password | Audit | Datasource credentials |
 | Redis password **[env]** | Auth | If the managed Redis requires auth |
-| `ANTHROPIC_API_KEY` | Audit | Enables the LLM assistant + flashcards; **server-side only**, never reaches the browser. Absent ⇒ those endpoints 503, rest of the app unaffected |
+| `ANTHROPIC_API_KEY` | Audit | Enables the LLM chat assistant; **server-side only**, never reaches the browser. Absent ⇒ that endpoint 503s, rest of the app unaffected |
 | Grafana admin password | Grafana | Dashboard access; reset to the secret on every deploy (`deploy.yml`) since the env var only applies on first DB init |
 | `SENTRY_AUTH_TOKEN` | Grafana | Lets the provisioned Sentry datasource read error data from all three Sentry projects (org/project/event read scopes only) |
 | `SENTRY_DSN_AUTH` / `SENTRY_DSN_AUDIT` | Auth / Audit | Per-service Sentry projects for unhandled-exception capture; empty ⇒ SDK disabled, app unaffected |
@@ -129,23 +129,23 @@ on the single GCE VM:
 
 ```bash
 # 1. Create the bucket once (uniform access, same region as the VM).
-gcloud storage buckets create gs://ai-sandbox-backups --location=us-east1 --uniform-bucket-level-access
+gcloud storage buckets create gs://ask-app-backups --location=us-east1 --uniform-bucket-level-access
 
 # 2. Retention = a bucket lifecycle rule (delete objects after 30 days), not script logic.
 cat > /tmp/lifecycle.json <<'JSON'
 { "rule": [ { "action": {"type": "Delete"}, "condition": {"age": 30} } ] }
 JSON
-gcloud storage buckets update gs://ai-sandbox-backups --lifecycle-file=/tmp/lifecycle.json
+gcloud storage buckets update gs://ask-app-backups --lifecycle-file=/tmp/lifecycle.json
 
 # 3. One cron line — nightly at 03:15 UTC (off-peak), logging to the VM.
 ( crontab -l 2>/dev/null; \
-  echo "15 3 * * * BACKUP_BUCKET=gs://ai-sandbox-backups /opt/ai-sandbox/deploy/backup.sh >> /var/log/ai-sandbox-backup.log 2>&1" ) \
+  echo "15 3 * * * BACKUP_BUCKET=gs://ask-app-backups /opt/ask-app/deploy/backup.sh >> /var/log/ask-app-backup.log 2>&1" ) \
   | crontab -
 ```
 
 The VM's service account needs `roles/storage.objectAdmin` on the bucket. **Restore** is
-`gsutil cp gs://ai-sandbox-backups/auditdb-<stamp>.sql.gz - | gunzip | docker exec -i
-aisandbox-postgres psql -U audit -d auditdb`. The dump command is verified locally against the
+`gsutil cp gs://ask-app-backups/auditdb-<stamp>.sql.gz - | gunzip | docker exec -i
+askapp-postgres psql -U audit -d auditdb`. The dump command is verified locally against the
 running compose Postgres (a ~12 KB gzipped snapshot with `audit_logs` present and `rag_chunk`
 absent); the GCS upload + cron is the one-time VM install above.
 
@@ -215,7 +215,7 @@ The SPA is served either as an nginx Deployment+Route, or as static assets on a 
 
 ## 9. Networking, DNS & TLS
 
-- **Ingress** — one hostname (e.g. `ai-sandbox.example.com`) routes to the SPA's nginx, which
+- **Ingress** — one hostname (e.g. `ask-app.example.com`) routes to the SPA's nginx, which
   reverse-proxies `/auth-api/*` → Auth and `/audit-api/*` → Audit on the cluster network, so the
   browser is same-origin and needs no CORS. Alternatively an OpenShift Route/Ingress per service.
 - **TLS** — terminate at the edge (Route/Ingress with cert-manager or the platform's ACME
@@ -237,13 +237,13 @@ instance once >1 replica runs. First production task on this front: capture a da
 real load run (the open observability item in the TODO).
 
 **Access on the live deployment [built]:** Grafana is published **read-only** at
-https://ai-sandbox.sahilparekh1212.com/grafana — anonymous visitors get the Viewer role
+https://ask-app.sahilparekh1212.com/grafana — anonymous visitors get the Viewer role
 (dashboards + Explore, no edits; sign-up disabled), routed by Caddy's `/grafana` handle with
 Grafana serving the sub-path itself (`GF_SERVER_SERVE_FROM_SUB_PATH`). The admin password is
 the `GRAFANA_ADMIN_PASSWORD` repo secret, shipped to the VM's `.env` by `deploy.yml` (no more
 `admin`/`admin`). Prometheus (:9090), Loki (:3100) and Tempo (:3200) publish **no** host ports
 in prod (`ports: !reset []`); to reach one directly, SSH into the VM
-(`gcloud compute ssh ai-sandbox-vm --zone=us-east1-b`) and curl the container over the compose
+(`gcloud compute ssh ask-app-vm --zone=us-east1-b`) and curl the container over the compose
 network, or temporarily tunnel via `docker exec`. For everyday inspection, the published
 Grafana's Explore covers all three datasources.
 

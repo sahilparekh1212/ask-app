@@ -96,6 +96,13 @@ caps message length (2000), history length (20 turns × 4000 chars), and restric
 
 ## Addendum — the flashcard generator reuses this data flow
 
+> **Update (2026-07-13): the flashcard feature was removed.** Reusing the *whole* grounding block
+> meant the deck was fed live audit data it didn't need (a study deck explains architecture, not
+> "who logged in today"). Rather than trim it, the feature was dropped and the chat assistant made
+> more capable instead: chat already answers design/architecture questions via RAG, and now
+> attaches the live audit stats/rows **only when the question is about the app's state** (see
+> `AuditQueryDetector`). The description below is retained as the historical record.
+
 `POST /api/v1/assistant/flashcards` (a second LLM feature) generates a study deck about the
 app. It deliberately reuses the same seams rather than duplicating them: the same `LlmClient`
 proxy (server-side key, no auth headers forwarded), and the **same allowlist** — the context

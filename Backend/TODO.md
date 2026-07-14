@@ -1,8 +1,64 @@
 # TODO — Interview-readiness punch list (Fullstack Engineer)
 
+## Owner action items — `ask-app` rename cutover (manual, do these)
+
+The in-repo rename (`AI-Sandbox`/`ai-sandbox`/`com.aisandbox` → `ask-app`/`com.askapp`) and the
+proprietary LICENSE are done in code. These external steps are what actually make the new name/URL
+live — I can't do them for you:
+
+- [x] **GitHub: rename the repo** `AI-Sandbox` → `ask-app` (Settings → General → Rename). GitHub
+      auto-redirects the old URLs, so existing links/clones keep working.
+- [x] **Update the local remote** after the rename:
+      `git remote set-url origin https://github.com/sahilparekh1212/ask-app.git`
+      (the old URL redirects, so a push works either way — this is just tidiness).
+- [x] **Porkbun DNS**: add an A record `ask-app` → `34.139.83.81`. Keep the `ai-sandbox` A record
+      too if you want the old URL to stay alive as a legacy link. (Verified resolving via 8.8.8.8/1.1.1.1.)
+- [x] **GitHub repo variable** `DEPLOY_DOMAIN` → `ask-app.sahilparekh1212.com` (Settings → Secrets
+      and variables → Actions → Variables). The deploy workflow + Caddy read this for the cert/host.
+- [x] **Google Cloud OAuth**: add redirect URI
+      `https://ask-app.sahilparekh1212.com/auth-api/login/oauth2/code/google` to "Web client 1"
+      (keep the old one if you keep the old domain).
+- [ ] **Cut over**: merge to `main` → CD publishes `ghcr.io/sahilparekh1212/ask-app/*` images →
+      deploy.yml ships → Caddy auto-issues a Let's Encrypt cert for the new domain once DNS
+      resolves. Then verify `https://ask-app.sahilparekh1212.com` (home, `/audit-api/actuator/health`,
+      MCP `ping`).
+- [ ] **Optional cleanup**: delete the old `ghcr.io/.../ai-sandbox/*` packages once the new ones are
+      confirmed; optionally rename the local checkout folder `C:\Dev\AI-Sandbox` (the Gradle build
+      dir moves to `%LOCALAPPDATA%\ask-app-build` on the next build automatically).
+
 ## Open roadmap (prioritized)
 
-### Deployment: live on Google Cloud, deployed from GitHub (NEXT UP)
+### Post-deploy: smoke-test prod, then resume summary (IMMEDIATE)
+
+- [ ] **Smoke-test prod after the PR #98 deploy** (the rename/About-page ship): home page, About
+      renders the README (+ chat-flow + CI/CD sections), `/audit-api/actuator/health` UP, MCP
+      `ping`, demo login, a chat turn answering grounded, Grafana `/grafana/api/health` — all
+      through `https://ask-app.sahilparekh1212.com`. Also confirm the deploy workflow's own smoke
+      step passed and the Let's Encrypt cert issued for the (new) domain on first boot.
+- [ ] **Resume summary (on request):** when the owner asks, distill the implementation-highlights
+      log into resume-ready bullets (what was built + problems solved: event-driven audit over
+      Kafka, RAG/MCP assistant, keyless CI/CD with signed images, observability proven end-to-end,
+      measured k6 numbers). Run the smoke test above first so every claim is verified-live.
+
+### Architecture diagram: redraw so the flows are legible
+
+The About page's inline SVG (`UI/src/app/features/home/architecture-diagram.ts`) and the README
+Mermaid have all the right boxes, but the *flows* don't read from the image (user feedback,
+2026-07-13): you can't tell how Google OAuth2 or Google Analytics 4 get used, or what sends data
+to Grafana. Root causes to fix in the redraw:
+
+- [ ] Every edge needs a legible source → target with a label naming the interaction — e.g.
+      `browser → GA4: page views`, `browser/Auth → Google OAuth2: login + token exchange`,
+      `Auth/Audit → Prometheus/Loki/Tempo: metrics/logs/traces`, `Prometheus/Loki/Tempo → Grafana:
+      dashboards` — instead of one lumped "OAuth · analytics · errors" lane and unlabeled curves.
+- [ ] Fix overlaps: "metrics · logs · traces" collides with the EXTERNAL AI band label;
+      "OBSERVABILITY · SELF-HOSTED" collides with the Prometheus pill.
+- [ ] Untangle dotted connectors that sweep across unrelated bands (AI-calls curve passes through
+      PostgreSQL; telemetry lane cuts through AI/SaaS bands) — route around bands or use a
+      column-per-concern layout so proximity implies connection.
+- [ ] Keep the README Mermaid and the SVG telling the same story after the redraw.
+
+### Deployment: live on Google Cloud, deployed from GitHub
 Chosen shape: one GCE VM running the existing compose stack via `docker-compose.ghcr.yml`
 (the CD workflow already pushes signed images to GHCR on every merge), deployed by a GitHub
 Actions workflow authenticated with Workload Identity Federation. GKE Autopilot + Cloud SQL
@@ -11,15 +67,15 @@ needs self-hosting either way — worth an ADR when/if this ships, same "conside
 alternative" treatment as ADR-0005/0008.
 
 - [x] **GCP foundation — done.** Project `divine-camera-500401-g9`, Compute Engine + Secret
-      Manager APIs enabled, static IP `34.139.83.81` (`ai-sandbox-ip`, us-east1), firewall
-      `allow-web` (tcp:80,443, tag `web`), VM `ai-sandbox-vm` (us-east1-b, e2-standard-2,
+      Manager APIs enabled, static IP `34.139.83.81` (`ask-app-ip`, us-east1), firewall
+      `allow-web` (tcp:80,443, tag `web`), VM `ask-app-vm` (us-east1-b, e2-standard-2,
       Debian 12, 50GB) with Docker installed and usable without sudo.
 - [x] **Domain + HTTPS — done.** `sahilparekh1212.com` bought at Porkbun; A record
-      `ai-sandbox` → `34.139.83.81` (Porkbun's default wildcard-parking CNAME had to be
+      `ask-app` → `34.139.83.81` (Porkbun's default wildcard-parking CNAME had to be
       deleted — it shadowed the subdomain), verified resolving via 8.8.8.8. TLS = the new
       `caddy` service in `docker-compose.prod.yml` + `deploy/Caddyfile` (auto Let's Encrypt
       for `$DOMAIN` in front of the ui nginx). Prod origin:
-      `https://ai-sandbox.sahilparekh1212.com`.
+      `https://ask-app.sahilparekh1212.com`.
 - [x] **Secrets + arm the deploy — done.** All 8 repo secrets + `DEPLOY_DOMAIN`/
       `DEPLOY_ENABLED` variables set; WIF pool/provider/SA created and verified (first
       attempt failed with `iam.serviceAccounts.getAccessToken` denied — the
@@ -27,7 +83,7 @@ alternative" treatment as ADR-0005/0008.
       new Cloud Shell session; re-running the binding with the resolved project number
       fixed it — a good "env vars don't survive Cloud Shell sessions" war story); GHCR
       packages public (verified anonymously pullable). **First deploy succeeded**:
-      https://ai-sandbox.sahilparekh1212.com live with valid Let's Encrypt TLS, demo login
+      https://ask-app.sahilparekh1212.com live with valid Let's Encrypt TLS, demo login
       issuing JWTs, audit stats showing LOGIN events flowing through Kafka in prod, MCP
       endpoint answering.
 - [x] **Fund the provider accounts — done, both features verified live.** Voyage payment
@@ -60,8 +116,8 @@ alternative" treatment as ADR-0005/0008.
 - [x] **Update README for public use — done.** The root README now leads with the live URL and a
       "Try it live" section: demo login (`demo`/`demo`, with the honest note that Google sign-in
       is test-users-only until the consent screen is published), the ask-the-app-about-itself
-      chat pitch, and the public MCP endpoint (`claude mcp add --transport http ai-sandbox
-      https://ai-sandbox.sahilparekh1212.com/audit-api/mcp` — re-verified answering `ping` live
+      chat pitch, and the public MCP endpoint (`claude mcp add --transport http ask-app
+      https://ask-app.sahilparekh1212.com/audit-api/mcp` — re-verified answering `ping` live
       before publishing the claim). The stale "the Angular UI hasn't been built yet" status line
       (long false) is replaced with an honest current status; the tech-stack table gained the AI
       row (Claude assistant/flashcards, RAG over docs+source, MCP), Tempo, pgvector, the live
@@ -80,9 +136,17 @@ alternative" treatment as ADR-0005/0008.
       buckets per user, so a higher-VU same-user run would measure the limiter's shedding (the
       existing `rate-limit.js` CI test) rather than read latency. Published in `Backend/README.md`
       §"Measured numbers" next to the CI figures, with a one-line summary in the root README.
+- [x] **Document stateful vs stateless for every component in the README — done.** Added a
+      "State — what's stateless, what's stateful (and why)" table to the root README covering the
+      UI (SPA + nginx), the services (Auth/Audit — stateless via local JWKS verification), the
+      per-pod rate limiter, the stateful backing stores (PostgreSQL/pgvector, Redis, Kafka/Redpanda),
+      the observability tools (Prometheus/Loki/Tempo stateful; Grafana config-as-code), Caddy, and
+      the external AI providers (Voyage/Claude — stateless request/response). Notes the two nuances:
+      `rag_chunk` is *reconstructible* stateful state (self-heals from the bundled corpus), and
+      "stateless service" means the state lives in the backing stores, not that there's none.
 - [x] **Set up the observability stack for prod — done, verified against the live deployment
       (PR #86).** Exposure: read-only Grafana published at
-      `https://ai-sandbox.sahilparekh1212.com/grafana` — a Caddy `handle /grafana*` route on the
+      `https://ask-app.sahilparekh1212.com/grafana` — a Caddy `handle /grafana*` route on the
       existing domain rather than the subdomain this item originally sketched (rides the existing
       cert, zero DNS changes; Grafana owns the prefix via `GF_SERVER_SERVE_FROM_SUB_PATH`), with
       **anonymous Viewer** access and the default `admin`/`admin` replaced by the
@@ -111,7 +175,7 @@ alternative" treatment as ADR-0005/0008.
 - [x] **GitHub → GCP deploy workflow — built (dormant until armed).**
       `.github/workflows/deploy.yml`: runs after a successful CD on main (plus
       `workflow_dispatch` for the first deploy), authenticates keyless via WIF, ships the
-      compose bundle + monitoring configs to `/opt/ai-sandbox`, writes `.env` (single-line
+      compose bundle + monitoring configs to `/opt/ask-app`, writes `.env` (single-line
       secrets) and `secrets/auth_key.pem` (multi-line PEM can't live in `.env`; it's
       exported into the shell that runs compose — shell env beats `.env` in precedence),
       then `pull && up -d --no-build`, then smoke-checks `/`, `/audit-api/actuator/health`
@@ -161,12 +225,12 @@ alternative" treatment as ADR-0005/0008.
       suspenders with the async fix — the patience covers any future slow-boot cause, not just
       this one.
 - [x] **Post-deploy verification + surface decisions — done (Google OAuth click-through still
-      blocked).** Verified live against `https://ai-sandbox.sahilparekh1212.com` right after the
+      blocked).** Verified live against `https://ask-app.sahilparekh1212.com` right after the
       PR-#95 deploy: **demo login** issues a JWT; the **audit dashboard** data loads
       (`/audit-logs/search` + `/stats` → 200 with the token); the **MCP** handshake works end to
       end (`initialize` → `tools/list` returns `[search_knowledge, list_sources]` →
-      `search_knowledge` call → 200; `claude mcp add --transport http ai-sandbox
-      https://ai-sandbox.sahilparekh1212.com/audit-api/mcp`); **Grafana** `/grafana/api/health` →
+      `search_knowledge` call → 200; `claude mcp add --transport http ask-app
+      https://ask-app.sahilparekh1212.com/audit-api/mcp`); **Grafana** `/grafana/api/health` →
       200. **Decision surfaced: keep `demo`/`demo` in prod** — it's the zero-setup recruiter path
       and is property-gated (the seeder + demo-log generator already don't exist outside
       LOCAL/DEV, so prod isn't padded with dummy rows). Still blocked: a live **Google OAuth**
@@ -185,8 +249,8 @@ should populate it instead.
       now publish through the same `audit.events` Kafka topic Auth uses and are consumed back by
       Audit's own `AuditEventConsumer` — one uniform event-sourcing path for every producer
       (another service or this one), exercising the Kafka pipeline for real feature traffic. New
-      `com.aisandbox.audit.event.AuditEventPublisher` mirrors Auth's exactly: reuses the shared
-      `com.aisandbox.common.event.AuditEvent` contract, `@Async` + fire-and-forget (with
+      `com.askapp.audit.event.AuditEventPublisher` mirrors Auth's exactly: reuses the shared
+      `com.askapp.common.event.AuditEvent` contract, `@Async` + fire-and-forget (with
       `@EnableAsync` on `AuditApplication` and `max.block.ms=5000` on the producer, both mirrored
       from Auth) so a slow/absent broker never blocks or fails a feature request — the ADR-0006
       at-most-once posture applies unchanged. Four shapes, each at its own service boundary with
@@ -314,7 +378,7 @@ should populate it instead.
       Audit + `POST /mcp`, a Model Context Protocol server (Streamable HTTP, stateless
       subset) exposing `search_knowledge` + `list_sources` over this repo's own knowledge
       (backend README, ADRs, `docs/`, `app-context.md`) — demo:
-      `claude mcp add --transport http ai-sandbox http://localhost:8083/mcp`. All five
+      `claude mcp add --transport http ask-app http://localhost:8083/mcp`. All five
       scoped decisions made and recorded in [ADR-0010](docs/adr/0010-rag-mcp-server.md):
       (1) **pgvector** on the existing Postgres (compose image → `pgvector/pgvector:pg16`,
       `dbms: postgresql`-gated Liquibase changeset for `rag_chunk` with `vector(1024)`),
@@ -424,7 +488,12 @@ profile pinned bottom-left) is live. Requested refinements:
       explicit *Why* and *How* (event-driven audit, RBAC JWTs, statelessness, rate limiting,
       observability, the guarded LLM proxy) with a pointer to the ADRs, and a feature tour linking
       into the app. Rendered from typed arrays; specs assert the content and the why/how pairing.
-- [x] **Flashcards feature — implemented.** `POST /api/v1/assistant/flashcards` generates a
+- [x] **Flashcards feature — implemented, then removed (2026-07-13).** Removed because reusing the
+      chat's whole grounding block fed the deck live audit data it didn't need (a study deck explains
+      architecture, not "who logged in today"). Instead the chat assistant was made more useful: it
+      already answers design questions via RAG, and now attaches live audit stats/rows **only when the
+      question is about app state** (`AuditQueryDetector`). The original description follows.
+      `POST /api/v1/assistant/flashcards` generated a
       Q&A study deck about the app via the same Claude proxy, reusing the assistant seams rather
       than duplicating them: same `LlmClient` (server-side key, no auth headers forwarded) and
       the **same allowlist** — the role-scoped grounding block was extracted into a shared
@@ -505,7 +574,7 @@ profile pinned bottom-left) is live. Requested refinements:
       (`.github/workflows/cd.yml`): on every merge to `main` (path-filtered to system-affecting
       paths, plus `workflow_dispatch`), a fail-fast-off matrix builds all three images (audit,
       auth — `Backend/` context matching their Dockerfiles' COPY layout; ui — `UI/` context) and
-      pushes each to GHCR under `ghcr.io/<owner>/ai-sandbox/<name>` with three tags via
+      pushes each to GHCR under `ghcr.io/<owner>/ask-app/<name>` with three tags via
       `docker/metadata-action`: a generated SemVer `0.1.<run_number>` (honest CI-versioning,
       monotonic, until real release tags exist), `sha-<short>` (pins a build to its exact
       commit — the promote-by-digest handle), and `latest`. Auth is `GITHUB_TOKEN` with
@@ -608,7 +677,7 @@ needs.
       build, headless unit tests) on `UI/**`, plus the backend required-check path filters broadened
       to `UI/**` so UI-only PRs are mergeable. Container: `UI/Dockerfile` (multi-stage — `npm ci` +
       prod build on node 22 matching Frontend CI, then `nginx:1.28-alpine` serving
-      `dist/ai-sandbox-ui/browser`) with `UI/nginx.conf` doing the two jobs the production
+      `dist/ask-app-ui/browser`) with `UI/nginx.conf` doing the two jobs the production
       `environment.ts` was already designed around: SPA fallback (`try_files … /index.html`) and
       same-origin reverse proxies `/auth-api/` → `auth:8085` / `/audit-api/` → `audit:8083`, so the
       browser never needs CORS on this path. Hashed bundles get immutable cache headers,
@@ -724,7 +793,7 @@ needs.
       (and a reviewer poking at Swagger) won't hit an empty table.
 
 ### Portfolio polish
-- [x] **Root `README.md` — written.** Was literally one line (`# AI-Sandbox`) at the actual repo
+- [x] **Root `README.md` — written.** Was literally one line (`# ask-app`) at the actual repo
       root (`/README.md`, one level above `Backend/` — `Backend/README.md` is the detailed one and
       was already substantial from earlier items). Added: one-paragraph pitch, a Mermaid
       architecture diagram (client → Auth/Audit → Kafka → Postgres, plus the observability fan-out
@@ -788,7 +857,7 @@ needs.
   - [x] **Consume→persist gated in CI.** `AuditEventConsumerIntegrationTest` uses an in-JVM embedded Kafka broker to verify the real path — JSON contract, `@KafkaListener`, JPA persistence, and idempotent dedup by `eventId` — and runs in the normal `test` task (no Docker). A full two-service smoke against the Redpanda compose (Auth → Kafka → Audit, plus the DLT) is still a nice manual check: `docker compose -f Backend/kafka/docker-compose.yml up -d` then run both services with `KAFKA_BOOTSTRAP_SERVERS=localhost:19092`.
   - [x] **`AuditEvent` extracted into a shared `:common` module — done alongside the ratelimit
         extraction below.** See that item for the full writeup; the short version for the Kafka
-        contract specifically: `AuditEvent` now lives once at `com.aisandbox.common.event`, both
+        contract specifically: `AuditEvent` now lives once at `com.askapp.common.event`, both
         services' Kafka JSON type-mapping properties (`spring.json.value.default.type` /
         `trusted.packages`) point at it, and the embedded-Kafka `AuditEventConsumerIntegrationTest`
         exercises real (de)serialization through the new package end-to-end.
@@ -929,7 +998,7 @@ detect-private-key in `lint.yml`). Now added:
       *label* `host=${HOSTNAME:-local}` already existed) and a `management.metrics.tags.podName`
       Micrometer tag in both `application.properties`, so a log line, a Loki query, or a
       Prometheus metric can all be traced back to the emitting instance once >1 replica runs.
-- [x] **Per-endpoint latency (p95/p99) now visible.** Enabled `management.metrics.distribution.percentiles-histogram.http.server.requests=true` in both services (emits `http_server_requests_seconds_bucket`) and added a "Latency p95/p99 by endpoint" panel to `monitoring/grafana/dashboards/aisandbox-overview.json` (`histogram_quantile` over the buckets). Response time was already partly observable (avg+max via Micrometer, `durationMs` in `AuditInterceptor` logs, k6 p95 at load). Still worth capturing a screenshot from a real load run (ties to the observability item above).
+- [x] **Per-endpoint latency (p95/p99) now visible.** Enabled `management.metrics.distribution.percentiles-histogram.http.server.requests=true` in both services (emits `http_server_requests_seconds_bucket`) and added a "Latency p95/p99 by endpoint" panel to `monitoring/grafana/dashboards/askapp-overview.json` (`histogram_quantile` over the buckets). Response time was already partly observable (avg+max via Micrometer, `durationMs` in `AuditInterceptor` logs, k6 p95 at load). Still worth capturing a screenshot from a real load run (ties to the observability item above).
 - [x] **Distributed tracing (OpenTelemetry) — implemented, third observability pillar closed.**
       Added `io.micrometer:micrometer-tracing-bridge-otel` + `io.opentelemetry:opentelemetry-exporter-otlp`
       to the shared subproject dependencies (both services get identical tracing, like the
@@ -984,9 +1053,9 @@ detect-private-key in `lint.yml`). Now added:
       `common` as a third subproject (`settings.gradle`), a plain library (Spring Boot's `bootJar`
       disabled, plain `jar` enabled). Moved `ActiveRequest`/`ActiveRequestRegistry`/`DiscardContext`/
       `RateLimitInterceptor`/`RateLimitProperties`/`RequestDiscardedException` to
-      `com.aisandbox.common.ratelimit` (`TransactionalRequestExecutor` stayed in Audit — it's
+      `com.askapp.common.ratelimit` (`TransactionalRequestExecutor` stayed in Audit — it's
       JPA-transaction-specific and Auth has no datastore) and `AuditEvent` to
-      `com.aisandbox.common.event`. Both services now `implementation project(':common')`. Also
+      `com.askapp.common.event`. Both services now `implementation project(':common')`. Also
       consolidated the two duplicated ratelimit test suites into one (`common/src/test/...`); the
       one Audit-only cross-cutting test (superseded-request → 429 via `GlobalExceptionHandler`)
       moved into each service's own `GlobalExceptionHandlerTest` — Auth's copy of that test didn't
