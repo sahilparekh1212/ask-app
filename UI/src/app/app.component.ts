@@ -101,7 +101,6 @@ export class AppComponent {
 
   /** The rail: primary sections. Profile/sign-in are rendered separately at the rail's bottom. */
   readonly sections: Section[] = [
-    { key: 'about', labelKey: 'nav.about', route: '/about', icon: ICON.about },
     { key: 'chat', labelKey: 'nav.chat', route: '/chat', icon: ICON.chat },
     {
       key: 'observability',
@@ -111,31 +110,15 @@ export class AppComponent {
     },
   ];
 
+  readonly aboutIcon = ICON.about;
   readonly profileIcon = ICON.profile;
   readonly signinIcon = ICON.signin;
 
-  // Per-section sidebar content. Only sections with genuine per-page context carry a sidebar —
-  // the old per-section "Related" cross-links merely duplicated the activity rail and were
-  // dropped. About/Observability keep their "On this page" anchors (the About prose is English
-  // by design — Google Translate covers it); chat/profile have no on-page context, so
-  // they render with no contextual sidebar at all. The Connect links (GitHub/LinkedIn) moved to
-  // the always-visible top bar. The `grafanaUrl` external link now lives on the About page.
+  // Per-section sidebar content. Only sections with genuine per-page context carry a sidebar.
+  // About renders the repository README full-width (its own source of truth), so it has no
+  // contextual sidebar; chat/profile have none either. Observability keeps its "On this page"
+  // anchors. The Connect links (GitHub/LinkedIn) live in the always-visible top bar.
   private readonly sidebars: Record<string, { titleKey: string; groups: SidebarGroup[] }> = {
-    about: {
-      titleKey: 'nav.about',
-      groups: [
-        {
-          id: 'about-sections',
-          titleKey: 'nav.onThisPage',
-          items: [
-            { text: 'Overview', fragment: 'overview' },
-            { text: 'Tech stack', fragment: 'tech-stack' },
-            { text: 'Design decisions', fragment: 'design-decisions' },
-            { text: 'Features', fragment: 'features' },
-          ],
-        },
-      ],
-    },
     observability: {
       titleKey: 'nav.observability',
       groups: [

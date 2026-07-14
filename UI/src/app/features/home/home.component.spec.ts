@@ -1,77 +1,58 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { provideRouter } from '@angular/router';
+import { provideHttpClient } from '@angular/common/http';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 
 import { HomeComponent } from './home.component';
 
 describe('HomeComponent', () => {
-  let component: HomeComponent;
   let fixture: ComponentFixture<HomeComponent>;
+  let httpMock: HttpTestingController;
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       imports: [HomeComponent],
-      providers: [provideRouter([])],
+      providers: [provideHttpClient(), provideHttpClientTesting()],
     }).compileComponents();
 
+    // The constructor fires the README fetch as the component is created.
     fixture = TestBed.createComponent(HomeComponent);
-    component = fixture.componentInstance;
+    httpMock = TestBed.inject(HttpTestingController);
+  });
+
+  afterEach(() => httpMock.verify());
+
+  it('fetches README.md and renders it as HTML', () => {
+    const req = httpMock.expectOne('README.md');
+    expect(req.request.method).toBe('GET');
+    req.flush('# ask-app\n\nHello **world**\n\n| A | B |\n|---|---|\n| 1 | 2 |\n');
     fixture.detectChanges();
+
+    const article = (fixture.nativeElement as HTMLElement).querySelector('.readme');
+    expect(article).not.toBeNull();
+    expect(article!.querySelector('h1')?.textContent).toContain('ask-app');
+    expect(article!.querySelector('strong')?.textContent).toBe('world');
+    expect(article!.querySelector('table')).not.toBeNull();
   });
 
-  it('should create', () => {
-    expect(component).toBeTruthy();
-  });
+  it('swaps the Architecture mermaid block for the inline SVG diagram', () => {
+    httpMock
+      .expectOne('README.md')
+      .flush('## Architecture\n\n```mermaid\nflowchart LR\n  A --> B\n```\n');
+    fixture.detectChanges();
 
-  it('renders the tech-stack, and the grouped decisions covering stack, patterns, data and CI/CD', () => {
-    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
-    expect(text).toContain('Tech stack');
-    expect(text).toContain('Spring Boot 3');
-    expect(text).toContain('Design decisions');
-    // one heading per required theme
-    const headings = Array.from(
-      (fixture.nativeElement as HTMLElement).querySelectorAll('.group-heading'),
-    ).map((h) => h.textContent ?? '');
-    expect(headings.some((h) => h.includes('Tech stack'))).toBeTrue();
-    expect(headings.some((h) => h.includes('Design patterns'))).toBeTrue();
-    expect(headings.some((h) => h.includes('Liquibase'))).toBeTrue();
-    expect(headings.some((h) => h.includes('CI / CD'))).toBeTrue();
-    // representative content actually rendered
-    expect(text).toContain('Event-driven audit');
-    expect(text).toContain('Liquibase owns the schema');
-    expect(text).toContain('coverage gate');
-  });
-
-  it('shows a why and a how for every decision across all groups', () => {
     const el = fixture.nativeElement as HTMLElement;
-    const total = component.decisionGroups.reduce((n, g) => n + g.items.length, 0);
-    const tags = Array.from(el.querySelectorAll('.decision .tag')).map((t) =>
-      t.textContent?.trim(),
-    );
-    expect(tags.filter((t) => t === 'Why').length).toBe(total);
-    expect(tags.filter((t) => t === 'How').length).toBe(total);
+    expect(el.querySelector('.readme svg.arch-svg')).not.toBeNull();
+    // the raw mermaid source must not survive as a code block
+    expect(el.querySelector('code.language-mermaid')).toBeNull();
   });
 
-  it('links each feature that declares a route into the app, plus external counterparts', () => {
-    const el = fixture.nativeElement as HTMLElement;
-    const links = el.querySelectorAll('.feature a[href]');
-    const routed = component.features.filter((f) => f.link).length;
-    const external = component.features.filter((f) => f.extLink).length;
-    expect(links.length).toBe(routed + external);
-  });
+  it('falls back to a GitHub link when the README cannot be loaded', () => {
+    httpMock.expectOne('README.md').error(new ProgressEvent('error'));
+    fixture.detectChanges();
 
-  it('links the live read-only Grafana from the observability decision and the dashboard feature', () => {
     const el = fixture.nativeElement as HTMLElement;
-    // getAttribute, not .href — the environment URL is same-origin relative ('/grafana')
-    // and .href would resolve it against the test origin.
-    const grafanaLinks = Array.from(el.querySelectorAll<HTMLAnchorElement>('a')).filter(
-      (a) => a.getAttribute('href') === component.grafanaUrl,
-    );
-    // one in the design-decision entry, one in the feature tour
-    expect(grafanaLinks.length).toBe(2);
-    // external links must open in a new tab without leaking the opener
-    for (const a of grafanaLinks) {
-      expect(a.target).toBe('_blank');
-      expect(a.rel).toContain('noopener');
-    }
+    expect(el.querySelector('.readme')).toBeNull();
+    const link = el.querySelector<HTMLAnchorElement>('.readme-status a');
+    expect(link?.getAttribute('href')).toBe('https://github.com/sahilparekh1212/ask-app');
   });
 });

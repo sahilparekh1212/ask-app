@@ -1,241 +1,128 @@
-.home {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
+:host {
+  display: block;
 }
 
-.hero {
-  padding-bottom: 0.5rem;
+.readme,
+.readme-status {
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 32px 24px 64px;
+}
+
+.readme-status {
+  color: var(--fg-muted);
+}
+
+.readme-status a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+// The README is injected via [innerHTML], so its markup carries no component-scoped attributes —
+// ::ng-deep is how a component style reaches it. Everything is themed off the global design tokens.
+.readme ::ng-deep {
+  color: var(--fg);
+  line-height: 1.65;
 
   h1 {
-    margin-bottom: 0.25rem;
-    font-size: 2rem;
+    font-size: 1.9rem;
+    margin: 0 0 0.5em;
   }
 
-  .lead {
-    color: var(--fg);
-    max-width: 70ch;
-    line-height: 1.55;
-    margin: 0.25rem 0;
+  h2 {
+    font-size: 1.35rem;
+    margin: 1.9em 0 0.6em;
+    padding-bottom: 0.3em;
+    border-bottom: 1px solid var(--border-muted);
   }
 
-  .status {
-    color: var(--fg-muted);
-    max-width: 70ch;
-    margin: 0.25rem 0 0.75rem;
-  }
-
-  .repo {
-    font-weight: 600;
-  }
-}
-
-.section-title {
-  margin: 1.75rem 0 0.75rem;
-  padding-bottom: 0.4rem;
-  border-bottom: 1px solid var(--border);
-  font-size: 1.25rem;
-}
-
-.stack {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 1rem;
-}
-
-.stack-group {
   h3 {
-    margin: 0 0 0.5rem;
-    font-size: 0.95rem;
-    color: var(--fg-muted);
-  }
-
-  .chips {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.4rem;
-
-    li {
-      background: var(--canvas-subtle);
-      border: 1px solid var(--border);
-      border-radius: 2rem;
-      padding: 0.2rem 0.7rem;
-      font-size: 0.8rem;
-    }
-  }
-}
-
-// Pill row that switches which decision group is shown — replaces the long scroll through
-// every group with a tabbed view. Each button carries the group's heading text.
-.decision-tabs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem;
-  margin-bottom: 1rem;
-
-  .group-heading {
-    appearance: none;
-    cursor: pointer;
-    background: var(--canvas-subtle);
-    border: 1px solid var(--border);
-    border-radius: 2rem;
-    padding: 0.35rem 0.9rem;
-    font-size: 0.85rem;
-    color: var(--fg-muted);
-    transition:
-      color 0.15s ease,
-      border-color 0.15s ease,
-      background 0.15s ease;
-
-    &:hover {
-      color: var(--fg);
-    }
-
-    &.active {
-      color: var(--fg);
-      border-color: var(--accent-emphasis);
-      background: rgba(47, 129, 247, 0.12);
-    }
-  }
-}
-
-.decision-group {
-  .group-blurb {
-    margin: 0 0 0.85rem;
-    color: var(--fg-muted);
-    font-size: 0.9rem;
-  }
-}
-
-.decisions {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-  gap: 1rem;
-}
-
-.decision {
-  background: var(--canvas-subtle);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 1rem 1.25rem;
-
-  h4 {
-    margin: 0 0 0.6rem;
-    font-size: 1.02rem;
+    font-size: 1.1rem;
+    margin: 1.4em 0 0.4em;
   }
 
   p {
-    margin: 0 0 0.5rem;
-    color: var(--fg-muted);
-    line-height: 1.5;
-
-    &:last-child {
-      margin-bottom: 0;
-    }
-  }
-
-  .tag {
-    display: inline-block;
-    margin-right: 0.5rem;
-    padding: 0.05rem 0.45rem;
-    border-radius: 4px;
-    font-size: 0.7rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
-    color: var(--accent);
-    background: rgba(47, 129, 247, 0.12);
-    vertical-align: 1px;
-  }
-
-  .decision-link {
-    display: inline-block;
-    margin-top: 0.35rem;
-    font-weight: 600;
-  }
-}
-
-.footnote {
-  color: var(--fg-muted);
-  font-size: 0.85rem;
-  margin: 0.75rem 0 0;
-}
-
-.features {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: 1rem;
-}
-
-.feature {
-  background: var(--canvas-subtle);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 1rem 1.25rem;
-
-  h3 {
-    margin: 0 0 0.4rem;
-    font-size: 1.05rem;
-  }
-
-  p {
-    margin: 0 0 0.6rem;
-    color: var(--fg-muted);
-    line-height: 1.45;
+    margin: 0.7em 0;
   }
 
   a {
-    font-weight: 600;
-  }
-
-  // The external counterpart link (e.g. the live Grafana) on its own line under the
-  // in-app route link.
-  a.ext {
-    display: block;
-    margin-top: 0.35rem;
-  }
-}
-
-// Persistent contact strip: sticks to the bottom of the viewport while the About page
-// scrolls (opaque --canvas so content passes cleanly underneath), settling at the very end.
-.social-bar {
-  position: sticky;
-  bottom: 0;
-  z-index: 20;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-  margin-top: 2rem;
-  padding: 0.85rem 0;
-  background: var(--canvas);
-  border-top: 1px solid var(--border);
-
-  .social {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.45rem 1rem;
-    border: 1px solid var(--border);
-    border-radius: 2rem;
-    background: var(--canvas-subtle);
-    color: var(--fg);
-    font-weight: 600;
-    font-size: 0.9rem;
+    color: var(--accent);
     text-decoration: none;
+  }
+  a:hover {
+    text-decoration: underline;
+  }
 
-    svg {
-      width: 18px;
-      height: 18px;
-      fill: currentColor;
-    }
+  ul,
+  ol {
+    margin: 0.7em 0;
+    padding-left: 1.4em;
+  }
+  li {
+    margin: 0.3em 0;
+  }
 
-    &:hover {
-      border-color: var(--accent-emphasis);
-      color: var(--accent);
-      text-decoration: none;
-    }
+  code {
+    font-family: var(--font-mono);
+    font-size: 0.88em;
+    background: var(--canvas-subtle);
+    border: 1px solid var(--border-muted);
+    border-radius: 4px;
+    padding: 0.1em 0.35em;
+  }
+
+  pre {
+    overflow-x: auto;
+    background: var(--canvas-inset);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+  }
+  pre code {
+    background: none;
+    border: 0;
+    padding: 0;
+    font-size: 0.85em;
+  }
+
+  table {
+    display: block;
+    width: 100%;
+    overflow-x: auto;
+    border-collapse: collapse;
+    margin: 1em 0;
+    font-size: 0.92em;
+  }
+  th,
+  td {
+    border: 1px solid var(--border);
+    padding: 6px 12px;
+    text-align: left;
+    vertical-align: top;
+  }
+  th {
+    background: var(--canvas-subtle);
+  }
+
+  hr {
+    border: 0;
+    border-top: 1px solid var(--border-muted);
+    margin: 2em 0;
+  }
+
+  blockquote {
+    margin: 1em 0;
+    padding: 0.2em 1em;
+    border-left: 3px solid var(--border);
+    color: var(--fg-muted);
+  }
+
+  .arch-figure {
+    margin: 1.4em 0;
+  }
+  .arch-svg {
+    display: block;
+    width: 100%;
+    height: auto;
   }
 }

@@ -203,6 +203,10 @@ services:
   ui:
     build:
       context: ../UI
+      # README.md (repo root) is outside this UI/ context, but the About page renders it, so pass
+      # the repo root as a named context the Dockerfile COPYs README.md from (--from=repo).
+      additional_contexts:
+        repo: ..
     container_name: askapp-ui
     ports:
       - "4200:80"

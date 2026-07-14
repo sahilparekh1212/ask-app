@@ -1,7 +1,11 @@
 # Multi-stage: build the Angular production bundle, then serve it (plus the /auth-api and
 # /audit-api reverse proxies — see nginx.conf) from a plain nginx image. Build context is UI/.
 #
-#   docker build -t ask-app-ui .
+# The About page renders the repo README, which lives at the repo root — outside this UI/ context.
+# Callers must pass the root as the `repo` named build context (compose: additional_contexts;
+# cd.yml: build-contexts; manual: --build-context repo=..):
+#
+#   docker build --build-context repo=.. -t ask-app-ui .
 #
 # Node 22 matches the Frontend CI workflow (.github/workflows/frontend-ci.yml).
 FROM node:22-alpine AS build
@@ -12,6 +16,10 @@ COPY package.json package-lock.json ./
 RUN npm ci
 
 COPY . .
+# README.md (repo root) is outside this context; drop it into public/ so the Angular asset pipeline
+# bundles it and nginx serves it same-origin. The `prebuild` copy script is a no-op here (the root
+# README isn't in the container) and keeps this file. See UI/scripts/copy-readme.mjs.
+COPY --from=repo README.md ./public/README.md
 RUN npm run build
 
 FROM nginx:1.28-alpine

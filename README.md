@@ -1,31 +1,26 @@
 # ask-app
 
 A production-shaped fullstack portfolio project, **live at
-[ask-app.sahilparekh1212.com](https://ask-app.sahilparekh1212.com)**: Spring Boot
+[ask-app.sahilparekh1212.com](https://ask-app.sahilparekh1212.com)** (demo login `demo` / `demo`): Spring Boot
 microservices with Google OAuth2/JWT auth (including RBAC), an event-driven audit pipeline over
 Kafka, an Angular SPA, a Claude-powered assistant grounded by RAG over this repo's own docs and
 source (pgvector + Voyage embeddings), a public MCP server, a full observability stack, and CI/CD
 with SAST/CVE/secret scanning, signed images, and keyless GitHub-Actions→GCP deployment. It's a
 sandbox for practicing the patterns a real system needs, not a toy CRUD demo.
 
-## Try it live
+**Ask the app about itself.** The Chat tab answers questions about the architecture, the ADRs, and
+even the deployed source code — the RAG corpus bundles the backend + UI source at build time, so the
+assistant quotes the exact code that's running. The same knowledge base is a public MCP server, so
+any MCP client can ask too:
 
-- **App:** https://ask-app.sahilparekh1212.com — sign in with the demo account
-  (`demo` / `demo`, pick `ROLE_ADMIN` to try the admin-gated features). Google sign-in works too,
-  but its OAuth consent screen is in testing mode, so it's limited to registered test users — the
-  demo login is the intended door.
-- **Ask the app about itself:** the Chat tab answers questions about the architecture, the ADRs,
-  and even the deployed source code (the RAG corpus bundles the backend + UI source at build
-  time, so the assistant quotes the exact code that's running).
-- **Live system dashboards:** https://ask-app.sahilparekh1212.com/grafana — the deployment's
-  own Grafana, published read-only (metrics, logs and traces of the very services answering your
-  requests; the audit dashboard in-app is the domain view of the same system).
-- **Public MCP server** — point any MCP client at the deployment and search its knowledge base:
+```bash
+claude mcp add --transport http ask-app https://ask-app.sahilparekh1212.com/audit-api/mcp
+# then, inside Claude Code: "why is there no API gateway?" → grounded in ADR-0005
+```
 
-  ```bash
-  claude mcp add --transport http ask-app https://ask-app.sahilparekh1212.com/audit-api/mcp
-  # then, inside Claude Code: "why is there no API gateway?" → grounded in ADR-0005
-  ```
+The deployment's own metrics, logs, and traces are published read-only at
+[Grafana](https://ask-app.sahilparekh1212.com/grafana) (the in-app Observability dashboard is the
+domain view of the same system).
 
 **Status:** the backend, the Angular UI, and the GCP deployment are all real and current; the
 [backend TODO](Backend/TODO.md) tracks what's still open honestly rather than pretending it's
@@ -41,42 +36,63 @@ further along than it is. A live off-peak k6 smoke of the read API on the shared
 flowchart LR
     subgraph Client
         R["Reviewer / browser"]
+        M["MCP client\n(Claude Code, …)"]
     end
 
-    subgraph Backend[" "]
-        Auth["Auth service :8085\nGoogle OAuth2 → JWT, JWKS"]
-        Audit["Audit service :8083\nSearch, filter, aggregate"]
-        Kafka[["Kafka (Redpanda)\naudit.events"]]
-        PG[(PostgreSQL)]
+    subgraph Edge
+        Caddy["Caddy\nTLS termination"]
+        UI["UI · nginx\nAngular SPA + same-origin proxy"]
+    end
+
+    subgraph Services[" "]
+        Auth["Auth :8085\nGoogle OAuth2 → JWT, JWKS"]
+        Audit["Audit :8083\nsearch · aggregate · chat · RAG · /mcp"]
+    end
+
+    subgraph Stateful[" "]
+        Redis[("Redis\nrefresh tokens")]
+        Kafka[["Kafka (Redpanda)\naudit.events (+ DLT)"]]
+        PG[("PostgreSQL + pgvector\naudit rows + RAG index")]
+    end
+
+    subgraph AIExt["External AI"]
+        Claude["Claude (Anthropic)"]
+        Voyage["Voyage embeddings"]
     end
 
     subgraph Observability
         Prom[Prometheus]
         Loki[Loki]
-        Graf[Grafana]
+        Tempo[Tempo]
+        Graf["Grafana\n(public read-only)"]
     end
 
-    R -- "Bearer JWT" --> Auth
-    R -- "Bearer JWT" --> Audit
-    Auth -- "LOGIN / TOKEN_REFRESH / LOGOUT\n(fire-and-forget, async)" --> Kafka
+    R --> Caddy --> UI
+    M -- "/audit-api/mcp" --> Audit
+    UI -- "/auth-api · Bearer JWT" --> Auth
+    UI -- "/audit-api · Bearer JWT" --> Audit
+    Auth -- "single-use refresh (GETDEL)" --> Redis
+    Auth -- "LOGIN / REFRESH / LOGOUT\n(fire-and-forget, async)" --> Kafka
     Kafka -- "idempotent consume" --> Audit
     Audit --> PG
-    Auth -. metrics .-> Prom
-    Audit -. metrics .-> Prom
-    Auth -. logs .-> Loki
-    Audit -. logs .-> Loki
-    Prom --> Graf
-    Loki --> Graf
+    Audit -- chat --> Claude
+    Audit -- embeddings --> Voyage
+    Auth & Audit -. metrics .-> Prom
+    Auth & Audit -. logs .-> Loki
+    Auth & Audit -. traces .-> Tempo
+    Prom & Loki & Tempo --> Graf
 ```
 
 Auth issues RSA-signed JWTs and publishes a JWKS endpoint; Audit (and any future service)
-verifies tokens against that endpoint without ever holding a signing secret. The two services
-never call each other directly for the audit trail — Auth publishes to Kafka and moves on
-whether or not the broker is up, and Audit consumes idempotently. The Audit service also hosts
-the AI surface: the Claude chat proxy, the RAG index, and the MCP server. In the live
-deployment the browser reaches all of it through Caddy (TLS) → the UI's nginx, which
-same-origin-proxies `/auth-api` and `/audit-api` to the services — the diagram shows the logical
-flow. Full writeups of these tradeoffs (and the ones this diagram doesn't show) are in
+verifies tokens against that endpoint without ever holding a signing secret. Auth's one piece of
+state — the single-use refresh token — lives in Redis, so it scales past one replica. The two
+services never call each other directly for the audit trail — Auth publishes to Kafka and moves on
+whether or not the broker is up, and Audit consumes idempotently. The Audit service also hosts the
+AI surface: the Claude chat proxy, the RAG index (pgvector + Voyage embeddings), and the MCP server.
+Every request path enters through Caddy (TLS) → the UI's nginx, which serves the Angular SPA and
+same-origin-proxies `/auth-api` and `/audit-api` to the services. Metrics, logs, and traces flow to
+Prometheus / Loki / Tempo and surface in a read-only [Grafana](https://ask-app.sahilparekh1212.com/grafana).
+Full writeups of these tradeoffs (and the ones this diagram doesn't show) are in
 [`Backend/docs/adr/`](Backend/docs/adr/README.md).
 
 ---

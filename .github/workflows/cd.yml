@@ -41,7 +41,9 @@ jobs:
           - name: ui
             context: UI
             dockerfile: UI/Dockerfile
-            build_contexts: ''
+            # The About page renders the repo README; it lives at the checkout root, outside the
+            # UI/ context, so pass root as the `repo` named context (the Dockerfile COPYs README.md).
+            build_contexts: repo=.
     steps:
       - uses: actions/checkout@v7
 
