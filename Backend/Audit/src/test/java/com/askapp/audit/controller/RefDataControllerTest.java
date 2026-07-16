@@ -3,6 +3,7 @@ package com.askapp.audit.controller;
 import com.askapp.audit.dto.IngestResponse;
 import com.askapp.audit.dto.PagedResponse;
 import com.askapp.audit.model.SecurityMaster;
+import com.askapp.audit.service.RefDataIngestService;
 import com.askapp.audit.service.RefDataService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -29,21 +30,24 @@ import static org.mockito.Mockito.when;
 class RefDataControllerTest {
 
 	private RefDataService service;
+	private RefDataIngestService ingestService;
 	private RefDataController controller;
 
 	@BeforeEach
 	void setUp() {
 		service = mock(RefDataService.class);
-		controller = new RefDataController(service);
+		ingestService = mock(RefDataIngestService.class);
+		controller = new RefDataController(service, ingestService);
 	}
 
 	@Test
-	void ingest_returnsServiceResult() {
-		when(service.ingest(10)).thenReturn(new IngestResponse(10, 10, "generator"));
+	void ingest_returnsIngestServiceResult() {
+		when(ingestService.ingest(10)).thenReturn(new IngestResponse(10, 10, "spring-batch"));
 
 		IngestResponse response = controller.ingest(10);
 
 		assertThat(response.ingested()).isEqualTo(10);
+		assertThat(response.engine()).isEqualTo("spring-batch");
 	}
 
 	@Test
@@ -51,13 +55,14 @@ class RefDataControllerTest {
 		assertThatThrownBy(() -> controller.ingest(0))
 			.isInstanceOf(ResponseStatusException.class)
 			.satisfies(e -> assertThat(((ResponseStatusException) e).getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST));
+		verify(ingestService, never()).ingest(any(Integer.class));
 	}
 
 	@Test
 	void ingest_rejectsCountAboveTheCap() {
 		assertThatThrownBy(() -> controller.ingest(100_001))
 			.isInstanceOf(ResponseStatusException.class);
-		verify(service, never()).ingest(any(Integer.class));
+		verify(ingestService, never()).ingest(any(Integer.class));
 	}
 
 	@Test

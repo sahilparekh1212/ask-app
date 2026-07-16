@@ -4,6 +4,7 @@ import com.askapp.audit.dto.IngestResponse;
 import com.askapp.audit.dto.PagedResponse;
 import com.askapp.audit.dto.SecurityFilter;
 import com.askapp.audit.model.SecurityMaster;
+import com.askapp.audit.service.RefDataIngestService;
 import com.askapp.audit.service.RefDataService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -44,23 +45,25 @@ public class RefDataController {
 	private static final int MAX_INGEST = 100_000;
 
 	private final RefDataService refDataService;
+	private final RefDataIngestService refDataIngestService;
 
-	public RefDataController(RefDataService refDataService) {
+	public RefDataController(RefDataService refDataService, RefDataIngestService refDataIngestService) {
 		this.refDataService = refDataService;
+		this.refDataIngestService = refDataIngestService;
 	}
 
 	@PostMapping("/ingest")
 	@ResponseStatus(HttpStatus.ACCEPTED)
 	@PreAuthorize("hasRole('ADMIN')")
-	@Operation(summary = "Bulk-ingest N synthetic security-master records (admin only). Idempotent: "
-		+ "records whose instrument id already exists are skipped.")
+	@Operation(summary = "Bulk-ingest N synthetic security-master records via a Spring Batch job "
+		+ "(admin only). Idempotent: records whose instrument id already exists are skipped.")
 	public IngestResponse ingest(@RequestParam(defaultValue = "1000") int count) {
 		if (count < 1 || count > MAX_INGEST) {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
 				"count must be between 1 and " + MAX_INGEST);
 		}
 		log.info("Ingesting {} security-master records", count);
-		IngestResponse response = refDataService.ingest(count);
+		IngestResponse response = refDataIngestService.ingest(count);
 		log.info("Ingested {} of {} requested security-master records", response.ingested(), count);
 		return response;
 	}

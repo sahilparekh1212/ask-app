@@ -180,3 +180,31 @@ databaseChangeLog:
             columns:
               - column:
                   name: currency
+
+  # Spring Batch 5 metadata tables (the JobRepository backing the ref-data ingestion job). Managed
+  # here rather than via spring.batch.jdbc.initialize-schema so it runs exactly once per database
+  # (Liquibase tracks it in DATABASECHANGELOG) and therefore survives restarts on the persistent
+  # prod Postgres — the framework's own initializer would re-run CREATE TABLE and fail on boot two.
+  # We load Spring Batch's own official per-dialect DDL from the spring-batch-core jar, so the
+  # tables/types always match the framework version. schema-*.sql are pure CREATEs (the DROPs live
+  # in schema-drop-*.sql), so running once is exactly right.
+  - changeSet:
+      id: 004-spring-batch-metadata-h2
+      author: aisandbox
+      dbms: h2
+      changes:
+        - sqlFile:
+            path: org/springframework/batch/core/schema-h2.sql
+            relativeToChangelogFile: false
+            splitStatements: true
+            stripComments: true
+  - changeSet:
+      id: 004-spring-batch-metadata-postgres
+      author: aisandbox
+      dbms: postgresql
+      changes:
+        - sqlFile:
+            path: org/springframework/batch/core/schema-postgresql.sql
+            relativeToChangelogFile: false
+            splitStatements: true
+            stripComments: true

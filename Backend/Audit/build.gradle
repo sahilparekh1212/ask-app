@@ -2,6 +2,11 @@ dependencies {
 	// Shared AuditEvent Kafka contract + the ratelimit/ package (see Backend/common).
 	implementation project(':common')
 	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+	// Spring Batch backs the reference-data bulk ingestion (see the refdata package). Its metadata
+	// schema is created by Liquibase (changeset 004), not spring.batch.jdbc.initialize-schema — so
+	// it stays idempotent across restarts on the persistent prod Postgres (ADR-0004: Liquibase owns
+	// the schema). The changeset runs Spring Batch's own per-dialect DDL via Liquibase sqlFile.
+	implementation 'org.springframework.boot:spring-boot-starter-batch'
 	implementation 'org.springframework.kafka:spring-kafka'
 	// Liquibase owns the DB schema (db/changelog); Hibernate runs with ddl-auto=none.
 	implementation 'org.liquibase:liquibase-core'
@@ -24,6 +29,8 @@ dependencies {
 	runtimeOnly 'org.postgresql:postgresql'
 	// Embedded (in-JVM) Kafka broker for the consumer integration test — no Docker needed.
 	testImplementation 'org.springframework.kafka:spring-kafka-test'
+	// JobLauncherTestUtils for launching the ref-data ingestion job in an integration test.
+	testImplementation 'org.springframework.batch:spring-batch-test'
 	// Lets MockMvc tests inject a mock authenticated JWT (with chosen authorities) without a
 	// real Auth service/JWKS endpoint — used to verify @PreAuthorize role gating.
 	testImplementation 'org.springframework.security:spring-security-test'

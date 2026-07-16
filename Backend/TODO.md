@@ -54,9 +54,16 @@ PR, completed one by one.
       idempotent), `GET /api/v1/refdata/securities` (paged, filterable, **field projection** via
       `fields=`), `GET /api/v1/refdata/securities/{instrumentId}`. Built/tested to the 90% gate
       locally (Spotless + tests + coverage green).
-- [ ] **0b. Swap the ingest engine to a real Spring Batch job.** Replace the inline generator loader
-      with a chunk-oriented Spring Batch job (reader→writer), keeping the same `/ingest` endpoint
-      contract; batch metadata schema kept separate from the Liquibase-owned domain schema (ADR-0004).
+- [x] **0b. Swap the ingest engine to a real Spring Batch job.** `RefDataBatchConfig` — a
+      chunk-oriented job (`securityMasterIngestJob`): a step-scoped reader (count from the `count`
+      job parameter), a dedupe `ItemProcessor` (skips existing instrument ids → idempotent), a
+      repository writer; launched by `RefDataIngestService` via `JobLauncher` behind the unchanged
+      `POST /api/v1/refdata/ingest` endpoint (response now reports `engine=spring-batch` + the step
+      write count). The Spring Batch **metadata schema is Liquibase-managed** (changeset
+      `004-spring-batch-metadata`, loading Spring Batch's own per-dialect DDL via `sqlFile`), so it's
+      idempotent across restarts on the persistent prod Postgres — ADR-0004 (`initialize-schema=never`,
+      `job.enabled=false`). Tested: batch integration test (real job on H2), ingest-service unit test,
+      generator unit test; Spotless + 90% gate green locally.
       >> Claim: "bulk reference-data ingestion via Spring Batch"
 - [ ] **1. Bitemporal / as-of queries (domain).** valid-time (`validFrom`/`validTo`) + transaction
       -time (`recordedAt`) on the model + an `asOf=<date>` query dimension, so "what did we believe

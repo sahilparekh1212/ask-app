@@ -1,6 +1,5 @@
 package com.askapp.audit.service;
 
-import com.askapp.audit.dto.IngestResponse;
 import com.askapp.audit.dto.SecurityFilter;
 import com.askapp.audit.exception.ResourceNotFoundException;
 import com.askapp.audit.model.SecurityMaster;
@@ -11,15 +10,15 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
 
 /**
- * Ingests and queries security-master reference data. Ingestion is idempotent (records whose
- * instrument id already exists are skipped), and reads support field projection so a caller can
- * ask for only the columns it needs — the payload-optimization angle of a read-heavy service.
+ * Queries security-master reference data. Ingestion is handled by the Spring Batch job (see
+ * {@code RefDataBatchConfig} / {@code RefDataIngestService}); this service is the read side. Reads
+ * support field projection so a caller can ask for only the columns it needs — the
+ * payload-optimization angle of a read-heavy service.
  */
 @Service
 public class RefDataService {
@@ -31,21 +30,9 @@ public class RefDataService {
 	private static final Map<String, Function<SecurityMaster, Object>> FIELDS = buildFields();
 
 	private final SecurityMasterRepository repository;
-	private final RefDataGenerator generator;
 
-	public RefDataService(SecurityMasterRepository repository, RefDataGenerator generator) {
+	public RefDataService(SecurityMasterRepository repository) {
 		this.repository = repository;
-		this.generator = generator;
-	}
-
-	/** Generate {@code count} synthetic securities and persist the ones not already present. */
-	public IngestResponse ingest(int count) {
-		List<SecurityMaster> generated = generator.generate(count);
-		List<SecurityMaster> fresh = generated.stream()
-			.filter(s -> !repository.existsByInstrumentId(s.getInstrumentId()))
-			.toList();
-		repository.saveAll(fresh);
-		return new IngestResponse(count, fresh.size(), "generator");
 	}
 
 	public Page<SecurityMaster> search(SecurityFilter filter, Pageable pageable) {
