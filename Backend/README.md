@@ -227,6 +227,25 @@ Audit also seeds ~15 demo rows on startup under LOCAL/DEV (`DemoDataSeeder`), so
 `/api/v1/audit-logs`, `/search`, and `/stats` aren't empty on first run. Skips if the table
 already has rows; disable with `DEMO_DATA_SEED_ENABLED=false`.
 
+### Browser GUIs (Docker stack)
+
+`docker compose up` runs a browser-based GUI for each backing store, next to the Redpanda
+console for Kafka — no desktop install needed:
+
+| Store | GUI | URL | Connect with |
+|-------|-----|-----|--------------|
+| Postgres | Adminer | http://localhost:8082 | server `postgres` (pre-filled), user/password `audit` / `audit`, database `auditdb` |
+| Redis | Redis Insight | http://localhost:5540 | add a database: host `redis`, port `6379`, no password |
+| Kafka | Redpanda console | http://localhost:8080 | auto-connected |
+
+These are local-only dev tools: the production override (`docker-compose.prod.yml`) puts Adminer
+and Redis Insight behind a `local-tools` profile it never activates, so they never run on the
+deployed host.
+
+Prefer a desktop client? Both stores publish to the host, so point one at `localhost:5432`
+(Postgres — `audit` / `audit`, db `auditdb`) or `localhost:6379` (Redis, no password). Good free
+options: **DBeaver** or **pgAdmin** for Postgres, **Redis Insight** (desktop) for Redis.
+
 ### External database (DEV/SIT/UAT/PROD)
 
 Higher profiles read the datasource from environment variables so you can point Audit at

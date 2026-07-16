@@ -10,7 +10,10 @@
 #   Audit Swagger:     http://localhost:8083/swagger-ui.html
 #   Grafana:           http://localhost:4200/grafana    (anonymous read-only; admin / admin to edit)
 #   Redpanda console:  http://localhost:8080
+#   Adminer (Postgres):http://localhost:8082            (server "postgres", audit / audit, db "auditdb")
+#   Redis Insight:     http://localhost:5540            (add a DB: host "redis", port 6379, no auth)
 #   Postgres:          localhost:5432                    (audit / audit, db "auditdb")
+#   Redis:             localhost:6379                    (no password)
 #
 # Try it without any Google OAuth setup: POST http://localhost:8085/auth/login with
 # {"username":"demo","password":"demo"} issues a JWT good against both services. To use real
@@ -39,6 +42,19 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+
+  adminer:
+    # Lightweight single-file web GUI for the Postgres above (the local parallel to the
+    # redpanda-console GUI for Kafka). ADMINER_DEFAULT_SERVER pre-fills the login form's server
+    # field with the `postgres` service name — then log in with audit / audit, database auditdb.
+    image: adminer:4.8.1
+    container_name: askapp-adminer
+    depends_on:
+      - postgres
+    ports:
+      - "8082:8080"
+    environment:
+      ADMINER_DEFAULT_SERVER: postgres
 
   redpanda:
     image: redpandadata/redpanda:v24.2.7
@@ -146,6 +162,16 @@ services:
       interval: 5s
       timeout: 3s
       retries: 5
+
+  redisinsight:
+    # Official Redis GUI for the redis above. Open the UI and add a database with host `redis`,
+    # port 6379 (no password) to browse keys — e.g. Auth's refresh-token entries (ADR-0007).
+    image: redis/redisinsight:2.64
+    container_name: askapp-redisinsight
+    depends_on:
+      - redis
+    ports:
+      - "5540:5540"
 
   auth:
     build:
