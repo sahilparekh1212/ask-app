@@ -100,3 +100,111 @@ databaseChangeLog:
       rollback:
         - sql:
             sql: DROP TABLE rag_chunk
+
+  # Security-master reference data (see SecurityMaster + the refdata ingestion). Runs on every
+  # database (H2 and Postgres) — plain relational columns, no extension needed. Mirrors the entity
+  # and its three @Index definitions so Hibernate can keep ddl-auto=none.
+  - changeSet:
+      id: 003-create-security-master
+      author: aisandbox
+      changes:
+        - createTable:
+            tableName: security_master
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: instrument_id
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: isin
+                  type: VARCHAR(255)
+              - column:
+                  name: cusip
+                  type: VARCHAR(255)
+              - column:
+                  name: sedol
+                  type: VARCHAR(255)
+              - column:
+                  name: name
+                  type: VARCHAR(255)
+              - column:
+                  name: asset_class
+                  type: VARCHAR(255)
+              - column:
+                  name: currency
+                  type: VARCHAR(255)
+              - column:
+                  name: price
+                  type: DECIMAL(19, 2)
+              - column:
+                  name: as_of_date
+                  type: DATE
+              - column:
+                  name: created_at
+                  type: TIMESTAMP
+              - column:
+                  name: updated_at
+                  type: TIMESTAMP
+              - column:
+                  name: created_by_request_id
+                  type: VARCHAR(255)
+              - column:
+                  name: updated_by_request_id
+                  type: VARCHAR(255)
+        # Unique business key + point lookups (GET /securities/{instrumentId}).
+        - createIndex:
+            indexName: idx_secmaster_instrument
+            tableName: security_master
+            unique: true
+            columns:
+              - column:
+                  name: instrument_id
+        # Equality filters on the listing.
+        - createIndex:
+            indexName: idx_secmaster_asset_class
+            tableName: security_master
+            columns:
+              - column:
+                  name: asset_class
+        - createIndex:
+            indexName: idx_secmaster_currency
+            tableName: security_master
+            columns:
+              - column:
+                  name: currency
+
+  # Spring Batch 5 metadata tables (the JobRepository backing the ref-data ingestion job). Managed
+  # here rather than via spring.batch.jdbc.initialize-schema so it runs exactly once per database
+  # (Liquibase tracks it in DATABASECHANGELOG) and therefore survives restarts on the persistent
+  # prod Postgres — the framework's own initializer would re-run CREATE TABLE and fail on boot two.
+  # We load Spring Batch's own official per-dialect DDL from the spring-batch-core jar, so the
+  # tables/types always match the framework version. schema-*.sql are pure CREATEs (the DROPs live
+  # in schema-drop-*.sql), so running once is exactly right.
+  - changeSet:
+      id: 004-spring-batch-metadata-h2
+      author: aisandbox
+      dbms: h2
+      changes:
+        - sqlFile:
+            path: org/springframework/batch/core/schema-h2.sql
+            relativeToChangelogFile: false
+            splitStatements: true
+            stripComments: true
+  - changeSet:
+      id: 004-spring-batch-metadata-postgres
+      author: aisandbox
+      dbms: postgresql
+      changes:
+        - sqlFile:
+            path: org/springframework/batch/core/schema-postgresql.sql
+            relativeToChangelogFile: false
+            splitStatements: true
+            stripComments: true

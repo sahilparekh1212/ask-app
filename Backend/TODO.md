@@ -36,6 +36,56 @@ live — I can't do them for you:
 
 ## Open roadmap (prioritized)
 
+### Reference-data ingestion via Spring Batch + 5 enhancements (IN PROGRESS)
+
+Reframe of the standalone "financial reference data service" idea into ask-app: rather than a new
+repo, the **Audit service ingests reference data through a Spring Batch job** exposed by a new
+endpoint. The data is synthetic but shaped like financial reference data (a security master + FX
+rates) so the domain reads as finance-grade — the point is the *engineering* around it. The
+foundation lands first; the five differentiators (3 domain + 2 credibility) layer on, each its own
+PR, completed one by one.
+
+- [x] **0a. Read-side foundation — reference-data model + query API (enables 1–5).** New `refdata`
+      slice in Audit: `SecurityMaster` (effective-dated security master — instrument id +
+      ISIN/CUSIP/SEDOL, name, asset class, currency, price, as-of), a Liquibase changeset
+      (`003-create-security-master`) + indexes, `SecurityMasterRepository` +
+      `SecurityMasterSpecifications` (mirroring the audit-log pattern), `RefDataService`/
+      `RefDataGenerator`, and `RefDataController`: `POST /api/v1/refdata/ingest?count=N` (admin,
+      idempotent), `GET /api/v1/refdata/securities` (paged, filterable, **field projection** via
+      `fields=`), `GET /api/v1/refdata/securities/{instrumentId}`. Built/tested to the 90% gate
+      locally (Spotless + tests + coverage green).
+- [x] **0b. Swap the ingest engine to a real Spring Batch job.** `RefDataBatchConfig` — a
+      chunk-oriented job (`securityMasterIngestJob`): a step-scoped reader (count from the `count`
+      job parameter), a dedupe `ItemProcessor` (skips existing instrument ids → idempotent), a
+      repository writer; launched by `RefDataIngestService` via `JobLauncher` behind the unchanged
+      `POST /api/v1/refdata/ingest` endpoint (response now reports `engine=spring-batch` + the step
+      write count). The Spring Batch **metadata schema is Liquibase-managed** (changeset
+      `004-spring-batch-metadata`, loading Spring Batch's own per-dialect DDL via `sqlFile`), so it's
+      idempotent across restarts on the persistent prod Postgres — ADR-0004 (`initialize-schema=never`,
+      `job.enabled=false`). Tested: batch integration test (real job on H2), ingest-service unit test,
+      generator unit test; Spotless + 90% gate green locally.
+      >> Claim: "bulk reference-data ingestion via Spring Batch"
+- [ ] **1. Bitemporal / as-of queries (domain).** valid-time (`validFrom`/`validTo`) + transaction
+      -time (`recordedAt`) on the model + an `asOf=<date>` query dimension, so "what did we believe
+      on date X" is answerable. Natural agent query.
+      >> Claim: "bitemporal reference data with as-of queries"
+- [ ] **2. Symbology / identifier cross-reference (domain).** ISIN↔CUSIP↔SEDOL↔FIGI mapping +
+      `GET /api/v1/refdata/xref?id=...` returning all identifiers for an instrument. Prime cache
+      candidate + agent tool.
+      >> Claim: "symbology cross-reference across ISIN/CUSIP/SEDOL/FIGI"
+- [ ] **3. Cache + invalidation correctness — Redis (domain).** Cache the read/xref endpoints on
+      the existing Redis; **invalidate on ingest/update** (evict-on-write / TTL) so the cache stays
+      consistent when a batch refreshes rates. Benchmark cached vs uncached.
+      >> Claim: "Redis caching with evict-on-update invalidation; Xms→Yms"
+- [ ] **4. Internal metrics — cache-hit ratio + latency (credibility).** Micrometer gauges/timers
+      for cache hit ratio and per-endpoint p95/p99 (reusing the Prometheus/Grafana stack), so the
+      load-test numbers are corroborated from inside, not just k6's external view. New Grafana panel.
+      >> Claim: "measured cache hit-rate + p95/p99 from app telemetry"
+- [ ] **5. Agent eval harness (credibility).** ~15 NL prompts → expected tool + params, automated
+      pass/fail; expose refdata query/xref as an MCP/assistant tool so the agent answers
+      reference-data questions.
+      >> Claim: "built an eval harness for the LLM agent; N/M pass"
+
 ### Post-deploy: smoke-test prod, then resume summary (IMMEDIATE)
 
 - [x] **WIF/VM rename blockers — fixed (2026-07-13).** Three deploy failures diagnosed from run
