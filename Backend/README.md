@@ -227,6 +227,46 @@ Audit also seeds ~15 demo rows on startup under LOCAL/DEV (`DemoDataSeeder`), so
 `/api/v1/audit-logs`, `/search`, and `/stats` aren't empty on first run. Skips if the table
 already has rows; disable with `DEMO_DATA_SEED_ENABLED=false`.
 
+### Connecting to Postgres & Redis (local Docker stack)
+
+**Local credentials.** These are non-secret dev defaults, hardcoded in `docker-compose.yml` (so
+they are already public in the repo). Real deployments inject their own via env vars / a secret
+manager and never commit them — see [§ External database](#external-database-devsituatprod) and
+`docker-compose.prod.yml` (`DB_PASSWORD`).
+
+| Store | Host from the host machine | Host inside the compose network | Database | Username | Password |
+|-------|----------------------------|---------------------------------|----------|----------|----------|
+| Postgres | `localhost:5432` | `postgres:5432` | `auditdb` | `audit` | `audit` |
+| Redis | `localhost:6379` | `redis:6379` | — | — | *(none)* |
+
+**Browser GUIs.** `docker compose up` runs one per store, next to the Redpanda console for Kafka
+— no desktop install needed. Use the *in-network* host name here (the GUI containers reach the
+stores over the compose network):
+
+| Store | GUI | URL | Steps |
+|-------|-----|-----|-------|
+| Postgres | Adminer | http://localhost:8082 | System **PostgreSQL**, Server `postgres` (pre-filled), Username `audit`, Password `audit`, Database `auditdb` → **Login** |
+| Redis | Redis Insight | http://localhost:5540 | **Add Redis database** → Host `redis`, Port `6379`, leave username/password blank → **Add Database** |
+| Kafka | Redpanda console | http://localhost:8080 | auto-connected |
+
+These are local-only dev tools: the production override (`docker-compose.prod.yml`) puts Adminer
+and Redis Insight behind a `local-tools` profile it never activates, so they never run on the
+deployed host.
+
+**Command line / desktop client.** Both stores also publish to the host, so connect directly with
+`localhost` (or with a desktop client — DBeaver / pgAdmin for Postgres, Redis Insight desktop for
+Redis):
+
+```bash
+# Postgres (user: audit, password: audit, db: auditdb)
+psql -h localhost -p 5432 -U audit -d auditdb           # prompts for the password
+docker compose exec postgres psql -U audit -d auditdb   # or through the container, no local psql
+
+# Redis (no password)
+redis-cli -h localhost -p 6379 ping                     # -> PONG
+docker compose exec redis redis-cli ping                # or through the container
+```
+
 ### External database (DEV/SIT/UAT/PROD)
 
 Higher profiles read the datasource from environment variables so you can point Audit at
