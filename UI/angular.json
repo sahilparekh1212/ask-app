@@ -73,7 +73,8 @@
               "buildTarget": "ask-app-ui:build:production"
             },
             "development": {
-              "buildTarget": "ask-app-ui:build:development"
+              "buildTarget": "ask-app-ui:build:development",
+              "proxyConfig": "proxy.config.js"
             }
           },
           "defaultConfiguration": "development"
