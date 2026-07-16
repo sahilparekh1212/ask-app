@@ -212,6 +212,27 @@ Disable in a real deployment with `AUTH_DEMO_ENABLED=false`.
 
 ## Connecting to the database
 
+### Profiles & databases
+
+Which database a service uses is decided by its Spring profile (`SPRING_PROFILES_ACTIVE`), not by
+where it runs. Only `LOCAL` hardcodes H2; every other profile reads the datasource from the
+environment (12-factor), so the same image runs on Postgres everywhere it's wired up.
+
+| Profile | Database | Used by | Notes |
+|---------|----------|---------|-------|
+| `LOCAL` | **H2** in-memory (hardcoded) | bare `gradlew bootRun`; the test suite | Zero external setup; H2 console at `/h2-console`. The datasource is fixed, so a running Postgres is ignored under this profile. |
+| `DEV` | **Postgres** (`SPRING_DATASOURCE_URL`, H2 fallback) | the local **Docker Compose** stack; a shared dev server | Compose points it at the `postgres` container; demo seed on. |
+| `SIT` / `UAT` | **Postgres** (from env) | pre-prod environments | No demo seed; real IdP. |
+| `PROD` | **Postgres** (from env; fails fast if unset) | the deployed GCE VM | WARN logging, no seeder / demo-log endpoint. |
+
+So "running locally" isn't one thing: a bare service or `./gradlew test` uses H2 (fast, offline —
+see [ADR-0003](docs/adr/0003-h2-over-testcontainers.md)), while `docker compose up` runs the
+services under the **`DEV`** profile against the real pgvector **Postgres** container — the same
+externalized-config path as a deployed environment. Reason it's `DEV` and not `LOCAL`: `LOCAL`
+hardcodes H2 and would ignore the Postgres container, whereas `DEV` takes its datasource from the
+environment, which is exactly what compose injects. The Liquibase changelog is dialect-neutral, so
+the identical migration runs on both H2 and Postgres.
+
 ### LOCAL profile (H2)
 
 Each service exposes the H2 web console. With the service running, open:
