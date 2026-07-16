@@ -70,6 +70,22 @@ flowchart LR
     Tempo --> Grafana
 ```
 
+## 🎨 Frontend (UI)
+
+An Angular 21 single-page app, hand-rolled with **no UI framework** — one CSS
+design-token layer (a GitHub-dark palette) drives the theme, and state is
+**signals-first** (`computed`, no global store; RxJS only at the HTTP edge).
+
+- **Stateless client auth** — a functional HTTP interceptor attaches
+  `Authorization: Bearer` to our APIs and does one silent refresh-and-retry on a
+  `401`; a route guard carries a `returnUrl`. The token lives in localStorage — a
+  documented trade-off vs httpOnly cookies.
+- **Same-origin, no CORS** — the SPA calls relative `/auth-api` and `/audit-api`
+  paths; nginx proxies them in the container and the dev-server proxy mirrors that
+  under `ng serve`, so the browser only ever talks to one origin.
+- Shipped as a static bundle by nginx (immutable cache headers, SPA fallback);
+  GA4 page views and Sentry errors fire only when their IDs/DSNs are configured.
+
 ## 🔄 Core runtime flows
 
 ### 🔐 Authentication and authorization
@@ -138,6 +154,29 @@ rate counter; a superseded request is interrupted and returns `429` with
 `Retry-After`. Audit mutations use a transactional checkpoint so an interrupted,
 superseded request rolls back rather than leaving partial writes.
 
+## 🗄️ Data, schema & profiles
+
+The backing stores and their state models are in the table above; two design points
+that aren't obvious from it:
+
+- **Liquibase owns the schema** — a single dialect-neutral changelog runs unmodified
+  on both H2 and Postgres (`ddl-auto=none`), so the schema is a versioned, reviewable
+  artifact and the H2/Postgres split can't drift. pgvector is the vector store in
+  Postgres environments; an in-memory store stands in on H2.
+- **The database is chosen by Spring profile, not by where the service runs** — only
+  `LOCAL` hardcodes H2; every other profile takes its datasource from the environment
+  (12-factor), so the same image runs on Postgres wherever it's wired up:
+
+| Profile | Database | Used by |
+|---|---|---|
+| `LOCAL` | H2 in-memory (hardcoded) | bare `gradlew bootRun`; the test suite |
+| `DEV` | Postgres (from env, H2 fallback) | the local Docker Compose stack; a shared dev server |
+| `SIT` / `UAT` / `PROD` | Postgres (from env) | pre-prod and production |
+
+So `docker compose up` runs the services under `DEV` against the real pgvector Postgres
+container — not `LOCAL`/H2 (which would ignore the container). Tests stay on H2 by design
+(fast, offline — see the ADRs); the E2E job and prod exercise Postgres.
+
 ## 📊 Observability and external reporting
 
 - Prometheus polls the Spring services' metrics endpoints.
@@ -198,6 +237,7 @@ them; the rest of the system remains usable without either key.
 
 ## 📚 Further reading
 
+- <a href="https://github.com/sahilparekh1212/ask-app/blob/main/UI/README.md" target="_blank" rel="noopener noreferrer">Frontend guide</a>
 - <a href="https://github.com/sahilparekh1212/ask-app/blob/main/Backend/README.md" target="_blank" rel="noopener noreferrer">Backend guide</a>
 - <a href="https://github.com/sahilparekh1212/ask-app/blob/main/Backend/docs/adr/README.md" target="_blank" rel="noopener noreferrer">Architecture decisions</a>
 - <a href="https://github.com/sahilparekh1212/ask-app/blob/main/Backend/docs/deployment.md" target="_blank" rel="noopener noreferrer">Deployment guide</a>
