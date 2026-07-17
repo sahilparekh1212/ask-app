@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img" aria-label="ask-app">
-  <!-- Dark app-canvas tile with the "mind" mark — the brain the app lets you interrogate. -->
+  <!-- Dark app-canvas tile with the chat balloon — the same mark the Chat page's welcome uses. -->
   <rect width="100" height="100" rx="22" fill="#0d1117" />
-  <text x="50" y="55" font-size="64" text-anchor="middle" dominant-baseline="central">🧠</text>
+  <text x="50" y="55" font-size="64" text-anchor="middle" dominant-baseline="central">💬</text>
 </svg>
