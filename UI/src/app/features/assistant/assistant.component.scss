@@ -294,6 +294,12 @@
   border: 1px solid var(--border);
   border-radius: 26px;
 
+  // Focus lives on the pill, not the input: a thin white border marks the active composer
+  // (the input's own blue focus ring is suppressed below — it drew a second ring inside).
+  &:focus-within {
+    border-color: var(--fg);
+  }
+
   input {
     flex: 1;
     border: none;
@@ -303,7 +309,11 @@
     font-size: 0.95rem;
 
     &:focus {
+      // Override the global input:focus accent ring (border + blue glow) — the pill's
+      // focus-within border above is the composer's single focus affordance.
       outline: none;
+      border-color: transparent;
+      box-shadow: none;
     }
 
     &::placeholder {
