@@ -11,6 +11,8 @@ import {
   FeaturesResponse,
   PageRequest,
   PagedResponse,
+  SecurityFilter,
+  SecurityMaster,
   TimelineInterval,
 } from './audit.models';
 
@@ -20,6 +22,7 @@ export class AuditService {
   private readonly http = inject(HttpClient);
   private readonly base = `${environment.auditApiUrl}/api/v1/audit-logs`;
   private readonly metaBase = `${environment.auditApiUrl}/api/v1/meta`;
+  private readonly refdataBase = `${environment.auditApiUrl}/api/v1/refdata`;
 
   /** Runtime capability flags — e.g. whether the demo-log generator exists on this backend. */
   features(): Observable<FeaturesResponse> {
@@ -50,6 +53,20 @@ export class AuditService {
   /** Bulk-insert generated demo rows (backend endpoint exists in LOCAL/DEV only). */
   addDemoLogs(count: number): Observable<DemoDataResponse> {
     return this.http.post<DemoDataResponse>(`${this.base}/demo`, { count });
+  }
+
+  /** Paginated, filterable security-master reference data (batch-loaded, read-only here). */
+  securities(filter: SecurityFilter, page: PageRequest): Observable<PagedResponse<SecurityMaster>> {
+    let params = new HttpParams()
+      .set('page', page.page)
+      .set('size', page.size)
+      .set('sort', page.sort);
+    if (filter.assetClass) params = params.set('assetClass', filter.assetClass);
+    if (filter.currency) params = params.set('currency', filter.currency);
+    if (filter.name) params = params.set('name', filter.name);
+    return this.http.get<PagedResponse<SecurityMaster>>(`${this.refdataBase}/securities`, {
+      params,
+    });
   }
 
   private filterParams(filter: AuditLogFilter): HttpParams {

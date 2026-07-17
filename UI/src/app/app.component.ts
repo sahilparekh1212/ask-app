@@ -1,11 +1,10 @@
-import { Component, afterNextRender, computed, inject, signal } from '@angular/core';
+import { Component, afterNextRender, computed, effect, inject, signal } from '@angular/core';
 import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { filter, fromEvent, map, merge } from 'rxjs';
 
 import { AuthService } from './core/auth/auth.service';
 import { TranslatePipe } from './core/i18n/translate.pipe';
-import { LanguageSwitcherComponent } from './shared/language-switcher/language-switcher.component';
 
 /** A primary section: an icon-rail entry that also keys its contextual sidebar. */
 interface Section {
@@ -49,7 +48,7 @@ const ICON = {
 
 @Component({
   selector: 'app-root',
-  imports: [RouterOutlet, RouterLink, RouterLinkActive, TranslatePipe, LanguageSwitcherComponent],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, TranslatePipe],
   templateUrl: './app.component.html',
   styleUrl: './app.component.scss',
 })
@@ -60,8 +59,15 @@ export class AppComponent {
   readonly title = 'ask-app';
   readonly isAuthenticated = this.auth.isAuthenticated;
 
-  /** External links promoted into the always-visible top bar (reachable from every page). */
-  readonly topbarLinks = [
+  /** First letter of the signed-in user's name/email, for the rail's account avatar ('' if unknown). */
+  readonly avatarInitial = computed(() => {
+    const profile = this.auth.profile();
+    const source = (profile?.name || profile?.email || '').trim();
+    return source ? source.charAt(0).toUpperCase() : '';
+  });
+
+  /** External links pinned in the activity rail (reachable from every page). */
+  readonly externalLinks = [
     {
       key: 'github',
       label: 'GitHub',
@@ -78,7 +84,7 @@ export class AppComponent {
     },
   ];
 
-  // Current URL as a signal, so the top-bar title and the active sidebar recompute on navigation.
+  // Current URL as a signal, so the active section/sidebar recompute on navigation.
   private readonly url = toSignal(
     this.router.events.pipe(
       filter((e): e is NavigationEnd => e instanceof NavigationEnd),
@@ -129,6 +135,7 @@ export class AppComponent {
             { labelKey: 'nav.summary', fragment: 'summary' },
             { labelKey: 'nav.trends', fragment: 'trends' },
             { labelKey: 'nav.log', fragment: 'log' },
+            { labelKey: 'nav.refdata', fragment: 'refdata' },
           ],
         },
       ],
@@ -137,16 +144,6 @@ export class AppComponent {
 
   /** The sidebar for the active section (null for sections with no per-page context). */
   readonly activeSidebar = computed(() => this.sidebars[this.section()] ?? null);
-
-  /** The page title shown in the top bar — driven by the section, not the (optional) sidebar. */
-  readonly sectionTitleKey = computed(() => {
-    const keys: Record<string, string> = {
-      chat: 'nav.chat',
-      observability: 'nav.observability',
-      profile: 'nav.profile',
-    };
-    return keys[this.section()] ?? null;
-  });
 
   // Which groups the user has collapsed (VS-Code dropdowns default to open).
   private readonly collapsed = signal<Set<string>>(new Set());
@@ -179,6 +176,21 @@ export class AppComponent {
   private static readonly SPY_LINE = 96;
 
   constructor() {
+    // Fetch the profile whenever we're authenticated but don't have it yet, so the rail's account
+    // avatar shows its initial. As an effect (not a one-off constructor check) it fires both on a
+    // reload with a stored token AND the moment a fresh login flips `isAuthenticated` — so the
+    // avatar appears right after login, not only after visiting /profile. Best-effort: a failure
+    // just leaves the generic person icon. Runs once (profile becoming set makes the guard false).
+    effect(() => {
+      if (this.auth.isAuthenticated() && !this.auth.profile()) {
+        this.auth.loadProfile().subscribe({
+          error: () => {
+            /* best-effort — a failure just leaves the generic person icon */
+          },
+        });
+      }
+    });
+
     // Recompute after each navigation (once the freshly-routed page has had a tick to render)
     // and on every scroll/resize. Reading four getBoundingClientRects per scroll is cheap enough
     // to do inline — no rAF/observer indirection, which keeps it working in background tabs too.

@@ -1,5 +1,6 @@
 package com.askapp.audit.rag;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -8,6 +9,7 @@ import java.util.Set;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anySet;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.timeout;
@@ -25,12 +27,21 @@ class RagIndexerTest {
 	private final CorpusLoader corpusLoader = mock(CorpusLoader.class);
 	private final MarkdownChunker markdownChunker = new MarkdownChunker(CONFIGURED);
 	private final CodeChunker codeChunker = new CodeChunker(CONFIGURED);
+	private final ReferenceDataChunker referenceDataChunker = mock(ReferenceDataChunker.class);
 	private final EmbeddingClient embeddingClient = mock(EmbeddingClient.class);
 	private final VectorStore vectorStore = mock(VectorStore.class);
 
+	@BeforeEach
+	void refDataOffByDefault() {
+		// Most tests assert exact doc-chunk embed calls, so the reference-data corpus contributes
+		// nothing unless a test opts in. (No @ExtendWith strict-stub checking here, so an unused
+		// stub is harmless.)
+		when(referenceDataChunker.chunks()).thenReturn(List.of());
+	}
+
 	private RagIndexer indexer(RagProperties properties) {
-		return new RagIndexer(properties, corpusLoader, markdownChunker, codeChunker, embeddingClient,
-			vectorStore);
+		return new RagIndexer(properties, corpusLoader, markdownChunker, codeChunker,
+			referenceDataChunker, embeddingClient, vectorStore);
 	}
 
 	@Test
@@ -96,6 +107,23 @@ class RagIndexerTest {
 		verifyNoInteractions(embeddingClient);
 		verify(vectorStore, never()).upsert(anyList(), anyList());
 		verify(vectorStore).retainOnly(Set.of(existing.id()));
+	}
+
+	@Test
+	void referenceDataChunksAreIndexedAlongsideTheDocs() {
+		when(corpusLoader.load()).thenReturn(List.of(
+			new CorpusLoader.CorpusDocument("README.md", "# Title\nSome intro.")));
+		DocChunk refChunk = DocChunk.of("reference-data/overview", "ref", "SEC-000000 EQUITY USD");
+		when(referenceDataChunker.chunks()).thenReturn(List.of(refChunk));
+		when(vectorStore.existingIds()).thenReturn(Set.of());
+		when(embeddingClient.embedDocuments(anyList())).thenReturn(
+			List.of(new float[] {1, 0}, new float[] {0, 1}));
+
+		indexer(CONFIGURED).index();
+
+		verify(embeddingClient).embedDocuments(argThat(texts -> texts.contains("SEC-000000 EQUITY USD")));
+		// The reference chunk's id must survive the retain-only sweep (it is a live chunk).
+		verify(vectorStore).retainOnly(argThat((Set<String> ids) -> ids.contains(refChunk.id())));
 	}
 
 	@Test

@@ -12,7 +12,8 @@ async function loginAsDemo(page: Page): Promise<void> {
   await page.goto('/login');
   await expect(page.getByLabel('Username')).toHaveValue('demo');
   await page.getByRole('button', { name: 'Demo login' }).click();
-  await page.waitForURL('**/profile');
+  // A plain login (no returnUrl) lands on the chat page, the app's default section.
+  await page.waitForURL('**/chat');
 }
 
 async function openAudit(page: Page): Promise<void> {
@@ -21,21 +22,23 @@ async function openAudit(page: Page): Promise<void> {
   await page.locator('.rail-item[href="/observability"]').click();
   await page.waitForURL('**/observability');
   // The seeder guarantees data on first run, so the initial unfiltered load must show rows.
-  await expect(page.locator('tbody tr').first()).toBeVisible();
+  // Locators are scoped to the audit log (#log / #filters): the reference-data panel below it
+  // has its own table, pager, and "Apply filters" button, so unscoped selectors are ambiguous.
+  await expect(page.locator('#log tbody tr').first()).toBeVisible();
   await expect(page.locator('.stats .total')).toBeVisible();
 }
 
-/** Parses "Page 1 of N · M total" from the pager. */
+/** Parses "Page 1 of N · M total" from the audit log's pager (the sibling of #log). */
 async function totalElements(page: Page): Promise<number> {
-  const text = (await page.locator('.pager span').innerText()).replace(/[,.\s]/g, ' ');
+  const text = (await page.locator('#log ~ .pager span').innerText()).replace(/[,.\s]/g, ' ');
   const match = text.match(/(\d+)\s+total/);
   expect(match, `pager text should contain a total: "${text}"`).not.toBeNull();
   return Number(match![1]);
 }
 
-test('demo login signs in and lands on the profile page', async ({ page }) => {
+test('demo login signs in and lands on the chat page', async ({ page }) => {
   await loginAsDemo(page);
-  await expect(page).toHaveURL(/\/profile$/);
+  await expect(page).toHaveURL(/\/chat$/);
   // Authenticated shell: the nav now offers Profile instead of Sign in.
   await expect(page.getByRole('link', { name: 'Sign in' })).toHaveCount(0);
   await expect(page.getByRole('link', { name: 'Profile' })).toBeVisible();
@@ -52,9 +55,9 @@ test('a login event flows through Kafka into a queryable audit row', async ({ pa
   await expect
     .poll(
       async () => {
-        await page.getByRole('button', { name: 'Apply filters' }).click();
+        await page.locator('#filters').getByRole('button', { name: 'Apply filters' }).click();
         return page
-          .locator('tbody tr')
+          .locator('#log tbody tr')
           .filter({ has: page.locator('td:nth-child(3)', { hasText: 'LOGIN' }) })
           .count();
       },
@@ -90,13 +93,13 @@ test('filtering by entity type narrows the rows and the stats agree', async ({ p
   const entityType = page.getByLabel('Entity type');
   await expect(entityType.locator('option', { hasText: 'User' })).toHaveCount(1);
   await entityType.selectOption('User');
-  await page.getByRole('button', { name: 'Apply filters' }).click();
+  await page.locator('#filters').getByRole('button', { name: 'Apply filters' }).click();
 
   // Wait for the filtered reload, then check every visible row matches the filter.
   await expect.poll(() => page.locator('.stats .total').innerText()).toMatch(/^\d+ matching/);
   await expect
     .poll(async () => {
-      const cells = await page.locator('tbody tr td:nth-child(2)').allInnerTexts();
+      const cells = await page.locator('#log tbody tr td:nth-child(2)').allInnerTexts();
       return cells.length > 0 && cells.every((c) => c === 'User');
     })
     .toBe(true);

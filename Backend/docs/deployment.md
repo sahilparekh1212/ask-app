@@ -3,8 +3,7 @@
 How ask-app goes from a commit to a running system. This is the design doc for deploying the
 whole application — the two Spring Boot services, the Angular SPA, and their backing
 infrastructure — end to end. It ties together artifacts that already exist in the repo
-(Dockerfiles, `docker-compose.yml`, `openshift/`, GitHub Actions) and names the gaps that the
-CI/CD roadmap in [TODO.md](../TODO.md) closes.
+(Dockerfiles, `docker-compose.yml`, `openshift/`, GitHub Actions) and names the remaining gaps.
 
 Status legend: **[built]** exists in the repo today · **[planned]** on the roadmap · **[env]**
 an environment-specific value the operator supplies.

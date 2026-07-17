@@ -208,3 +208,43 @@ databaseChangeLog:
             relativeToChangelogFile: false
             splitStatements: true
             stripComments: true
+
+  # createdAt-only index on audit_logs. Backs the retention purge's DELETE WHERE created_at < ?
+  # (which spans active AND soft-deleted rows, so idx_audit_active_created — led by `deleted` —
+  # can't serve the range) and time-range reads that don't constrain `deleted`. Mirrors the
+  # matching @Index on AuditLog so Hibernate's validate (PROD/UAT) passes.
+  - changeSet:
+      id: 005-audit-created-at-index
+      author: aisandbox
+      changes:
+        - createIndex:
+            indexName: idx_audit_created_at
+            tableName: audit_logs
+            columns:
+              - column:
+                  name: created_at
+
+  # Reporting view: audit activity rolled up per calendar day / entity type / action, excluding
+  # soft-deleted rows. A read-only convenience for BI / Grafana / ad-hoc SQL — the app's own
+  # /stats endpoint still aggregates live via Criteria, so nothing in the code path depends on this
+  # view. Dialect-neutral SQL (CAST(... AS DATE) works on both H2 and Postgres), so it is created on
+  # every database like the rest of the changelog. See docs/data-and-profiles.md for the rationale
+  # and how to query it.
+  - changeSet:
+      id: 006-create-audit-daily-summary-view
+      author: aisandbox
+      changes:
+        - createView:
+            viewName: v_audit_daily_summary
+            replaceIfExists: true
+            selectQuery: >-
+              SELECT CAST(created_at AS DATE) AS event_date,
+                     entity_type,
+                     action,
+                     COUNT(*) AS event_count
+              FROM audit_logs
+              WHERE deleted = false
+              GROUP BY CAST(created_at AS DATE), entity_type, action
+      rollback:
+        - dropView:
+            viewName: v_audit_daily_summary

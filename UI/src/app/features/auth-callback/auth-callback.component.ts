@@ -26,6 +26,6 @@ export class AuthCallbackComponent implements OnInit {
     // Strip the fragment from the address bar / history so the tokens aren't left behind.
     history.replaceState(null, '', window.location.pathname);
 
-    void this.router.navigateByUrl(ok ? '/profile' : '/login');
+    void this.router.navigateByUrl(ok ? '/chat' : '/login');
   }
 }

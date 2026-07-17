@@ -32,7 +32,17 @@ public class RefDataIngestService {
 	}
 
 	public IngestResponse ingest(int count) {
+		return ingest(0, count);
+	}
+
+	/**
+	 * Ingest {@code count} records beginning at instrument index {@code startIndex}. The daily
+	 * incremental scheduler passes the current row count as {@code startIndex} so the generated
+	 * range is entirely new; the initial seed and the manual endpoint start at 0.
+	 */
+	public IngestResponse ingest(int startIndex, int count) {
 		JobParameters parameters = new JobParametersBuilder()
+			.addLong("startIndex", (long) startIndex)
 			.addLong("count", (long) count)
 			.addLong("run.id", RUN_ID.incrementAndGet())
 			.toJobParameters();

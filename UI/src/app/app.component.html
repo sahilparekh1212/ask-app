@@ -19,9 +19,6 @@
     </div>
 
     <div class="rail-bottom">
-      <!-- Language switcher sits just above the account slot (VS Code puts settings-like
-           controls at the bottom of the activity bar). -->
-      <app-language-switcher class="rail-lang" />
       @if (isAuthenticated()) {
         <a
           class="rail-item"
@@ -30,9 +27,13 @@
           [attr.aria-label]="'nav.profile' | t"
           [title]="'nav.profile' | t"
         >
-          <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
-            <path [attr.d]="profileIcon" />
-          </svg>
+          @if (avatarInitial()) {
+            <span class="avatar" aria-hidden="true">{{ avatarInitial() }}</span>
+          } @else {
+            <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+              <path [attr.d]="profileIcon" />
+            </svg>
+          }
           <span class="rail-label">{{ 'nav.profile' | t }}</span>
         </a>
       } @else {
@@ -55,7 +56,6 @@
   <!-- Secondary panel: the active section's collapsible groups (dropdowns). -->
   @if (activeSidebar(); as sb) {
     <aside class="sidebar" [attr.aria-label]="sb.titleKey | t">
-      <div class="sidebar-title">{{ sb.titleKey | t }}</div>
       @for (g of sb.groups; track g.id) {
         <div class="sb-group">
           <button
@@ -106,38 +106,28 @@
     </aside>
   }
 
-  <!-- Content column: top bar + the routed page. -->
+  <!-- Content column: just the routed page — no top bar. -->
   <div class="content" [class.no-sidebar]="!activeSidebar()">
-    <header class="topbar">
-      <span class="topbar-title">
-        @if (sectionTitleKey(); as titleKey) {
-          {{ titleKey | t }}
-        } @else {
-          {{ title }}
-        }
-      </span>
-      <div class="topbar-right">
-        @for (link of topbarLinks; track link.key) {
-          <a
-            class="topbar-link"
-            [href]="link.href"
-            target="_blank"
-            rel="noopener noreferrer"
-            [attr.aria-label]="link.label"
-            [title]="link.label"
-          >
-            <svg [attr.viewBox]="link.viewBox" aria-hidden="true" focusable="false">
-              <path [attr.d]="link.icon" />
-            </svg>
-          </a>
-        }
-        <!-- Google Website Translator renders here when the visitor picks "Google Translate" -->
-        <div id="google_translate_element" hidden></div>
-      </div>
-    </header>
-
     <main class="app-main">
       <router-outlet />
     </main>
+  </div>
+
+  <!-- GitHub / LinkedIn pinned to the top-right, floating over the page (ChatGPT-style). -->
+  <div class="corner-links">
+    @for (link of externalLinks; track link.key) {
+      <a
+        class="corner-link"
+        [href]="link.href"
+        target="_blank"
+        rel="noopener noreferrer"
+        [attr.aria-label]="link.label"
+        [title]="link.label"
+      >
+        <svg [attr.viewBox]="link.viewBox" aria-hidden="true" focusable="false">
+          <path [attr.d]="link.icon" />
+        </svg>
+      </a>
+    }
   </div>
 </div>

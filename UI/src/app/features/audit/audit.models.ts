@@ -68,3 +68,24 @@ export interface PageRequest {
   size: number;
   sort: string; // e.g. "createdAt,desc"
 }
+
+/** A security-master reference-data row (GET /api/v1/refdata/securities content items). */
+export interface SecurityMaster {
+  id: number;
+  instrumentId: string;
+  isin: string | null;
+  cusip: string | null;
+  sedol: string | null;
+  name: string | null;
+  assetClass: string | null;
+  currency: string | null;
+  price: number | null;
+  asOfDate: string | null; // ISO date (yyyy-MM-dd)
+}
+
+/** Filters for the reference-data listing (GET /api/v1/refdata/securities). */
+export interface SecurityFilter {
+  assetClass?: string | null;
+  currency?: string | null;
+  name?: string | null;
+}

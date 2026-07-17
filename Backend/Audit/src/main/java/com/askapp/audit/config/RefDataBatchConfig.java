@@ -54,12 +54,18 @@ public class RefDataBatchConfig {
 			.build();
 	}
 
-	/** Step-scoped so {@code count} binds from the running job's parameters (0 if absent). */
+	/**
+	 * Step-scoped so {@code count} and {@code startIndex} bind from the running job's parameters
+	 * (0 if absent). {@code startIndex} lets the daily incremental job append a fresh range instead
+	 * of regenerating index 0; the initial bulk load and the manual {@code /ingest} endpoint leave
+	 * it at 0.
+	 */
 	@Bean
 	@StepScope
 	public ItemReader<SecurityMaster> securityItemReader(RefDataGenerator generator,
+			@Value("#{jobParameters['startIndex'] ?: 0}") long startIndex,
 			@Value("#{jobParameters['count'] ?: 0}") long count) {
-		Iterator<SecurityMaster> iterator = generator.generate((int) count).iterator();
+		Iterator<SecurityMaster> iterator = generator.generate((int) startIndex, (int) count).iterator();
 		return () -> iterator.hasNext() ? iterator.next() : null;
 	}
 

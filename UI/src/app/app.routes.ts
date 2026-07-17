@@ -26,6 +26,14 @@ export const routes: Routes = [
     title: 'Chat',
     canActivate: [authGuard],
   },
+  // Same component — the id is a ChatGPT-style conversation handle in the URL (set via
+  // Location.replaceState on the first message); a direct hit re-opens an empty chat.
+  {
+    path: 'chat/:id',
+    component: AssistantComponent,
+    title: 'Chat',
+    canActivate: [authGuard],
+  },
   // Legacy paths from before the URL/label alignment (and the removed About page).
   { path: 'about', redirectTo: 'chat' },
   { path: 'audit', redirectTo: 'observability' },

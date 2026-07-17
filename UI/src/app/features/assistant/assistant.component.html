@@ -1,28 +1,76 @@
-<section class="assistant">
-  <p class="hint">{{ 'assistant.hint' | t }}</p>
-
-  <div class="chat-log" #log>
-    @if (turns().length === 0) {
-      <p class="empty">
-        {{ 'assistant.tryPrefix' | t }} <em>“{{ 'assistant.sample1' | t }}”</em>
-        {{ 'login.or' | t }} <em>“{{ 'assistant.sample2' | t }}”</em>
-      </p>
-    }
-    @for (turn of turns(); track $index) {
-      <div class="turn" [class.user]="turn.role === 'user'" [class.blocked]="turn.blocked">
-        <span class="who">{{
-          turn.role === 'user' ? ('assistant.you' | t) : ('assistant.assistant' | t)
-        }}</span>
-        <p class="bubble">{{ turn.content }}</p>
-      </div>
-    }
-    @if (busy()) {
-      <div class="turn">
-        <span class="who">{{ 'assistant.assistant' | t }}</span>
-        <p class="bubble thinking">{{ 'assistant.thinking' | t }}</p>
-      </div>
-    }
-  </div>
+<section class="assistant" [class.started]="started()">
+  @if (started()) {
+    <div class="chat-log">
+      @for (turn of turns(); track $index) {
+        <div class="turn" [class.user]="turn.role === 'user'" [class.blocked]="turn.blocked">
+          <span class="who">{{
+            turn.role === 'user' ? ('assistant.you' | t) : ('assistant.assistant' | t)
+          }}</span>
+          @if (turn.role === 'assistant' && !turn.blocked) {
+            <!-- Assistant replies are Markdown; render them (escaped) so bullets/bold/code show. -->
+            <div class="bubble markdown" [innerHTML]="turn.content | markdown"></div>
+          } @else {
+            <p class="bubble">{{ turn.content }}</p>
+          }
+          <button
+            class="copy-btn"
+            type="button"
+            (click)="copy(turn.content, $index)"
+            [attr.aria-label]="'assistant.copy' | t"
+            [title]="'assistant.copy' | t"
+          >
+            @if (copiedIndex() === $index) {
+              <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+                <path
+                  d="M13.78 4.22a.75.75 0 0 1 0 1.06l-7.25 7.25a.75.75 0 0 1-1.06 0L2.22 9.28a.751.751 0 0 1 .018-1.042.751.751 0 0 1 1.042-.018L6 10.94l6.72-6.72a.75.75 0 0 1 1.06 0Z"
+                />
+              </svg>
+              {{ 'assistant.copied' | t }}
+            } @else {
+              <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+                <path
+                  d="M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 0 1 0 1.5h-1.5a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-1.5a.75.75 0 0 1 1.5 0v1.5A1.75 1.75 0 0 1 9.25 16h-7.5A1.75 1.75 0 0 1 0 14.25Z"
+                />
+                <path
+                  d="M5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0 1 14.25 11h-7.5A1.75 1.75 0 0 1 5 9.25Zm1.75-.25a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-7.5a.25.25 0 0 0-.25-.25Z"
+                />
+              </svg>
+              {{ 'assistant.copy' | t }}
+            }
+          </button>
+        </div>
+      }
+      @if (busy()) {
+        <div class="turn">
+          <span class="who">{{ 'assistant.assistant' | t }}</span>
+          <p class="bubble thinking">{{ 'assistant.thinking' | t }}</p>
+        </div>
+      }
+    </div>
+  } @else {
+    <div class="welcome">
+      <h1 class="welcome-title">
+        {{ 'assistant.welcome' | t }}
+        <span class="info">
+          <button class="info-btn" type="button" [attr.aria-label]="'assistant.infoLabel' | t">
+            <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+              <path
+                d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8Zm8-6.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13ZM6.5 7.75A.75.75 0 0 1 7.25 7h1a.75.75 0 0 1 .75.75v2.75h.25a.75.75 0 0 1 0 1.5h-2a.75.75 0 0 1 0-1.5h.25v-2h-.25a.75.75 0 0 1-.75-.75ZM8 6a1 1 0 1 1 0-2 1 1 0 0 1 0 2Z"
+              />
+            </svg>
+          </button>
+          <span class="info-popover" role="tooltip">
+            <span class="info-line">{{ 'assistant.hint' | t }}</span>
+            <span class="info-line">{{ 'assistant.screening' | t }}</span>
+            <span class="info-line">
+              {{ 'assistant.tryPrefix' | t }} <em>“{{ 'assistant.sample1' | t }}”</em>
+              {{ 'login.or' | t }} <em>“{{ 'assistant.sample2' | t }}”</em>
+            </span>
+          </span>
+        </span>
+      </h1>
+    </div>
+  }
 
   @if (error(); as e) {
     <p class="error" role="alert">{{ e | t }}</p>
@@ -37,8 +85,18 @@
       [attr.disabled]="busy() ? '' : null"
       [attr.aria-label]="'assistant.placeholder' | t"
     />
-    <button type="submit" [disabled]="busy() || !input.value.trim()">
-      {{ 'assistant.send' | t }}
+    <button
+      type="submit"
+      class="send-btn"
+      [disabled]="busy() || !input.value.trim()"
+      [attr.aria-label]="'assistant.send' | t"
+      [title]="'assistant.send' | t"
+    >
+      <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+        <path
+          d="M3.47 7.78a.75.75 0 0 1 0-1.06l4-4a.75.75 0 0 1 1.06 0l4 4a.75.75 0 1 1-1.06 1.06L8.75 4.81v7.44a.75.75 0 0 1-1.5 0V4.81L4.53 7.78a.75.75 0 0 1-1.06 0Z"
+        />
+      </svg>
     </button>
   </form>
 </section>

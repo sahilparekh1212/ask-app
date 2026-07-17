@@ -3,6 +3,7 @@ import { provideRouter } from '@angular/router';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { signal } from '@angular/core';
+import { of } from 'rxjs';
 import { AppComponent } from './app.component';
 import { AuthService } from './core/auth/auth.service';
 
@@ -17,7 +18,14 @@ describe('AppComponent', () => {
         provideRouter([]),
         provideHttpClient(),
         provideHttpClientTesting(),
-        { provide: AuthService, useValue: { isAuthenticated: authenticated } },
+        {
+          provide: AuthService,
+          useValue: {
+            isAuthenticated: authenticated,
+            profile: signal(null),
+            loadProfile: () => of(null),
+          },
+        },
       ],
     }).compileComponents();
   });
@@ -82,12 +90,12 @@ describe('AppComponent', () => {
     expect(el.querySelector('.content')?.classList.contains('no-sidebar')).toBeTrue();
   });
 
-  it('promotes GitHub + LinkedIn to always-visible top-bar links', () => {
+  it('pins GitHub + LinkedIn as always-visible links in the top-right corner', () => {
     const fixture = TestBed.createComponent(AppComponent);
     fixture.detectChanges();
     const links = [
       ...(fixture.nativeElement as HTMLElement).querySelectorAll<HTMLAnchorElement>(
-        '.topbar-right .topbar-link',
+        '.corner-links .corner-link',
       ),
     ];
     expect(links.map((a) => a.getAttribute('aria-label'))).toEqual(['GitHub', 'LinkedIn']);
@@ -100,14 +108,5 @@ describe('AppComponent', () => {
       expect(a.querySelector('svg')).not.toBeNull();
       expect(a.getAttribute('rel')).toContain('noopener');
     });
-  });
-
-  it('shows the section title in the top bar even when a section has no sidebar', () => {
-    const fixture = TestBed.createComponent(AppComponent);
-    fixture.detectChanges();
-    // Default route → Chat: title comes from the section, not the sidebar.
-    expect(fixture.componentInstance.sectionTitleKey()).toBe('nav.chat');
-    const title = (fixture.nativeElement as HTMLElement).querySelector('.topbar-title');
-    expect(title?.textContent?.trim()).toBe('Chat');
   });
 });

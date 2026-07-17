@@ -1,702 +1,244 @@
 # ask-app Backend
 
-A Spring Boot 3.5 / Java 17 multi-module microservice backend, built with Gradle and deployed
-live at https://ask-app.sahilparekh1212.com (GCE VM, deployed from GitHub Actions; OpenShift
-manifests also provided). Each service is an independently buildable, runnable and
-scalable Gradle subproject.
+_Developer guide to the ask-app backend — what the services do, why they're built this way, and
+how to build, run, and operate them._
 
-## Services
+**Contents:** [LLM chat assistant](#llm-chat-assistant) ·
+[RAG MCP server](#rag-mcp-server) ·
+[Concepts & design decisions](#concepts--design-decisions--what--how) ·
+[Build & test](#build--test) · [Run locally](#run-locally) ·
+[Profiles & databases](#profiles--databases) · [Rate limiting](#rate-limiting) ·
+[Logging & auditing](#logging-correlation--auditing) · [Observability](#observability) ·
+[OpenShift](#deploying-to-openshift) · [Secrets](#secrets) ·
+[Security scanning](#security--supply-chain-scanning)
 
-| Service        | Port | Module         | Purpose                                              |
-|----------------|------|----------------|------------------------------------------------------|
-| Auth           | 8085 | `Auth`         | Google OAuth2 login, issues/refreshes JWTs, JWKS     |
-| Audit          | 8083 | `Audit`        | Audit-log create/read/delete (immutable)             |
+Spring Boot 3.5 / Java 17 multi-module backend (Gradle), deployed live at
+https://ask-app.sahilparekh1212.com (GCE VM, deployed from GitHub Actions; OpenShift manifests
+also provided).
 
-A third Gradle subproject, `common`, is a plain shared library (no `main`, not independently
-runnable) holding code identical across both services: the `AuditEvent` Kafka message contract
-and the `ratelimit/` package described below.
+| Service | Port | Module | Purpose |
+|---------|------|--------|---------|
+| Auth | 8085 | `Auth` | Google OAuth2 + demo login, issues/refreshes JWTs, JWKS |
+| Audit | 8083 | `Audit` | Audit trail (Kafka consumer + query API), LLM assistant, RAG/MCP |
 
-All services share: JWT resource-server security, Swagger/OpenAPI docs, structured
-logging, a global exception handler, an actuator health endpoint, and the rate
-limiter described below.
-
-Non-obvious design tradeoffs (why RSA over HMAC, why the refresh-token store moved to Redis to make
-Auth stateless — and why the rate limiter stays per-pod, why H2 in tests, why Liquibase owns the
-schema) are written up in [`docs/adr/`](docs/adr/README.md).
+A third subproject, `common`, is a plain shared library: the `AuditEvent` Kafka contract and the
+rate limiter. Both services share JWT resource-server security, Swagger (`/swagger-ui.html`),
+structured logging, a global exception handler, and actuator health. The non-obvious "why"s live
+in [`docs/adr/`](docs/adr/README.md).
 
 ### LLM chat assistant
 
-The Audit service also hosts `POST /api/v1/assistant/chat` — a server-side proxy that lets the
-SPA's Assistant page ask a Claude model questions about the application, grounded on an app
-overview doc plus live audit data. Enable it by exporting `ANTHROPIC_API_KEY` before starting
-the Audit service (or `docker compose up`); without a key the endpoint returns 503 and nothing
-else is affected. Model and output size are tunable via `ASSISTANT_MODEL` (default
-`claude-opus-4-8`; use `claude-haiku-4-5` for cost) and `ASSISTANT_MAX_TOKENS`.
-
-Access is role-aware: every signed-in user chats against aggregate statistics only, while
-`ROLE_ADMIN` answers are additionally grounded on the 20 most recent raw audit rows. Inbound
-messages are screened server-side (JWT/token shapes, credential assignments, emails, card-like
-numbers are refused locally and never forwarded), auth headers are never proxied, and the
-provider data-flow is documented in
-[ADR-0009](docs/adr/0009-llm-chat-assistant-data-flow.md).
+`POST /api/v1/assistant/chat` (Audit) proxies the SPA's chat to Claude, grounded on the repo's
+docs/source plus live audit data. Role-aware: every user chats against aggregate stats; only
+`ROLE_ADMIN` answers also see recent raw rows. Inbound text is screened server-side (JWT/token
+shapes, credential assignments, emails, card-like numbers → refused locally, never forwarded);
+auth headers are never proxied ([ADR-0009](docs/adr/0009-llm-chat-assistant-data-flow.md)).
+Enable with `ANTHROPIC_API_KEY`; without it the endpoint 503s and nothing else is affected.
+Tunables: `ASSISTANT_MODEL` (default `claude-opus-4-8`), `ASSISTANT_MAX_TOKENS`.
 
 ### RAG MCP server
 
-The Audit service is also a [Model Context Protocol](https://modelcontextprotocol.io) server:
-`POST /mcp` exposes semantic search over this repo's own documentation (this README, the ADRs,
-`docs/`) *and its bundled source code*, backed by a real vector database — pgvector on the
-stack's Postgres — with Voyage AI embeddings. Point any MCP client at the live deployment (or a
-local stack) and ask about the project:
+The Audit service is also an MCP server: `POST /mcp` exposes semantic search over the repo's own
+docs *and bundled source* (pgvector on the stack's Postgres, Voyage embeddings; corpus bundled at
+build time, chunked by heading, indexed incrementally by content hash). The synthetic
+security-master reference data is indexed alongside — public, non-PII only; audit/user data is
+never indexed ([ADR-0010](docs/adr/0010-rag-mcp-server.md)). Tools: `search_knowledge`,
+`list_sources`. Enable indexing with `VOYAGE_API_KEY`.
 
 ```bash
-# the public deployment — no setup needed
 claude mcp add --transport http ask-app https://ask-app.sahilparekh1212.com/audit-api/mcp
-# or a locally-running stack
-claude mcp add --transport http ask-app http://localhost:8083/mcp
 # then, inside Claude Code: "why is there no API gateway?" → grounded in ADR-0005
 ```
-
-Tools: `search_knowledge` (top-k doc chunks by cosine similarity, with source + heading +
-score) and `list_sources` (index inventory). The docs corpus is bundled into the jar at build
-time, chunked along markdown headings, and indexed incrementally at startup (content-hashed —
-unchanged chunks cost zero embedding calls). Enable indexing by exporting `VOYAGE_API_KEY`;
-without it the tools report "not configured" and nothing else is affected. The same retrieval
-grounds the chat assistant's answers (a `<retrieved_docs>` block in its prompt). Decisions —
-pgvector vs a dedicated engine, provider vs local embeddings, why the MCP endpoint is
-hand-rolled and unauthenticated — are in [ADR-0010](docs/adr/0010-rag-mcp-server.md).
 
 ---
 
 ## Concepts & design decisions — what & how
 
-A map of the ideas this backend is built to demonstrate, each as **what** (the concept / the
-decision and why) and **how** (the concrete technology or mechanism that implements it). Deeper
-writeups live in [`docs/adr/`](docs/adr/README.md); the sections below and the `docs/` folder
-carry the detail.
-
 | Concept — *what & why* | How — *technology / mechanism* |
 |---|---|
-| **Statelessness** — services keep no server-side session, so any pod can serve any request and Auth scales horizontally | JWTs verified locally against Auth's JWKS (no per-request call back to Auth); the one piece of state, the single-use refresh token, is a `RefreshTokenStore` **Strategy** — in-memory for dev, **Redis** (atomic `GETDEL`) when scaled ([ADR-0007](docs/adr/0007-redis-refresh-token-store-for-statelessness.md)). The rate limiter stays *per-pod* on purpose (it's a thread-interrupt dedup, not a counter) |
-| **RBAC & token security** — verifiers must check identity + role locally and must not be able to mint tokens | **Google OAuth2** → **RSA-signed JWT** (asymmetric: verifiers hold only the public key) published at a **JWKS** endpoint; `roles` claim → Spring authorities; admin actions gated with `@PreAuthorize` ([ADR-0001](docs/adr/README.md)) |
-| **Event-driven architecture** — recording an audit trail is a side effect of an action, not part of it; the producer shouldn't block on or be coupled to the sink | Auth (and the Audit service's own AI features) publish `AuditEvent`s to a **Kafka** topic `audit.events` `@Async` fire-and-forget; Audit consumes them. **Apache Kafka** (single-node KRaft) locally, managed/multi-broker in prod ([ADR-0006](docs/adr/README.md), [ADR-0011](docs/adr/README.md)) |
-| **Idempotency** — at-least-once delivery means the consumer *will* occasionally see a duplicate | Consumer dedups by `eventId` backed by a **unique index** (`idx_audit_event_id`); retries, then dead-letters to `audit.events.DLT`. So a redelivered event is a no-op, never a double row |
-| **RDBMS** — audit rows are relational and queried by filters / ranges / grouped aggregations that want real indexes and durability | **PostgreSQL 16** via **Spring Data JPA**; the same `AuditLogSpecifications` builds *both* the paginated search and the database-side `GROUP BY` stats, so rows and counts can never disagree; **H2** only for tests / the LOCAL profile |
-| **Database schema management** — the schema should be a versioned, reviewable artifact, not silent Hibernate DDL that drifts between environments | **Liquibase** owns the schema (`ddl-auto=none`); changesets are **expand/contract** (add before remove) so a rolling deploy and a rollback stay safe |
-| **Rate limiting** — under burst load a user's newest request should win, shedding gracefully instead of queueing | Newest-wins per `userId+method+path`: a superseded request's thread is interrupted and its `@Transactional` work **rolled back**, then it returns **429 + `Retry-After`**. Lock-free `ConcurrentHashMap` registry, no global locks (see [Rate limiting](#rate-limiting)) |
-| **Guarded LLM proxy** — sending app data to a third-party model makes the *data flow* the security boundary | A server-side proxy holds the `ANTHROPIC_API_KEY` (never the browser), screens inbound text for secrets/PII, forwards no auth headers, and scopes context by role in a single allowlist class ([ADR-0009](docs/adr/0009-llm-chat-assistant-data-flow.md)) |
-| **RAG + vector search** — ground the assistant in the repo's own docs *and* source so it quotes the code that's actually deployed | **pgvector** (`vector(1024)`) on the existing Postgres + **Voyage** embeddings; heading-based chunking, content-hash incremental indexing at startup; corpus bundled into the jar at build time ([ADR-0010](docs/adr/0010-rag-mcp-server.md)) |
-| **MCP server** — expose that knowledge base to any MCP client | A hand-rolled stateless **Model Context Protocol** JSON-RPC endpoint (`/mcp`): `initialize` / `tools/list` / `tools/call` for `search_knowledge` + `list_sources` — the SDK's session/SSE machinery isn't needed |
-| **Metrics** — answer "how are the servers performing?" | **Micrometer** → **Prometheus** (`/actuator/prometheus`), scraped per-service; request rates, p95/p99 latency (see [Observability](#observability-prometheus--loki--tempo--grafana)) |
-| **Log aggregation** — searchable, structured logs across pods | **Structured JSON** logs shipped to **Loki**, labelled per service; correlated with traces |
-| **Distributed tracing** — follow one request across the async Kafka hop | **OpenTelemetry** → **Tempo**; a login trace spans `http post /auth/login` → `audit.events send` → `audit.events receive` |
-| **Domain analytics** — "what did users & agents *do*?" is a different question from server health | The **event-sourced audit trail** feeds an in-app dashboard (KPI cards, events-over-time, DB-side aggregations); the Grafana/Prometheus/Loki/Tempo stack answers the *system* question — two views, deliberately separate |
-| **API contract safety** — a breaking API change shouldn't merge silently | springdoc emits OpenAPI from the running code; an **openapi-diff** PR gate fails only on incompatible changes |
-| **Testing depth** — coverage as a gate, plus proof the tests actually assert | **JUnit** + **90% JaCoCo** line gate per module, `diff-cover` on changed lines, **PIT** mutation testing (report-only baseline), **Playwright** E2E against the compose stack, **k6** load tests |
-| **CI** — nothing reaches `main` unproven | **GitHub Actions**: build/test/coverage, CodeQL SAST, Trivy (deps + images), Dependabot, gitleaks secret scan, conventional-commit lint, branch protection |
-| **CD & supply chain** — build once, promote by digest, prove provenance | Versioned images to **GHCR** on merge (SemVer + git SHA + `latest`), **cosign** keyless signing (OIDC, Rekor), **syft** SBOM attestations; keyless **Workload Identity Federation** deploy to the GCE VM |
-| **Config & secrets** — same artifact everywhere, secrets never in the image | A profile matrix (LOCAL/DEV/…/PROD) selects behaviour; provider keys and DB passwords come from the environment; nothing sensitive is committed (see [Secrets](#secrets)) |
+| **Statelessness** — any pod serves any request; Auth scales horizontally | JWTs verified locally against Auth's JWKS; the one piece of state (single-use refresh token) is a `RefreshTokenStore` **Strategy** — in-memory for dev, **Redis** (atomic `GETDEL`) when scaled ([ADR-0007](docs/adr/0007-redis-refresh-token-store-for-statelessness.md)). The rate limiter stays *per-pod* on purpose (thread-interrupt dedup, not a counter) |
+| **RBAC & token security** — verify identity + role locally, never mint remotely | **Google OAuth2** → **RSA-signed JWT** (verifiers hold only the public key) via **JWKS**; `roles` claim → authorities; `@PreAuthorize` on admin actions ([ADR-0001](docs/adr/README.md)) |
+| **Event-driven architecture** — the audit trail is a side effect; producers must not block on the sink | Auth (and Audit's own AI features) publish `AuditEvent`s to Kafka topic `audit.events` `@Async` fire-and-forget; Audit consumes. **Apache Kafka** (single-node KRaft) locally, managed/multi-broker in prod ([ADR-0006](docs/adr/README.md), [ADR-0011](docs/adr/README.md)) |
+| **Idempotency** — at-least-once delivery means duplicates happen | Consumer dedups by `eventId` (unique index); retry then dead-letter to `audit.events.DLT` |
+| **RDBMS** — filtered/aggregated relational queries want real indexes | **PostgreSQL 16** + Spring Data JPA; one `AuditLogSpecifications` builds *both* search and DB-side `GROUP BY` stats, so rows and counts never disagree; **H2** for tests/LOCAL |
+| **Schema as code** | **Liquibase** owns the schema (`ddl-auto=none`); expand/contract changesets keep rolling deploys safe |
+| **Rate limiting** — newest request wins, shed gracefully | Newest-wins per `userId+method+path`: superseded request's thread interrupted, its `@Transactional` work rolled back, client gets **429 + `Retry-After`** (see [Rate limiting](#rate-limiting)) |
+| **Guarded LLM proxy** — the data flow is the security boundary | Server-side key, inbound secret/PII screening, no auth-header forwarding, role-scoped context in one allowlist class ([ADR-0009](docs/adr/0009-llm-chat-assistant-data-flow.md)) |
+| **RAG + vector search** — ground answers in the code that's actually deployed | **pgvector** on the existing Postgres + **Voyage** embeddings; content-hash incremental indexing ([ADR-0010](docs/adr/0010-rag-mcp-server.md)) |
+| **MCP server** | Hand-rolled stateless JSON-RPC `/mcp` (`initialize`/`tools/list`/`tools/call`) — the SDK's session/SSE machinery isn't needed |
+| **Metrics / logs / traces** | **Micrometer → Prometheus**; structured JSON → **Loki**; OpenTelemetry → **Tempo**, one trace across the async Kafka hop (see [Observability](#observability)) |
+| **Domain analytics vs system health** | The event-sourced audit trail feeds the in-app dashboard; Grafana/Prometheus/Loki/Tempo answer the *system* question — two views, deliberately separate |
+| **API contract safety** | springdoc emits OpenAPI from running code; an **openapi-diff** PR gate fails only on incompatible changes |
+| **Testing depth** | JUnit + **90% JaCoCo gate** per module, diff-cover, **PIT** mutation baseline, **Playwright** E2E vs the compose stack, **k6** load tests |
+| **CI / CD / supply chain** | GitHub Actions: build/test/coverage, CodeQL, Trivy, Dependabot, gitleaks, commit lint → versioned GHCR images on merge, **cosign** keyless signing + **syft** SBOM attestations, keyless **WIF** deploy to the VM |
+| **Config & secrets** | Profile matrix (LOCAL…PROD) selects behaviour; keys and passwords come from the environment; nothing sensitive committed |
 
 ---
 
-## Prerequisites
+## Build & test
 
-- JDK 17 (`java -version` should report 17.x)
-- No local Gradle needed — use the included wrapper (`./gradlew` / `gradlew.bat`)
-
----
-
-## Build
+JDK 17; use the wrapper (`./gradlew`).
 
 ```bash
-# Build everything
-./gradlew build
-
-# Build a single service
-./gradlew :Audit:build
-
-# Run the tests for one service
-./gradlew :Audit:test
-
-# Mutation testing (PIT, report-only — see TODO's CI/CD section for the measured baseline).
-# Report lands in <module>/build/reports/pitest/index.html; CI runs this in mutation.yml.
-./gradlew :Audit:pitest :Auth:pitest :common:pitest
+./gradlew build                # everything (tests + 90% coverage gate)
+./gradlew :Audit:test          # one module
+./gradlew :Audit:pitest        # mutation testing (report-only)
 ```
 
-### End-to-end tests (Playwright)
-
-The `e2e/` suite (repo root) drives the real compose stack through a browser — demo login,
-the Kafka-published login event appearing in the audit table, demo-log generation, filters
-vs stats agreement. Start the stack first, then:
-
-```bash
-cd ../e2e          # from Backend/; it's <repo-root>/e2e
-npm ci
-npx playwright install chromium
-npx playwright test
-```
-
-CI runs the same suite against a freshly built stack on every system-affecting PR
-(`.github/workflows/e2e.yml`).
-
----
+Playwright E2E (`<repo-root>/e2e`) drives the real compose stack — start it first, then
+`npm ci && npx playwright test`. CI runs the same suite on every system-affecting PR.
 
 ## Run locally
 
 **One command, the whole system:** `docker compose up --build` (root `docker-compose.yml`) —
-Postgres, Kafka, both services, and Prometheus/Loki/Grafana. See the file's header
-comment for URLs and the zero-setup demo login. First build takes a few minutes.
-
-**Skip the build entirely** with the GHCR pull variant — runs the exact CI-built images CD
-publishes on every merge to `main` (public packages, no login needed):
+Postgres, Kafka, both services, observability. See the file's header comment for URLs and the
+zero-setup demo login. Skip the build with the GHCR variant (CI-built images, public packages):
 
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.ghcr.yml up -d --no-build
-
-# Pin a specific build instead of latest (promote-by-digest — see docs/deployment.md §3)
-AI_SANDBOX_TAG=sha-abc1234 docker compose -f docker-compose.yml -f docker-compose.ghcr.yml up -d --no-build
+# pin a build: AI_SANDBOX_TAG=sha-abc1234 docker compose ... up -d --no-build
 ```
 
-**Or run a service directly with Gradle**, standalone. The default profile is **LOCAL**, which
-uses an in-memory H2 database — no external database required to get started.
+**Or with Gradle**, standalone (default profile LOCAL = in-memory H2, zero setup):
 
 ```bash
-# Start the Auth service first (other services validate JWTs against its JWKS endpoint)
-./gradlew :Auth:bootRun
-
-# Then, in separate terminals:
-./gradlew :Audit:bootRun
+./gradlew :Auth:bootRun     # first — Audit validates JWTs against its JWKS
+./gradlew :Audit:bootRun    # separate terminal; SPRING_PROFILES_ACTIVE=DEV to override
 ```
 
-To run a service under a non-default profile:
+**Demo login (no Google setup):** `POST /auth/login` with
+`{"username":"demo","password":"demo"}` issues the same JWTs as the Google flow; add
+`"role":"ROLE_ADMIN"` to test admin endpoints. Disable with `AUTH_DEMO_ENABLED=false`.
 
-```bash
-SPRING_PROFILES_ACTIVE=DEV ./gradlew :Audit:bootRun
-# Windows PowerShell:
-$env:SPRING_PROFILES_ACTIVE="DEV"; ./gradlew :Audit:bootRun
-```
+**Google OAuth:** create credentials with redirect URI
+`http://localhost:8085/login/oauth2/code/google`, export `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET`,
+then open `http://localhost:8085/oauth2/authorization/google`. Tokens are returned to
+`${FRONTEND_URL}/login/callback` in the URL *fragment* (never query/logs); refresh via
+`POST /auth/refresh`.
 
-### Google OAuth2 (Auth service)
+## Profiles & databases
 
-Create OAuth credentials in the Google Cloud Console and set the redirect URI to
-`http://localhost:8085/login/oauth2/code/google`, then export:
+Which database a service uses is decided by profile, not by where it runs — only `LOCAL`
+hardcodes H2; every other profile reads the datasource from the environment (12-factor). The
+compose stack runs `DEV` against the real pgvector Postgres; bare `bootRun`/tests use H2
+([ADR-0003](docs/adr/0003-h2-over-testcontainers.md)). The Liquibase changelog is
+dialect-neutral, so the identical migration runs on both.
 
-```bash
-export GOOGLE_CLIENT_ID=...
-export GOOGLE_CLIENT_SECRET=...
-```
+| Profile | Datasource | `ddl-auto` | Notes |
+|---------|------------|------------|-------|
+| LOCAL | In-memory H2 (hardcoded) | update | H2 console at `/h2-console` (`sa`, blank); demo seed on |
+| DEV | Env vars, H2 fallback | update | The compose stack; demo seed on |
+| SIT / UAT | Env vars | update / validate | No demo seed |
+| PROD | Env vars (required) | validate | WARN logging, no seeder/demo endpoints |
 
-Login flow: open `http://localhost:8085/oauth2/authorization/google`. On success the Auth
-service redirects the browser to `${FRONTEND_URL}/login/callback` (default
-`http://localhost:4200`) with the access token (30-min TTL), refresh token (7-day TTL), and
-`expires_in` in the URL *fragment* — e.g. `#access_token=...&refresh_token=...&expires_in=1800
-&token_type=Bearer` — not the query string, so they're never sent back to a server or logged.
-The UI route at that path reads `window.location.hash` once and should replace history
-immediately (`history.replaceState`) so the tokens don't linger in browser history. Set
-`FRONTEND_URL` to point at a UI running somewhere other than `:4200`. Refresh via
-`POST /auth/refresh` with `{"refreshToken":"..."}`.
-
-### Demo login (no Google setup needed)
-
-`POST /auth/login` with `{"username":"demo","password":"demo"}` issues the same JWTs as
-the Google flow — handy for trying the API without OAuth credentials. Every JWT carries a
-`roles` claim (`ROLE_USER` by default); to test the admin-gated endpoints
-(e.g. `DELETE /api/v1/audit-logs/{id}`), request `ROLE_ADMIN` explicitly:
-
-```json
-{"username": "demo", "password": "demo", "role": "ROLE_ADMIN"}
-```
-
-Disable in a real deployment with `AUTH_DEMO_ENABLED=false`.
-
----
-
-## Connecting to the database
-
-### Profiles & databases
-
-Which database a service uses is decided by its Spring profile (`SPRING_PROFILES_ACTIVE`), not by
-where it runs. Only `LOCAL` hardcodes H2; every other profile reads the datasource from the
-environment (12-factor), so the same image runs on Postgres everywhere it's wired up.
-
-| Profile | Database | Used by | Notes |
-|---------|----------|---------|-------|
-| `LOCAL` | **H2** in-memory (hardcoded) | bare `gradlew bootRun`; the test suite | Zero external setup; H2 console at `/h2-console`. The datasource is fixed, so a running Postgres is ignored under this profile. |
-| `DEV` | **Postgres** (`SPRING_DATASOURCE_URL`, H2 fallback) | the local **Docker Compose** stack; a shared dev server | Compose points it at the `postgres` container; demo seed on. |
-| `SIT` / `UAT` | **Postgres** (from env) | pre-prod environments | No demo seed; real IdP. |
-| `PROD` | **Postgres** (from env; fails fast if unset) | the deployed GCE VM | WARN logging, no seeder / demo-log endpoint. |
-
-So "running locally" isn't one thing: a bare service or `./gradlew test` uses H2 (fast, offline —
-see [ADR-0003](docs/adr/0003-h2-over-testcontainers.md)), while `docker compose up` runs the
-services under the **`DEV`** profile against the real pgvector **Postgres** container — the same
-externalized-config path as a deployed environment. Reason it's `DEV` and not `LOCAL`: `LOCAL`
-hardcodes H2 and would ignore the Postgres container, whereas `DEV` takes its datasource from the
-environment, which is exactly what compose injects. The Liquibase changelog is dialect-neutral, so
-the identical migration runs on both H2 and Postgres.
-
-### LOCAL profile (H2)
-
-Each service exposes the H2 web console. With the service running, open:
-
-| Service      | H2 console URL                       | JDBC URL                    |
-|--------------|--------------------------------------|-----------------------------|
-| Audit        | http://localhost:8083/h2-console     | `jdbc:h2:mem:auditdb`       |
-
-Login with user `sa`, blank password, and the JDBC URL above. (In-memory data is
-reset on each restart.)
-
-Audit also seeds ~15 demo rows on startup under LOCAL/DEV (`DemoDataSeeder`), so
-`/api/v1/audit-logs`, `/search`, and `/stats` aren't empty on first run. Skips if the table
-already has rows; disable with `DEMO_DATA_SEED_ENABLED=false`.
-
-### Connecting to Postgres & Redis (local Docker stack)
-
-**Local credentials.** These are non-secret dev defaults, hardcoded in `docker-compose.yml` (so
-they are already public in the repo). Real deployments inject their own via env vars / a secret
-manager and never commit them — see [§ External database](#external-database-devsituatprod) and
-`docker-compose.prod.yml` (`DB_PASSWORD`).
-
-| Store | Host from the host machine | Host inside the compose network | Database | Username | Password |
-|-------|----------------------------|---------------------------------|----------|----------|----------|
-| Postgres | `localhost:5432` | `postgres:5432` | `auditdb` | `audit` | `audit` |
-| Redis | `localhost:6379` | `redis:6379` | — | — | *(none)* |
-
-**Browser GUIs.** `docker compose up` runs one per store, next to the Kafbat Kafka UI for Kafka
-— no desktop install needed. Use the *in-network* host name here (the GUI containers reach the
-stores over the compose network):
-
-| Store | GUI | URL | Steps |
-|-------|-----|-----|-------|
-| Postgres | Adminer | http://localhost:8082 | System **PostgreSQL**, Server `postgres` (pre-filled), Username `audit`, Password `audit`, Database `auditdb` → **Login** |
-| Redis | Redis Insight | http://localhost:5540 | **Add Redis database** → Host `redis`, Port `6379`, leave username/password blank → **Add Database** |
-| Kafka | Kafbat Kafka UI | http://localhost:8080 | auto-connected |
-
-These are local-only dev tools: the production override (`docker-compose.prod.yml`) puts the
-Kafka UI, Adminer, and Redis Insight behind a `local-tools` profile it never activates, so they
-never run on the deployed host.
-
-**Command line / desktop client.** Both stores also publish to the host, so connect directly with
-`localhost` (or with a desktop client — DBeaver / pgAdmin for Postgres, Redis Insight desktop for
-Redis):
-
-```bash
-# Postgres (user: audit, password: audit, db: auditdb)
-psql -h localhost -p 5432 -U audit -d auditdb           # prompts for the password
-docker compose exec postgres psql -U audit -d auditdb   # or through the container, no local psql
-
-# Redis (no password)
-redis-cli -h localhost -p 6379 ping                     # -> PONG
-docker compose exec redis redis-cli ping                # or through the container
-```
-
-### External database (DEV/SIT/UAT/PROD)
-
-Higher profiles read the datasource from environment variables so you can point Audit at
-PostgreSQL (the driver is already on the classpath — `runtimeOnly 'org.postgresql:postgresql'`
-in `Audit/build.gradle`) or another JDBC database (add its driver the same way). The root
-`docker-compose.yml` does exactly this against a real Postgres container; to do it manually
-against your own instance:
-
-```bash
-export SPRING_PROFILES_ACTIVE=DEV
-export SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5432/auditdb
-export SPRING_DATASOURCE_USERNAME=app
-export SPRING_DATASOURCE_PASSWORD=secret
-./gradlew :Audit:bootRun
-```
-
----
-
-## Profiles
-
-| Profile | Datasource                         | `ddl-auto` | SQL logging | H2 console | App log level |
-|---------|------------------------------------|------------|-------------|------------|---------------|
-| LOCAL   | In-memory H2                       | update     | on          | enabled    | DEBUG         |
-| DEV     | Env vars, H2 fallback              | update     | on          | off        | DEBUG         |
-| SIT     | Env vars, H2 fallback              | update     | off         | off        | INFO          |
-| UAT     | Env vars (required)                | validate   | off         | off        | INFO          |
-| PROD    | Env vars (required)                | validate   | off         | off        | INFO (root WARN) |
-
-Profile-specific config lives in each module's
-`src/main/resources/application-<PROFILE>.properties`; common settings are in
-`application.properties`. The active profile defaults to `LOCAL` and is overridden
-with `SPRING_PROFILES_ACTIVE`.
-
----
-
-## API documentation (Swagger)
-
-With a service running, Swagger UI is at `http://localhost:<port>/swagger-ui.html`
-and the raw spec at `http://localhost:<port>/v3/api-docs`. Use the **Authorize**
-button to supply a `Bearer <token>` obtained from the Auth service.
-
----
+Local stack credentials (dev-only, deliberately public): Postgres `localhost:5432`
+`audit`/`audit` db `auditdb`; Redis `localhost:6379`, no password. Browser GUIs ship in the
+stack — Adminer (`:8082`), Redis Insight (`:5540`), Kafbat Kafka UI (`:8080`) — and are kept out
+of prod via a never-activated `local-tools` profile. Real deployments inject their own
+credentials (`docker-compose.prod.yml`, `DB_PASSWORD`).
 
 ## Rate limiting
 
-Every service enforces **one active request per user per endpoint**, newest-wins:
+Every service enforces **one active request per user per endpoint, newest-wins**: a new request
+for the same `userId+method+path` interrupts the older one, rolls back its `@Transactional`
+work, and the older client gets **429 + `Retry-After: 30`**. Lock-free `ConcurrentHashMap`
+registry, interrupt-based race-safe cancellation, shared via `:common`
+(`com.askapp.common.ratelimit`); configurable via `ratelimit.*`.
 
-- The key is `userId + HTTP method + path`.
-- If a new request arrives for the same key while an older one is still in flight,
-  the **older** request is **discarded**: its worker thread is interrupted and its
-  `@Transactional` work is **rolled back**, so no partial writes survive.
-- The discarded request's client receives **HTTP 429** with a **`Retry-After: 30`**
-  header — i.e. it may retry after 30 seconds.
+**Measured (k6):**
 
-Implementation — shared by both services via the `:common` module
-(`com.askapp.common.ratelimit`), except `TransactionalRequestExecutor`, which stays in Audit
-since it's JPA-transaction-specific and Auth has no datastore:
+| Scenario | Numbers |
+|----------|---------|
+| Throughput (`search-stats.js`, limiter off, 20 VUs) | 281 req/s sustained, p95 **7.31 ms**, 0% failed |
+| Prod smoke (`prod-smoke.js`, live VM over public TLS, 5 VUs) | 12.7 req/s, read p95 **96.7 ms**, 0 × 5xx, 0 × 429 |
+| Contention (`rate-limit.js`, 30 VUs on one key) | 715 req/s, **81.5% shed as 429, 0% 5xx** |
 
-| Component                      | Role                                                                 |
-|--------------------------------|----------------------------------------------------------------------|
-| `RateLimitInterceptor`         | Registers/deregisters each request; cancels superseded ones          |
-| `ActiveRequestRegistry`        | Lock-free (`ConcurrentHashMap`) registry of the active request/key   |
-| `ActiveRequest`                | Per-request handle with interrupt-based, race-safe cancellation      |
-| `DiscardContext`               | `ThreadLocal` checkpoint used inside transactions                    |
-| `TransactionalRequestExecutor` | Audit-only: runs mutations in a tx that rolls back if discarded      |
-| `RequestDiscardedException`    | Mapped to `429 + Retry-After` by each service's global exception handler |
+The hard gate — a superseded request sheds as `429`, never a `5xx` — held at 0% under load.
+Both scripts also run in CI on every PR.
 
-Configurable via `ratelimit.enabled` and `ratelimit.retry-after-seconds`.
+## Logging, correlation & auditing
 
-The design is built for high concurrency: no global locks (only per-key
-`ConcurrentHashMap` bin locks), volatile flags for cancellation signalling, and
-per-request `ThreadLocal` state that is cleared (along with any lingering thread
-interrupt) when the request completes.
+One structured line per event:
+`[<service>] <ts> pod=<host> traceId= spanId= requestId= userId= threadId= url= - <message>`.
+Every request carries a correlation UUID (`X-Request-Id` in, MDC, echoed back, in error
+payloads). Auditing is two-level: JPA persistence auditing (`created_at`/`updated_at` +
+request-UUID "by" columns — never a user identity) and an `AuditInterceptor` emitting
+`AUDIT action= resource= status= outcome= durationMs=` lines (no bodies/headers). Filter in
+Loki: `{app=~".+-service"} |= "AUDIT"`.
 
-### Measured numbers (k6, local run, 2026-07-01)
+## Observability
 
-Both `Backend/load-test/*.js` scripts run in CI on every PR (see `backend-ci.yml`'s
-`load-test` job); the numbers below are a local run of the same scripts against the same jar,
-captured directly instead of pulled from a CI artifact.
+The Grafana/Prometheus/Loki/Tempo stack is the **system view** (request rates, p95/p99, logs,
+traces); the in-app audit dashboard is the **domain view**. Prod publishes Grafana **read-only**
+at **https://ask-app.sahilparekh1212.com/grafana** (anonymous Viewer); Prometheus/Loki/Tempo
+stay unpublished. Usage guide with verified example queries:
+[docs/observability.md](docs/observability.md).
 
-**Throughput/latency** (`search-stats.js` — limiter off, ramping to 20 VUs over 55s, `/search` +
-`/stats` against a seeded 200+-row table):
-
-| Metric | Value |
-|--------|-------|
-| Requests | 15,850 (281 req/s sustained) |
-| `http_req_duration` p95 | 7.31 ms (threshold: < 800 ms) |
-| `http_req_duration` avg | 3.62 ms |
-| Failed requests | 0.00% |
-
-**Production smoke** (`prod-smoke.js` — the *live* GCE VM through the public origin
-`https://ask-app.sahilparekh1212.com`, rate limiter **on**, read-only, ramping to 5 VUs over
-45s; off-peak run 2026-07-13). This is the honest "how does the shared 8 GB / ~\$50 VM hold up
-over public TLS with real data" number — higher than the CI figures above (real internet round
-trip + TLS termination + one shared VM), still comfortably sub-100 ms:
-
-| Metric | Value |
-|--------|-------|
-| Requests | 597 (12.7 req/s at 5 VUs) |
-| Read latency **p95** (200s only) | **96.7 ms** (threshold: < 1500 ms) |
-| Read latency avg / median | 69.6 ms / 62.2 ms |
-| Failed requests | 0.00% |
-| Server errors (`5xx`) | 0 |
-| Rate-limited (`429`) | 0 |
-
-Concurrency is deliberately modest: the demo login mints a single user id and prod's newest-wins
-limiter buckets per user, so a higher-VU same-user run would measure the limiter's shedding (that
-is the `rate-limit.js` test below) rather than the VM's read latency. At 5 VUs with think time the
-limiter never trips (0 × 429) and no request 5xx'd.
-
-**Rate-limit behavior** (`rate-limit.js` — limiter on, 30 VUs hammering the same key for 20s):
-
-| Metric | Value |
-|--------|-------|
-| Requests | 14,317 (715 req/s sustained) |
-| Shed as `429` | 81.53% (11,674 requests) |
-| Server errors (`5xx`) | 0.00% (threshold: < 5%) |
-
-The hard gate — a superseded request must shed as `429`, never a `5xx` — held at 0% under this
-load. (A small fraction of requests instead see a network-level connection reset rather than a
-clean `429`: the interrupt-based cancellation can land mid-write on the older request's
-connection. That's a k6-visible client artifact of the same graceful-shedding mechanism, not a
-5xx from the server — see `rate-limit.js`'s own threshold comment.)
-
----
-
-## Logging
-
-Logback (`logback-spring.xml`) emits one structured line per event:
-
-```
-[<service>] <ISO-8601 timestamp> pod=<hostname> requestId=<id> userId=<id> threadId=<thread> url=<last 2 path parts> - <message>
-```
-
-`requestId`, `userId`, and `url` come from an MDC filter; `pod` is the container's
-`HOSTNAME` env var (`local` outside a container) so a log line — or, via the matching
-`podName` metrics tag and Loki `host` label — a metric or dashboard panel can be traced
-back to the instance that emitted it once more than one replica is running; `threadId`
-is the executing thread (logback's native `%thread`, so it renders on every line). The
-global exception handler logs the originating method, exception class, message, and the
-first 300 chars of the stack trace.
-
----
-
-## Request correlation & auditing
-
-Every request carries a correlation UUID:
-
-- The UI sends it as the **`X-Request-Id`** header; if absent, the service generates one.
-- It is placed in the logging MDC (`requestId=` appears on every log line) and **echoed
-  back** on the response `X-Request-Id` header, so responses, logs, and audit rows can be
-  stitched together.
-- It is included in error response payloads (`requestId` field).
-
-**Auditing** works at two levels:
-
-1. **Persistence auditing** (Spring Data JPA): every entity extends `AuditableEntity` and
-   automatically records `created_at`, `updated_at`, and `created_by_request_id` /
-   `updated_by_request_id`. The "by" columns store **the request UUID — never a user
-   identity** — resolved from the correlation UUID via an `AuditorAware` bean.
-2. **Request-event auditing** (`AuditInterceptor`): emits one structured line per request
-   under the `AUDIT` logger —
-   `AUDIT action=<method> resource=<path> status=<code> outcome=<SUCCESS|ERROR> durationMs=<n>`
-   — with the actor, timestamp, and `requestId` coming from the MDC. Only method/path/status/
-   duration are recorded (no bodies, headers, or query strings).
-
-Neither path captures personally identifiable information, and both are correlated by the
-same request UUID. Filter the in-app audit trail in Loki with `{app=~".+-service"} |= "AUDIT"`.
-
----
-
-## Observability (Prometheus + Loki + Tempo + Grafana)
-
-This stack is the **system view** — how the servers are performing (request rates, p95/p99
-latency, logs, traces). It complements the app's own audit dashboard, which is the
-**domain view** — what users and agents actually did, fed by the event-sourced audit trail.
-Same deployment, two different questions.
-
-The production deployment publishes its Grafana **read-only** at
-**https://ask-app.sahilparekh1212.com/grafana** (anonymous Viewer behind the Caddy
-`/grafana` route — dashboards and Explore work, nothing is editable). Prometheus, Loki and
-Tempo themselves stay unpublished.
-
-**Usage guide with example queries** (PromQL, LogQL, tracing a login across the Kafka hop, a
-2-minute end-to-end walkthrough): [docs/observability.md](docs/observability.md). Every example
-query in it was verified against the running stack.
-
-| Tool       | Role                                | Source from each service                        |
-|------------|-------------------------------------|---------------------------------------------------|
-| Prometheus | Scrapes metrics                     | Micrometer `/actuator/prometheus`                |
-| Loki       | Aggregates logs                     | logback `Loki4jAppender` (push)                  |
-| Tempo      | Aggregates traces                   | Micrometer Tracing → OTel bridge → OTLP (push)   |
-| Grafana    | Dashboards over all three           | All three datasources, auto-provisioned          |
-
-Every service exposes `/actuator/prometheus` (metrics tagged with `application=<service>`),
-ships logs to Loki via a logback appender, and exports traces via OTLP — all three are **only
-active in DEV/SIT/UAT/PROD** (LOCAL stays console-only, unsampled). Targets default to the
-in-cluster/in-compose hostnames and are overridable: `LOKI_URL`,
-`OTEL_EXPORTER_OTLP_ENDPOINT`, `TRACING_SAMPLING_PROBABILITY` (default `1.0` — 100%, fine at
-this traffic volume; lower it for a real production workload).
-
-**Traces span the async Kafka boundary, not just one request.** `spring.kafka.template/
-listener.observation-enabled=true` wraps `KafkaTemplate.send()` and `@KafkaListener` in a
-Micrometer Observation, and a `ContextPropagatingTaskDecorator` carries the active trace across
-the `@Async` hop into the fire-and-forget publisher — so a trace started by a `POST /auth/login`
-request continues through the `AuditEvent` Kafka message's headers and into Audit's consumer:
-one trace, two services, an async executor hop *and* a broker in between. Every log line also
-carries `traceId=`/`spanId=` (from Micrometer Tracing's MDC integration), so a trace found in
-Tempo's Explore view jumps straight to its matching log lines in Loki (searched by trace ID) via
-the pre-provisioned datasource correlation.
-
-### Proven against real traffic
+Telemetry is active in DEV+ only (LOCAL stays console-only). Traces span the async Kafka
+boundary: Kafka template/listener observations plus a `ContextPropagatingTaskDecorator` across
+the `@Async` hop mean one login is **one trace** — auth's HTTP span → `audit.events send` →
+`audit.events receive`. Log lines carry `traceId=`, so Tempo ↔ Loki correlation is
+pre-provisioned.
 
 ![Grafana ask-app Overview dashboard during a k6 load run](docs/images/grafana-overview-load.png)
 
-Captured from the full `docker compose` stack — Auth scaled to **2 replicas** (see
-`docker-compose.scale.yml`; Prometheus discovers every replica via Docker DNS
-`dns_sd_configs`, not a host port) — while the k6 scripts ran against the JWT-secured DEV
-profile (`k6 run -e TOKEN=<demo-login JWT> load-test/*.js`). What it shows: request-rate
-bursts from the k6 runs, per-endpoint p95/p99 latency from the histogram buckets, live Loki
-logs, and an empty 5xx panel — the rate limiter sheds contention as 429s, never 5xx. Verified
-in the same session through Tempo's API: one trace for a single `POST /auth/login` containing
-auth's HTTP server span, its `audit.events send` producer span, and audit's
-`audit.events receive` consumer span — the login → Kafka → audit-persist path really is one
-trace. Getting this screenshot honest surfaced (and fixed) two silent breaks: loki4j 2.x
-ignoring its 1.x-style label config (every line shipped as `app=default`) and the `@Async`
-publish dropping the trace context, which had split that one trace in two.
-
-### Run the stack locally
-
-```bash
-# 1. Start Prometheus, Loki, Tempo and Grafana (datasources + a starter dashboard are pre-provisioned)
-docker compose -f monitoring/docker-compose.yml up -d
-
-# 2. Run services under DEV so they push logs/traces to Loki/Tempo and Prometheus can scrape them
-SPRING_PROFILES_ACTIVE=DEV LOKI_URL=http://localhost:3100/loki/api/v1/push \
-  OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318/v1/traces ./gradlew :Audit:bootRun
-```
-
-Then open **Grafana at http://localhost:3000** (admin / admin) → the *ask-app Overview*
-dashboard shows request/error rates, JVM heap, and live logs; use **Explore → Tempo** to search
-traces. Prometheus UI is at http://localhost:9090.
-
-Config lives under `monitoring/` (`prometheus/`, `loki/`, `tempo/`, `grafana/provisioning/` +
-`grafana/dashboards/`).
-
----
+Captured from the compose stack with Auth at 2 replicas (Docker-DNS service discovery) under k6
+load: request bursts, per-endpoint p95/p99, live logs, and an empty 5xx panel. Standalone local
+run: `docker compose -f monitoring/docker-compose.yml up -d`, then bootRun under `DEV` with
+`LOKI_URL`/`OTEL_EXPORTER_OTLP_ENDPOINT` pointed at it — Grafana at `:3000` (admin/admin).
 
 ## Deploying to OpenShift
 
-> For the full commit-to-running-system picture — image registry, environments, CI→CD
-> promotion, rollout/rollback, DNS/TLS — see the [end-to-end deployment plan](docs/deployment.md).
-> This section is the concrete OpenShift apply sequence.
+> Full commit-to-running-system picture (registry, environments, promotion, rollout/rollback,
+> DNS/TLS): [docs/deployment.md](docs/deployment.md). This is the apply sequence.
 
-Manifests live under `openshift/<service>/` (Deployment, Service, Route, ConfigMap,
-HPA; plus Secret templates for Auth and Postgres) alongside self-hosted `redis`/`postgres`
-backing stores. Each service scales independently via its HorizontalPodAutoscaler.
+Manifests under `openshift/<service>/` (Deployment, Service, Route, ConfigMap, HPA, Secret
+templates) plus self-hosted `redis`/`postgres`:
 
 ```bash
-# 1. Namespace
 oc apply -f openshift/namespace.yaml
-
-# 2. Secrets — real values are NEVER committed. Copy the gitignored templates and fill them in,
-#    or create the Secrets imperatively (oc create secret ...). See "Secrets" section below.
-cp openshift/auth/secret.example.yaml openshift/auth/secret.yaml                 # then edit real values
-cp openshift/postgres/secret.example.yaml openshift/postgres/secret.yaml         # DB user/password/db
-cp openshift/monitoring/grafana/secret.example.yaml openshift/monitoring/grafana/secret.yaml  # then edit
-oc apply -f openshift/auth/secret.yaml
-oc apply -f openshift/postgres/secret.yaml
-
-# 3. Build & push each image (build context is the repo root)
-docker build -f Audit/Dockerfile -t <registry>/ask-app/audit-service:latest .
-# ...repeat per service, then push
-
-# 4. Backing stores — Redis (Auth's refresh-token store, before Auth scales past one replica)
-#    and Postgres (Audit's database of record, before Audit starts; see the SCC/PVC note below).
-oc apply -f openshift/redis/
-oc apply -f openshift/postgres/
-
-# 5. Apply each service's manifests (both run 2 replicas by default; see HPA below)
-oc apply -f openshift/auth/
-oc apply -f openshift/audit/
-
-# 6. Observability stack (Prometheus scrapes the services, Grafana reads Prometheus + Loki)
-oc apply -f openshift/monitoring/prometheus/
-oc apply -f openshift/monitoring/loki/
-oc apply -f openshift/monitoring/grafana/
+cp openshift/auth/secret.example.yaml openshift/auth/secret.yaml   # fill in; never commit
+oc apply -f openshift/auth/secret.yaml -f openshift/postgres/secret.yaml
+oc apply -f openshift/redis/ -f openshift/postgres/
+oc apply -f openshift/auth/ -f openshift/audit/
+oc apply -f openshift/monitoring/prometheus/ -f openshift/monitoring/loki/ -f openshift/monitoring/grafana/
 ```
 
-> The Postgres and Grafana/Loki/Prometheus images may need a relaxed SCC on OpenShift, e.g.
-> `oc adm policy add-scc-to-user anyuid -z default -n ask-app` — they run as fixed uids and must
-> own their data dirs (Postgres sets `fsGroup: 999` to match). Each gets a `ReadWriteOnce`
-> `PersistentVolumeClaim` for its data dir (`pvc.yaml` alongside each `deployment.yaml`; sized
-> 5Gi for Postgres and 5Gi/1Gi/10Gi for Loki/Grafana/Prometheus respectively, no
-> `storageClassName` set so it binds the cluster default — override per environment).
-> Deployments use `strategy: Recreate` since a RWO volume can't be mounted by an old
-> and new pod at once during a rolling update. Postgres is a single-replica SPOF here (the
-> self-contained option mirroring the compose stack); a managed instance or an operator is the
-> HA route.
-
-Scale a service manually at any time:
-
-```bash
-oc scale deployment audit-service --replicas=3 -n ask-app
-```
-
-> **Auth + scaling:** Auth is stateless and ships at 2 replicas. Two things make that safe, both
-> already wired in the manifests: (1) `AUTH_REFRESH_TOKEN_STORE=redis` + `REDIS_HOST=redis`
-> (in `openshift/auth/configmap.yaml`) point every pod at the shared Redis so a refresh token
-> issued by one pod is honored by another; (2) `AUTH_RSA_PRIVATE_KEY` (which you set in
-> `openshift/auth/secret.yaml`) makes every pod sign JWTs with the same key. Miss the key and each
-> pod generates an ephemeral one and tokens fail validation across replicas; miss Redis (or leave
-> the store `in-memory`) and refresh silently fails on whichever pod didn't mint the token. See
-> [ADR-0007](docs/adr/0007-redis-refresh-token-store-for-statelessness.md).
-
----
+Notes: the store images may need a relaxed SCC (`oc adm policy add-scc-to-user anyuid ...`) and
+each gets a RWO PVC with `strategy: Recreate`; Postgres is a single-replica SPOF here (managed
+instance = the HA route). **Auth at 2 replicas is safe because** every pod shares the Redis
+refresh-token store (`AUTH_REFRESH_TOKEN_STORE=redis`) and signs with the same
+`AUTH_RSA_PRIVATE_KEY` — miss either and cross-replica refresh/validation silently breaks
+([ADR-0007](docs/adr/0007-redis-refresh-token-store-for-statelessness.md)).
 
 ## Secrets
 
-**Real secrets are never committed** — not even to a private repo. The repo contains only
-`*.example.yaml` templates; the real `secret.yaml` files are gitignored.
-
-```bash
-# Option A — copy the template, fill it in (file is gitignored), apply it
-cp openshift/auth/secret.example.yaml openshift/auth/secret.yaml   # edit real values
-oc apply -f openshift/auth/secret.yaml
-
-# Option B — create the Secret imperatively, nothing touches the repo
-oc create secret generic auth-secret -n ask-app \
-  --from-literal=GOOGLE_CLIENT_ID=... \
-  --from-literal=GOOGLE_CLIENT_SECRET=... \
-  --from-file=AUTH_RSA_PRIVATE_KEY=private_pkcs8.pem
-```
-
-A **gitleaks pre-commit hook** guards against accidental commits — enable it once:
-
-```bash
-pip install pre-commit && pre-commit install
-pre-commit run --all-files   # scan the whole repo on demand
-```
-
-If a real secret ever lands in git history, **rotate it** (regenerate the Google client
-secret / RSA key / Grafana password) — deleting the file does not remove it from history.
-
----
+Real secrets are never committed — only `*.example.yaml` templates; real files are gitignored,
+or create Secrets imperatively (`oc create secret generic ... --from-literal=...`). A
+**gitleaks pre-commit hook** guards the repo (`pip install pre-commit && pre-commit install`).
+If a secret ever lands in history: **rotate it** — deleting the file doesn't remove it.
 
 ## Security & supply-chain scanning
 
-Four layers of automated scanning run in CI and on a schedule, each covering a distinct class of
-risk. Findings surface in the repo's **Security tab**, and CodeQL + Trivy are **required branch-
-protection checks**, so a new SAST alert or a fixable HIGH/CRITICAL CVE blocks the merge rather
-than landing after the fact.
+| Layer | Tool | Where |
+|-------|------|-------|
+| SAST | **CodeQL** | `codeql.yml` (required check) |
+| Dependency CVEs | **Trivy** (jar) + **Dependabot** | `backend-ci.yml`; `dependabot.yml` |
+| Image CVEs | **Trivy** (image) | `backend-ci.yml` (required check) |
+| Secrets | **gitleaks** + detect-private-key | pre-commit + `lint.yml` |
 
-| Layer | Tool | What it catches | Where |
-|-------|------|-----------------|-------|
-| **SAST** (code flaws) | **CodeQL** | Injection, auth mistakes, unsafe APIs in the Java code | `.github/workflows/codeql.yml` |
-| **SCA** (dependency CVEs) | **Trivy** (jar scan) + **Dependabot** | Known vulns in bundled libraries; automated update PRs | `trivy` job in `backend-ci.yml`; `.github/dependabot.yml` |
-| **Container image CVEs** | **Trivy** (image scan) | OS/base-image vulns in the built `eclipse-temurin` images | `trivy` job in `backend-ci.yml` |
-| **Secrets** | **gitleaks** + **detect-private-key** | Committed credentials/keys, pre-commit and in CI | pre-commit hook (above) + `lint.yml` |
-
-Dependabot watches three ecosystems — **gradle**, **github-actions**, and **docker** (base images) —
-groups routine bumps into a couple of PRs a week, and opens security-update PRs immediately for
-vulnerable dependencies.
-
-### Image signing & SBOM (cosign + syft)
-
-Beyond scanning, every image CD pushes to GHCR is **signed by digest with cosign** (keyless —
-the signing identity is the `cd.yml` workflow's OIDC token, recorded in the public Rekor
-transparency log; no key to store or rotate) and carries a **syft SPDX SBOM** as a signed
-attestation. Verify an image before running or deploying it:
+Every image CD pushes is **cosign-signed by digest** (keyless: the signing identity is
+`cd.yml`'s OIDC token, logged in Rekor) with a **syft SPDX SBOM** attestation:
 
 ```bash
-# Signature: proves the image was built by THIS repo's CD workflow on main
 cosign verify \
   --certificate-identity-regexp 'https://github.com/sahilparekh1212/ask-app/\.github/workflows/cd\.yml@.*' \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
   ghcr.io/sahilparekh1212/ask-app/audit:latest
-
-# SBOM attestation: the dependency inventory attached to the image
-cosign verify-attestation --type spdxjson \
-  --certificate-identity-regexp 'https://github.com/sahilparekh1212/ask-app/\.github/workflows/cd\.yml@.*' \
-  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
-  ghcr.io/sahilparekh1212/ask-app/audit:latest
 ```
 
-The identity pin is the point of keyless signing: a signature only counts if it was produced by
-this repository's `cd.yml` running on GitHub's runners — not merely "signed by someone".
-
-### Why this stack (and not a commercial suite like Snyk)
-
-This was a deliberate choice, not a default — the trade-offs:
-
-- **Full category coverage, no gap.** SAST, SCA, container, and secrets are each covered. The four
-  tools map one-to-one onto what a single commercial platform (e.g. Snyk) bundles, so there's no
-  capability being given up — only the single-vendor dashboard.
-- **Native to where the code lives.** CodeQL and Dependabot are first-party GitHub: results land in
-  the Security tab, alerts gate PRs through branch protection, and there's **no extra service,
-  runner, or API token** to provision or keep secret. One less integration to own.
-- **Defense in depth via independent sources.** Trivy, CodeQL, and Dependabot draw on *different*
-  vulnerability databases (Trivy's advisories, GitHub's Advisory DB, CodeQL's query packs). Layering
-  independent scanners catches more than relying on one vendor's feed — the same reason the Trivy
-  image scan runs *in addition to* the jar scan.
-- **Free and quota-free at any scan volume.** The OSS tools (Trivy, gitleaks) impose no monthly
-  test caps. A free commercial tier typically does, which a chatty CI pipeline can exhaust; here
-  every push and PR can scan without metering.
-- **No vendor lock-in.** All configuration is plain YAML in this repo; the pipeline is portable to
-  any CI, not tied to a SaaS account.
-
-**When a commercial tool like Snyk would earn its place:** a single dashboard across *many* repos,
-auto-generated fix PRs, license-compliance policy enforcement, or simply matching an organization's
-existing standard. At single-repo scale, the GitHub-native + OSS stack delivers the same protection
-for zero cost and less operational surface — so it's added only if one of those triggers appears.
+The identity pin is the point: a signature only counts if produced by *this repo's* `cd.yml`.
+Why GitHub-native + OSS instead of a commercial suite (Snyk et al.): same four categories
+covered, results land in the Security tab and gate PRs natively, independent vulnerability
+databases layer, zero cost/quota at any scan volume, no vendor lock-in — a commercial platform
+earns its place at many-repo scale, not here.

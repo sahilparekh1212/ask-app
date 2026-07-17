@@ -32,21 +32,35 @@ public class RagIndexer implements ApplicationRunner {
 	private final CorpusLoader corpusLoader;
 	private final MarkdownChunker markdownChunker;
 	private final CodeChunker codeChunker;
+	private final ReferenceDataChunker referenceDataChunker;
 	private final EmbeddingClient embeddingClient;
 	private final VectorStore vectorStore;
 
 	public RagIndexer(RagProperties properties, CorpusLoader corpusLoader, MarkdownChunker markdownChunker,
-			CodeChunker codeChunker, EmbeddingClient embeddingClient, VectorStore vectorStore) {
+			CodeChunker codeChunker, ReferenceDataChunker referenceDataChunker, EmbeddingClient embeddingClient,
+			VectorStore vectorStore) {
 		this.properties = properties;
 		this.corpusLoader = corpusLoader;
 		this.markdownChunker = markdownChunker;
 		this.codeChunker = codeChunker;
+		this.referenceDataChunker = referenceDataChunker;
 		this.embeddingClient = embeddingClient;
 		this.vectorStore = vectorStore;
 	}
 
 	@Override
 	public void run(ApplicationArguments args) {
+		reindex();
+	}
+
+	/**
+	 * Run (or re-run) indexing on a background thread. Called once at startup and again by the
+	 * daily reference-data scheduler after it appends rows, so newly-ingested reference data
+	 * becomes retrievable without a restart. A no-op when RAG is not configured. Indexing is
+	 * incremental (content-hashed) and idempotent, so overlapping or repeated calls only ever
+	 * embed genuinely-new chunks.
+	 */
+	public void reindex() {
 		if (!properties.isConfigured()) {
 			log.info("RAG indexing skipped: not configured (set VOYAGE_API_KEY to enable)");
 			return;
@@ -81,6 +95,10 @@ public class RagIndexer implements ApplicationRunner {
 				: codeChunker.chunk(document.source(), document.content());
 			corpus.addAll(chunks);
 		}
+		// Reference data (the security master) is indexed alongside the bundled docs/code, so the
+		// assistant and MCP search can answer questions about the dataset. Query-derived, not
+		// bundled, so it reflects the current rows (including the daily incremental batch).
+		corpus.addAll(referenceDataChunker.chunks());
 		Set<String> liveIds = corpus.stream().map(DocChunk::id).collect(Collectors.toSet());
 		Set<String> existing = vectorStore.existingIds();
 

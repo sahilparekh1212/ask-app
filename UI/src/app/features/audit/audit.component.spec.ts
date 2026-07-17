@@ -54,6 +54,7 @@ describe('AuditComponent', () => {
     });
     flushTimeline();
     flushKpis();
+    flushSecurities();
     // ngOnInit also probes the capability endpoint to decide whether to show the demo button.
     httpMock
       .expectOne((r) => r.url === `${environment.auditApiUrl}/api/v1/meta/features`)
@@ -62,6 +63,13 @@ describe('AuditComponent', () => {
 
   function flushTimeline(buckets: { bucket: string; count: number }[] = []): void {
     httpMock.expectOne((r) => r.url === `${base}/stats/timeline`).flush(buckets);
+  }
+
+  /** ngOnInit also loads the reference-data (security-master) panel's first page. */
+  function flushSecurities(): void {
+    httpMock
+      .expectOne((r) => r.url === `${environment.auditApiUrl}/api/v1/refdata/securities`)
+      .flush({ content: [], page: 0, size: 10, totalElements: 0, totalPages: 0, last: true });
   }
 
   /** The panel's own stats request — the KPI requests carry a `from` param, this one doesn't. */
@@ -104,6 +112,7 @@ describe('AuditComponent', () => {
     filteredStats().flush(emptyStats);
     flushTimeline();
     flushKpis();
+    flushSecurities();
     httpMock
       .expectOne((r) => r.url === `${environment.auditApiUrl}/api/v1/meta/features`)
       .flush({ demoData: false });
@@ -222,6 +231,7 @@ describe('AuditComponent', () => {
       { bucket: new Date(anchor).toISOString(), count: 2 },
       { bucket: new Date(anchor + 2 * 3_600_000).toISOString(), count: 1 },
     ]);
+    flushSecurities();
     httpMock
       .expectOne((r) => r.url === `${environment.auditApiUrl}/api/v1/meta/features`)
       .flush({ demoData: false });
@@ -258,6 +268,7 @@ describe('AuditComponent', () => {
       { total: 3, byAction: [], byEntityType: [] },
       { total: 1, byAction: [], byEntityType: [] },
     );
+    flushSecurities();
     httpMock
       .expectOne((r) => r.url === `${environment.auditApiUrl}/api/v1/meta/features`)
       .flush({ demoData: false });
@@ -293,5 +304,46 @@ describe('AuditComponent', () => {
     // external link must open in a new tab without leaking the opener
     expect(link!.target).toBe('_blank');
     expect(link!.rel).toContain('noopener');
+  });
+
+  it('loads the reference-data panel and applies its filters (trimmed, sorted)', () => {
+    flushInitialLoad(); // includes the panel's initial (unfiltered) securities load
+
+    component.refdataForm.patchValue({ assetClass: 'BOND', currency: 'EUR', name: '  foo ' });
+    component.applyRefdataFilters();
+
+    const req = httpMock.expectOne(
+      (r) => r.url === `${environment.auditApiUrl}/api/v1/refdata/securities`,
+    );
+    expect(req.request.params.get('assetClass')).toBe('BOND');
+    expect(req.request.params.get('currency')).toBe('EUR');
+    expect(req.request.params.get('name')).toBe('foo'); // trimmed
+    expect(req.request.params.get('sort')).toBe('instrumentId,asc');
+    req.flush({
+      content: [
+        {
+          id: 1,
+          instrumentId: 'SEC-000001',
+          isin: 'US0000000001',
+          cusip: 'CUSIP0001',
+          sedol: 'SED0001',
+          name: 'Synthetic BOND SEC-000001',
+          assetClass: 'BOND',
+          currency: 'EUR',
+          price: 10.25,
+          asOfDate: '2026-07-16',
+        },
+      ],
+      page: 0,
+      size: 10,
+      totalElements: 1,
+      totalPages: 1,
+      last: true,
+    });
+    fixture.detectChanges();
+
+    const rows = (fixture.nativeElement as HTMLElement).querySelectorAll('#securities tbody tr');
+    expect(rows.length).toBe(1);
+    expect(component.securities()?.content[0].instrumentId).toBe('SEC-000001');
   });
 });

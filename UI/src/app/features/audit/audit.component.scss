@@ -264,7 +264,7 @@
     // (the border-bottom doesn't travel with a sticky cell).
     thead th {
       position: sticky;
-      top: 56px;
+      top: 0;
       z-index: 5;
       background: var(--canvas-subtle);
       color: var(--fg-muted);
@@ -294,6 +294,29 @@
     margin-top: 1rem;
     font-size: 0.85rem;
     color: var(--fg-muted);
+  }
+
+  // Reference-data panel: separated from the audit trail above by a rule. Its table has six
+  // content-sized columns, so it opts out of the audit table's fixed 4-column layout.
+  .refdata {
+    margin-top: 2rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--border);
+
+    h3 {
+      font-size: 1rem;
+      margin: 0 0 0.35rem;
+    }
+
+    .refdata-blurb {
+      margin: 0 0 1rem;
+      font-size: 0.85rem;
+      color: var(--fg-muted);
+    }
+
+    table {
+      table-layout: auto;
+    }
   }
 
   .error {

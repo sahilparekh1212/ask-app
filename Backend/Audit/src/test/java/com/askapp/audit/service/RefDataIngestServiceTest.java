@@ -3,6 +3,7 @@ package com.askapp.audit.service;
 import com.askapp.audit.dto.IngestResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.batch.core.Job;
 import org.springframework.batch.core.JobExecution;
 import org.springframework.batch.core.JobParameters;
@@ -44,6 +45,22 @@ class RefDataIngestServiceTest {
 		assertThat(response.requested()).isEqualTo(7);
 		assertThat(response.ingested()).isEqualTo(7L);
 		assertThat(response.engine()).isEqualTo("spring-batch");
+	}
+
+	@Test
+	void ingest_passesStartIndexAndCountAsJobParameters() throws Exception {
+		StepExecution step = mock(StepExecution.class);
+		when(step.getWriteCount()).thenReturn(50L);
+		JobExecution execution = mock(JobExecution.class);
+		when(execution.getStepExecutions()).thenReturn(List.of(step));
+		ArgumentCaptor<JobParameters> params = ArgumentCaptor.forClass(JobParameters.class);
+		when(jobLauncher.run(eq(job), params.capture())).thenReturn(execution);
+
+		IngestResponse response = service.ingest(1000, 50);
+
+		assertThat(params.getValue().getLong("startIndex")).isEqualTo(1000L);
+		assertThat(params.getValue().getLong("count")).isEqualTo(50L);
+		assertThat(response.ingested()).isEqualTo(50L);
 	}
 
 	@Test

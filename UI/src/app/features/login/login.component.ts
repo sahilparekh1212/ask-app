@@ -35,7 +35,7 @@ export class LoginComponent {
     this.auth.demoLogin(this.form.getRawValue()).subscribe({
       next: () => {
         // Show a brief "Redirecting…" state before sending the user back to wherever they were
-        // headed before the guard bounced them here (returnUrl), defaulting to their profile.
+        // headed before the guard bounced them here (returnUrl), defaulting to the chat page.
         this.redirecting.set(true);
         setTimeout(() => void this.router.navigateByUrl(this.returnUrl()), 700);
       },
@@ -51,6 +51,6 @@ export class LoginComponent {
   }
 
   private returnUrl(): string {
-    return this.route.snapshot.queryParamMap.get('returnUrl') ?? '/profile';
+    return this.route.snapshot.queryParamMap.get('returnUrl') ?? '/chat';
   }
 }

@@ -198,6 +198,84 @@
     </div>
   }
 
+  <section class="refdata" id="refdata">
+    <h3>{{ 'refdata.title' | t }}</h3>
+    <p class="refdata-blurb">{{ 'refdata.blurb' | t }}</p>
+
+    <form class="filters" [formGroup]="refdataForm" (ngSubmit)="applyRefdataFilters()">
+      <label
+        >{{ 'refdata.assetClass' | t }}
+        <select formControlName="assetClass">
+          <option value="">{{ 'audit.all' | t }}</option>
+          @for (c of assetClassOptions; track c) {
+            <option [value]="c">{{ c }}</option>
+          }
+        </select>
+      </label>
+      <label
+        >{{ 'refdata.currency' | t }}
+        <select formControlName="currency">
+          <option value="">{{ 'audit.all' | t }}</option>
+          @for (c of currencyOptions; track c) {
+            <option [value]="c">{{ c }}</option>
+          }
+        </select>
+      </label>
+      <label
+        >{{ 'refdata.name' | t }}
+        <input type="text" formControlName="name" [placeholder]="'audit.detailsPlaceholder' | t"
+      /></label>
+      <button type="submit">{{ 'audit.applyFilters' | t }}</button>
+    </form>
+
+    @if (refdataError()) {
+      <p class="error" role="alert">{{ refdataError() }}</p>
+    }
+
+    <table id="securities">
+      <thead>
+        <tr>
+          <th>{{ 'refdata.colInstrument' | t }}</th>
+          <th>{{ 'refdata.colName' | t }}</th>
+          <th>{{ 'refdata.assetClass' | t }}</th>
+          <th>{{ 'refdata.currency' | t }}</th>
+          <th>{{ 'refdata.colPrice' | t }}</th>
+          <th>{{ 'refdata.colAsOf' | t }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (s of securities()?.content ?? []; track s.id) {
+          <tr>
+            <td [attr.data-label]="'refdata.colInstrument' | t">{{ s.instrumentId }}</td>
+            <td [attr.data-label]="'refdata.colName' | t">{{ s.name || '—' }}</td>
+            <td [attr.data-label]="'refdata.assetClass' | t">{{ s.assetClass || '—' }}</td>
+            <td [attr.data-label]="'refdata.currency' | t">{{ s.currency || '—' }}</td>
+            <td [attr.data-label]="'refdata.colPrice' | t">{{ s.price ?? '—' }}</td>
+            <td [attr.data-label]="'refdata.colAsOf' | t">{{ s.asOfDate || '—' }}</td>
+          </tr>
+        } @empty {
+          <tr>
+            <td colspan="6" class="empty">{{ 'refdata.empty' | t }}</td>
+          </tr>
+        }
+      </tbody>
+    </table>
+
+    @if (securities(); as r) {
+      <div class="pager">
+        <button type="button" (click)="goToRefdataPage(r.page - 1)" [disabled]="r.page === 0">
+          {{ 'audit.previous' | t }}
+        </button>
+        <span>{{
+          'audit.pageOf' | t: { page: r.page + 1, total: r.totalPages || 1, count: r.totalElements }
+        }}</span>
+        <button type="button" (click)="goToRefdataPage(r.page + 1)" [disabled]="r.last">
+          {{ 'audit.next' | t }}
+        </button>
+      </div>
+    }
+  </section>
+
   <div class="system-view-bar">
     <span>{{ 'audit.systemViewBlurb' | t }}</span>
     <a [href]="grafanaUrl" target="_blank" rel="noopener">{{ 'audit.systemViewLink' | t }}</a>

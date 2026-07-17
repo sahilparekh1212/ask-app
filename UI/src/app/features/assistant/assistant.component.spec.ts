@@ -1,4 +1,6 @@
-import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing';
+import { Location } from '@angular/common';
+import { provideLocationMocks } from '@angular/common/testing';
 import { of, throwError } from 'rxjs';
 
 import { AssistantComponent } from './assistant.component';
@@ -8,14 +10,16 @@ describe('AssistantComponent', () => {
   let fixture: ComponentFixture<AssistantComponent>;
   let component: AssistantComponent;
   let assistant: jasmine.SpyObj<AssistantService>;
+  let location: Location;
 
   beforeEach(async () => {
     assistant = jasmine.createSpyObj('AssistantService', ['chat']);
     await TestBed.configureTestingModule({
       imports: [AssistantComponent],
-      providers: [{ provide: AssistantService, useValue: assistant }],
+      providers: [{ provide: AssistantService, useValue: assistant }, provideLocationMocks()],
     }).compileComponents();
 
+    location = TestBed.inject(Location);
     fixture = TestBed.createComponent(AssistantComponent);
     component = fixture.componentInstance;
     fixture.detectChanges();
@@ -86,5 +90,42 @@ describe('AssistantComponent', () => {
     component.send();
     expect(assistant.chat).not.toHaveBeenCalled();
     expect(component.turns().length).toBe(0);
+  });
+
+  it('is not "started" until the first message, then docks and updates the URL with an id', () => {
+    assistant.chat.and.returnValue(of({ reply: 'ok', blocked: false }));
+    expect(component.started()).toBeFalse();
+
+    component.input.setValue('hello');
+    component.send();
+
+    expect(component.started()).toBeTrue();
+    expect(location.path()).toMatch(/^\/chat\/.+/);
+  });
+
+  it('copies a turn to the clipboard and flags it briefly as copied', fakeAsync(() => {
+    const writeText = jasmine.createSpy('writeText').and.returnValue(Promise.resolve());
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+
+    component.copy('How does the RAG pipeline work?', 1);
+    tick();
+    expect(writeText).toHaveBeenCalledWith('How does the RAG pipeline work?');
+    expect(component.copiedIndex()).toBe(1);
+
+    // The copied flag clears itself after the transient window.
+    tick(1500);
+    expect(component.copiedIndex()).toBeNull();
+  }));
+
+  it('keeps the same URL id across subsequent messages', () => {
+    assistant.chat.and.returnValue(of({ reply: 'ok', blocked: false }));
+    component.input.setValue('first');
+    component.send();
+    const firstUrl = location.path();
+
+    component.input.setValue('second');
+    component.send();
+
+    expect(location.path()).toBe(firstUrl);
   });
 });

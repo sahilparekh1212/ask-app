@@ -33,6 +33,16 @@
   --btn-hover: #30363d;
   --btn-fg: var(--fg);
 
+  /* App background gradient: dark at the top, lighter by the middle, then flat — applied across
+     every screen (body + the seamless top strip). The rail/sidebar/content are transparent so they
+     all sit on this one gradient, keeping the whole shell coherent (minimal color difference). */
+  --app-gradient: linear-gradient(
+    180deg,
+    var(--canvas) 0%,
+    var(--canvas-overlay) 50%,
+    var(--canvas-overlay) 100%
+  );
+
   --radius: 6px;
   --shadow: 0 8px 24px rgba(1, 4, 9, 0.5);
 
@@ -44,10 +54,10 @@ html {
   color-scheme: dark;
 }
 
-/* Sidebar "On this page" links scroll to element ids; offset the landing so the target clears
-   the 56px sticky top bar instead of hiding beneath it. */
+/* Sidebar "On this page" links scroll to element ids; a small offset so the target isn't flush
+   against the viewport top (there's no top bar to clear anymore). */
 [id] {
-  scroll-margin-top: 72px;
+  scroll-margin-top: 16px;
 }
 
 body {
@@ -56,7 +66,11 @@ body {
   /* The audit page breaks out of the centered column with a 100vw-wide block; vw includes
      the scrollbar, so clip the few leftover pixels instead of growing a horizontal scrollbar. */
   overflow-x: clip;
-  background: var(--canvas);
+  /* One app-wide gradient behind everything; `fixed` anchors it to the viewport so it stays
+     consistent as pages scroll, and the transparent rail/sidebar/content all reveal it. */
+  background-color: var(--canvas);
+  background-image: var(--app-gradient);
+  background-attachment: fixed;
   color: var(--fg);
   font-family: var(--font);
   line-height: 1.5;

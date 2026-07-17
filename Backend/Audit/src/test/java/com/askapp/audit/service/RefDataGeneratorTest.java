@@ -34,4 +34,15 @@ class RefDataGeneratorTest {
 	void generate_zeroReturnsNoRecords() {
 		assertThat(generator.generate(0)).isEmpty();
 	}
+
+	@Test
+	void generate_fromStartIndex_appendsANonOverlappingRange() {
+		List<SecurityMaster> records = generator.generate(1000, 3);
+
+		assertThat(records).extracting(SecurityMaster::getInstrumentId)
+			.containsExactly("SEC-001000", "SEC-001001", "SEC-001002");
+		// Same deterministic identity as generate(n): index 1000 has the same shape whether it is
+		// produced by generate(1003) or generate(1000, 3) — so the dedupe step stays idempotent.
+		assertThat(records.get(0).getIsin()).isEqualTo("US0000001000");
+	}
 }

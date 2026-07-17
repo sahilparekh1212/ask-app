@@ -5,8 +5,9 @@
 
 $rail-width: 84px;
 $sidebar-width: 232px;
-$topbar-height: 56px;
 
+// Rail + sidebar are transparent so they sit on the app-wide body gradient — the left menu and the
+// view read as one surface (minimal colour difference), separated only by a hairline border.
 .rail {
   position: fixed;
   top: 0;
@@ -17,8 +18,8 @@ $topbar-height: 56px;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  background: var(--canvas-inset);
-  border-right: 1px solid var(--border);
+  background: transparent;
+  border-right: 1px solid var(--border-muted);
   overflow-y: auto;
   overflow-x: hidden;
 }
@@ -33,13 +34,6 @@ $topbar-height: 56px;
 .rail-bottom {
   // The account/sign-in slot, pinned to the bottom of the rail (VS Code convention).
   border-top: 1px solid var(--border-muted);
-}
-
-// The language switcher, hosted in the rail just above the account slot.
-.rail-lang {
-  display: flex;
-  justify-content: center;
-  padding: 0.5rem 0.25rem 0.35rem;
 }
 
 .rail-item {
@@ -57,6 +51,25 @@ $topbar-height: 56px;
     width: 26px;
     height: 26px;
     fill: currentColor;
+  }
+
+  // Account avatar (the user's initial in a filled circle) — the intuitive "signed in" affordance,
+  // shown in place of the generic person icon once a profile is loaded (à la Claude Code).
+  .avatar {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    // Dark neutral chip (matches the button palette) rather than the accent blue.
+    background: var(--btn-bg);
+    border: 1px solid var(--border);
+    color: var(--fg);
+    font-size: 0.78rem;
+    font-weight: 600;
+    line-height: 1;
+    box-sizing: border-box;
   }
 
   .rail-label {
@@ -85,23 +98,12 @@ $topbar-height: 56px;
   bottom: 0;
   width: $sidebar-width;
   z-index: 20;
-  background: var(--canvas-subtle);
-  border-right: 1px solid var(--border);
+  background: transparent;
+  border-right: 1px solid var(--border-muted);
   overflow-y: auto;
-  padding-bottom: 1rem;
-}
-
-.sidebar-title {
-  height: $topbar-height;
-  display: flex;
-  align-items: center;
-  padding: 0 1rem;
-  font-size: 0.72rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--fg-muted);
-  border-bottom: 1px solid var(--border-muted);
+  // Small top gap so the first group isn't flush against the viewport edge (aligns with the
+  // content's own top padding); a little bottom room for the last group.
+  padding: 0.75rem 0 1rem;
 }
 
 .sb-group {
@@ -176,57 +178,45 @@ $topbar-height: 56px;
   }
 }
 
-.topbar {
-  position: sticky;
-  top: 0;
-  z-index: 15;
-  height: $topbar-height;
+// GitHub / LinkedIn floating at the top-right of the page (ChatGPT-style, like its Upgrade/Share),
+// over the content. Each is a subtle icon button with its own background so it stays legible over
+// whatever is behind it.
+.corner-links {
+  position: fixed;
+  top: 0.6rem;
+  right: 0.85rem;
+  z-index: 40;
   display: flex;
-  align-items: center;
-  gap: 1rem;
-  padding: 0 1.25rem;
-  background: var(--canvas-inset);
-  border-bottom: 1px solid var(--border);
+  gap: 0.35rem;
 }
 
-.topbar-title {
-  font-size: 0.95rem;
-  font-weight: 600;
-  color: var(--fg);
-}
-
-.topbar-right {
-  margin-left: auto;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-// GitHub / LinkedIn icon links, sitting just left of the language switcher.
-.topbar-link {
+.corner-link {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
-  border-radius: 6px;
+  width: 40px;
+  height: 40px;
+  border-radius: 9px;
   color: var(--fg-muted);
+  background: var(--canvas-subtle);
+  border: 1px solid var(--border-muted);
 
   svg {
-    width: 18px;
-    height: 18px;
+    width: 22px;
+    height: 22px;
     fill: currentColor;
   }
 
   &:hover {
     color: var(--fg);
-    background: var(--canvas-subtle);
+    background: var(--canvas-overlay);
     text-decoration: none;
   }
 }
 
+// A small top gap now that there's no top bar — content isn't jammed against the viewport edge.
 .app-main {
-  padding: 1.5rem;
+  padding: 0.75rem 1.5rem 1.5rem;
 }
 
 // Phones: the rail becomes a top strip of icons, the contextual sidebar is hidden (its links
@@ -295,11 +285,10 @@ $topbar-height: 56px;
     margin-top: 52px;
   }
 
-  .topbar {
-    // The rail is a fixed 52px strip at the very top on phones; keep the top bar sticking
-    // just beneath it instead of at 0 (where they'd overlap).
-    top: 52px;
-    padding: 0 0.75rem;
+  // The top-right links would collide with the phone's top rail strip; drop them (they remain in
+  // the footer/About and are a desktop nicety).
+  .corner-links {
+    display: none;
   }
 
   .app-main {

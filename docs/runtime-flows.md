@@ -10,9 +10,12 @@ JWKS endpoint. Audit retrieves the public JWKS to verify tokens locally; it
 never receives Auth's private signing key and does not call Auth for each API
 request.
 
-Refresh tokens are single-use and stored with a TTL in Redis. The browser keeps
+Access tokens expire 30 minutes after they are issued. Refresh tokens are
+single-use, valid for 7 days, and stored with a TTL in Redis. The browser keeps
 the access and refresh tokens locally; its HTTP interceptor attaches the bearer
-token and performs one refresh-and-retry after a `401`.
+token and, rather than refreshing on a timer, performs a single silent
+refresh-and-retry the first time a request returns `401` (i.e. once the access
+token has expired). When the refresh token itself expires, the user signs in again.
 
 ## 📝 Event-driven audit trail
 
@@ -32,7 +35,10 @@ call. It embeds a question with Voyage, searches pgvector for repository
 chunks, builds a role-scoped prompt, and submits only readable retrieved text to
 Claude. Vectors never reach Claude.
 
-At startup, Audit incrementally indexes bundled documentation and source code:
-new or changed chunks are embedded with Voyage and stored in pgvector. The same
-RAG service powers `/mcp`; it exposes repository knowledge only and does not
-expose audit rows.
+At startup, Audit incrementally indexes bundled documentation and source code,
+plus the synthetic security-master reference data (chunked from the database):
+new or changed chunks are embedded with Voyage and stored in pgvector, and the
+daily reference-data batch triggers a re-index so newly-added rows become
+retrievable. The same RAG service powers `/mcp`; it exposes repository knowledge
+and the synthetic reference dataset — both non-PII — and does not expose audit
+rows or any user data.

@@ -24,6 +24,10 @@ import io.swagger.v3.oas.annotations.media.Schema;
  *   <li>{@code idx_audit_event_id} — unique index on the source Kafka {@code eventId}, giving
  *       the {@code AuditEventConsumer} idempotent (at-least-once) inserts. Null for rows created
  *       via REST; most DBs allow many NULLs in a unique index.</li>
+ *   <li>{@code idx_audit_created_at} — a {@code createdAt}-only index backing the retention purge's
+ *       {@code DELETE WHERE created_at < ?} range scan (which spans both active and soft-deleted
+ *       rows, so the {@code deleted}-leading index above doesn't serve it) and time-range queries
+ *       that don't constrain {@code deleted}.</li>
  * </ul>
  * Hibernate emits these under {@code ddl-auto=update} (DEV/SIT/LOCAL); PROD/UAT run
  * {@code validate}, so the same indexes must be created by the schema migration.
@@ -32,7 +36,8 @@ import io.swagger.v3.oas.annotations.media.Schema;
 @Table(name = "audit_logs", indexes = {
 	@Index(name = "idx_audit_active_created", columnList = "deleted, created_at"),
 	@Index(name = "idx_audit_entity_type_action", columnList = "entity_type, action"),
-	@Index(name = "idx_audit_event_id", columnList = "event_id", unique = true)
+	@Index(name = "idx_audit_event_id", columnList = "event_id", unique = true),
+	@Index(name = "idx_audit_created_at", columnList = "created_at")
 })
 public class AuditLog extends AuditableEntity {
 

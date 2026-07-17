@@ -288,9 +288,8 @@ endpoint each page calls — see [`ui-guide.md`](ui-guide.md). This section is t
 - `README.md` (root) — portfolio overview: live URL, Mermaid architecture diagram, tech stack, run
   instructions.
 - `Backend/README.md` — detailed engineering README.
-- `Backend/TODO.md` — the prioritized punch-list / roadmap (what is built vs planned).
 - `Backend/docs/deployment.md` — the deployment guide (see Deployment section).
-- `Backend/docs/adr/0001…0010-*.md` — Architecture Decision Records (RSA JWT signing, in-memory rate
+- `Backend/docs/adr/0001…0011-*.md` — Architecture Decision Records (RSA JWT signing, in-memory rate
   limit/refresh store, H2 over Testcontainers, Liquibase schema ownership, no API gateway,
   fire-and-forget audit events, Redis refresh store for statelessness, no microfrontend split, LLM
   chat data flow, RAG/MCP server) — each with the alternatives considered and revisit triggers.

@@ -25,10 +25,20 @@ public class RefDataGenerator {
 
 	/** Generate the first {@code count} synthetic securities (indexes {@code 0..count-1}). */
 	public List<SecurityMaster> generate(int count) {
+		return generate(0, count);
+	}
+
+	/**
+	 * Generate {@code count} synthetic securities starting at {@code startIndex} (indexes
+	 * {@code startIndex..startIndex+count-1}). The daily incremental batch passes the current row
+	 * count as {@code startIndex} so each run appends a fresh, non-overlapping range rather than
+	 * re-generating index 0 (which the dedupe step would then discard as already present).
+	 */
+	public List<SecurityMaster> generate(int startIndex, int count) {
 		LocalDate asOf = LocalDate.now();
-		List<SecurityMaster> records = new ArrayList<>(count);
+		List<SecurityMaster> records = new ArrayList<>(Math.max(0, count));
 		for (int i = 0; i < count; i++) {
-			records.add(at(i, asOf));
+			records.add(at(startIndex + i, asOf));
 		}
 		return records;
 	}

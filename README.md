@@ -1,35 +1,26 @@
 # ask-app
 
-👋 **Welcome!** Thanks for stopping by. This is a production-shaped full-stack
-portfolio project — a live, deployed system rather than a demo. This README gives
-you the overview; the [documentation](#-documentation) links dive into how the
-pieces connect and the CI/CD that ships it. Feel free to poke around the <a href="https://ask-app.sahilparekh1212.com" target="_blank" rel="noopener noreferrer">live app</a> (demo login `demo` / `demo`)
-while you read.
+ask-app is a full-stack application you can interrogate about itself: an **LLM chat assistant**
+grounded by **RAG** over the repo's own docs and source code, the same knowledge exposed to any
+MCP client through a public **MCP server**, and **observability** on both axes — an in-app audit
+dashboard for what users and agents *did* (event-sourced over Kafka), and
+Grafana/Prometheus/Loki/Tempo for how the system is *performing*.
 
-Source: <a href="https://github.com/sahilparekh1212/ask-app" target="_blank" rel="noopener noreferrer">github.com/sahilparekh1212/ask-app</a>
+**Live app:** <a href="https://ask-app.sahilparekh1212.com" target="_blank" rel="noopener noreferrer">ask-app.sahilparekh1212.com</a> — demo login `demo` / `demo`.
 
-## 📦 What this project is
+What's in it:
 
-ask-app is a production-shaped full-stack portfolio application:
-
-- Angular 21 single-page application served by nginx;
+- Angular 21 SPA served by nginx;
 - Spring Boot Auth and Audit services;
-- Google OAuth2, RSA-signed JWTs, JWKS, and role-based access control;
+- Google OAuth2, RSA-signed JWTs, JWKS, role-based access control;
 - asynchronous audit events through Apache Kafka;
-- PostgreSQL and pgvector for audit data and repository RAG;
-- a server-side Claude assistant and public MCP knowledge-search endpoint;
-- Prometheus, Loki, Tempo, Grafana, Google Analytics 4, and Sentry; and
-- Docker/OpenShift deployment definitions plus CI/CD and supply-chain checks.
+- PostgreSQL + pgvector for audit data and repository RAG;
+- a batch-loaded security-master reference dataset with a scheduled daily batch;
+- a server-side Claude assistant and a public MCP knowledge-search endpoint;
+- Prometheus, Loki, Tempo, Grafana, GA4, and Sentry;
+- Docker/OpenShift deployment plus CI/CD and supply-chain checks.
 
-The live app is available at
-<a href="https://ask-app.sahilparekh1212.com" target="_blank" rel="noopener noreferrer">ask-app.sahilparekh1212.com</a>. The demo
-account is `demo` / `demo`.
-
-## 📖 Documentation
-
-The detailed, code-verified architecture is split into focused pages under
-[`docs/`](docs/). Each is intentionally focused on how the deployed system is
-connected and why its boundaries exist.
+## 📖 Architecture documentation
 
 | Page | What it covers |
 |---|---|
@@ -38,21 +29,34 @@ connected and why its boundaries exist.
 | [🔄 Core runtime flows](docs/runtime-flows.md) | Auth/authz, event-driven audit trail, assistant + RAG + MCP |
 | [🧩 Component map](docs/component-map.md) | Each area's responsibility and where it lives |
 | [⚖️ State, scaling & resilience](docs/state-scaling-resilience.md) | State models, replication, the newest-wins limiter |
-| [🗄️ Data, schema & profiles](docs/data-and-profiles.md) | Liquibase schema, H2/Postgres by Spring profile |
+| [🗄️ Data, schema & profiles](docs/data-and-profiles.md) | Liquibase schema, indexes, views, retention, H2/Postgres by profile |
 | [📊 Observability](docs/observability.md) | Prometheus, Loki, Tempo, Grafana, GA4, Sentry |
 | [🚦 CI/CD](docs/ci-cd.md) | Quality gates on every PR and delivery on merge |
-| [🖥️ Run locally](docs/running-locally.md) | One `docker compose up` to bring the stack up |
+| [⚙️ Backend guide](Backend/README.md) | Services, concepts, rate limiting, deployment |
+| [🖼️ Frontend guide](UI/README.md) | Routes, design decisions, dev workflow |
+| [🧠 Architecture decisions](Backend/docs/adr/README.md) | The non-obvious "why" behind each choice |
+| [🚀 Deployment plan](Backend/docs/deployment.md) | Commit → registry → environments → rollout |
 
-## 📚 Further reading
+## 🚀 Run it — onboarding by level
 
-- <a href="https://github.com/sahilparekh1212/ask-app/blob/main/UI/README.md" target="_blank" rel="noopener noreferrer">Frontend guide</a>
-- <a href="https://github.com/sahilparekh1212/ask-app/blob/main/Backend/README.md" target="_blank" rel="noopener noreferrer">Backend guide</a>
-- <a href="https://github.com/sahilparekh1212/ask-app/blob/main/Backend/docs/adr/README.md" target="_blank" rel="noopener noreferrer">Architecture decisions</a>
-- <a href="https://github.com/sahilparekh1212/ask-app/blob/main/Backend/docs/deployment.md" target="_blank" rel="noopener noreferrer">Deployment guide</a>
+| Level | Guide | What you get |
+|---|---|---|
+| 🧑‍💻 [LOCAL](docs/onboarding-local.md) | Bare metal — JDK + Node, no Docker | Both services on H2 + the UI dev server |
+| 🐳 [DEV](docs/onboarding-dev.md) | `docker compose up --build` | The full 12-container stack: Postgres, Kafka, observability |
+| ☁️ [PROD](docs/onboarding-prod.md) | Merge → CD → deploy (GCE VM) | The live deployment and how to operate it |
+
+## 🛠️ How-to, by technology
+
+| Guide | Covers (setup + access, LOCAL → PROD) |
+|---|---|
+| [Grafana](docs/how-to/grafana.md) | Dashboards & Explore; anonymous read-only posture; admin access |
+| [Kafka](docs/how-to/kafka.md) | Broker, Kafka UI, CLI, topics & DLT |
+| [Postgres](docs/how-to/postgres.md) | pgvector, Adminer, psql, backups; H2 at LOCAL |
+| [Redis](docs/how-to/redis.md) | Refresh-token store, Redis Insight, the 2-replica proof |
+| [Prometheus, Loki & Tempo](docs/how-to/prometheus-loki-tempo.md) | Reaching the telemetry backends directly at each level |
+| [LLM chat, RAG & MCP](docs/how-to/llm-rag-mcp.md) | Provider keys, indexing, trying MCP, the guardrails |
 
 ## 📄 License
 
-**Proprietary — all rights reserved.** This repository is published for
-viewing/portfolio evaluation only; no right to use, run, copy, modify, or
-distribute the code is granted. See
-<a href="https://github.com/sahilparekh1212/ask-app/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">LICENSE</a>.
+**Proprietary — all rights reserved.** Published for viewing/portfolio evaluation only;
+see <a href="https://github.com/sahilparekh1212/ask-app/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">LICENSE</a>.

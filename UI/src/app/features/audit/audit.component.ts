@@ -9,6 +9,7 @@ import {
   AuditLogStats,
   AuditLogTimeBucket,
   PagedResponse,
+  SecurityMaster,
 } from './audit.models';
 import { TranslatePipe } from '../../core/i18n/translate.pipe';
 import { TranslateService } from '../../core/i18n/translate.service';
@@ -93,9 +94,24 @@ export class AuditComponent implements OnInit {
   );
 
   readonly page = signal(0);
-  readonly size = signal(20);
+  readonly size = signal(10);
   readonly sortField = signal<SortField>('createdAt');
   readonly sortDir = signal<SortDir>('desc');
+
+  // ── Reference data (security master) panel. A batch-loaded, read-heavy dataset shown alongside
+  // the audit trail; filters mirror the backend's (assetClass / currency / name substring). The
+  // option lists are the generator's fixed vocabularies, so no extra round-trip to discover them.
+  readonly assetClassOptions = ['EQUITY', 'BOND', 'ETF', 'FX'];
+  readonly currencyOptions = ['USD', 'EUR', 'GBP', 'JPY', 'CHF'];
+  readonly refdataForm = this.fb.nonNullable.group({
+    assetClass: [''],
+    currency: [''],
+    name: [''],
+  });
+  readonly securities = signal<PagedResponse<SecurityMaster> | null>(null);
+  readonly refdataPage = signal(0);
+  readonly refdataError = signal<string | null>(null);
+  readonly refdataTotalPages = computed(() => this.securities()?.totalPages ?? 0);
 
   readonly totalPages = computed(() => this.result()?.totalPages ?? 0);
   /** Largest bucket count, so the stat bars can be scaled to a shared max width. */
@@ -105,6 +121,7 @@ export class AuditComponent implements OnInit {
   ngOnInit(): void {
     this.reload();
     this.loadKpis();
+    this.loadSecurities();
     this.audit.features().subscribe({
       next: (f) => this.demoAvailable.set(f.demoData),
       error: () => this.demoAvailable.set(false),
@@ -154,6 +171,40 @@ export class AuditComponent implements OnInit {
     }
     this.page.set(page);
     this.reload();
+  }
+
+  applyRefdataFilters(): void {
+    this.refdataPage.set(0);
+    this.loadSecurities();
+  }
+
+  goToRefdataPage(page: number): void {
+    if (page < 0 || page >= this.refdataTotalPages()) {
+      return;
+    }
+    this.refdataPage.set(page);
+    this.loadSecurities();
+  }
+
+  private loadSecurities(): void {
+    const v = this.refdataForm.getRawValue();
+    this.refdataError.set(null);
+    this.audit
+      .securities(
+        {
+          assetClass: v.assetClass || null,
+          currency: v.currency || null,
+          name: v.name.trim() || null,
+        },
+        { page: this.refdataPage(), size: 10, sort: 'instrumentId,asc' },
+      )
+      .subscribe({
+        next: (result) => this.securities.set(result),
+        error: () => {
+          this.securities.set(null);
+          this.refdataError.set(this.translate.t('refdata.loadError'));
+        },
+      });
   }
 
   barWidth(count: number, max: number): string {
