@@ -77,7 +77,7 @@
   "refdata.empty": "No securities match.",
   "refdata.loadError": "Could not load reference data — is the Audit service running and are you signed in?",
 
-  "assistant.welcome": "Welcome to Ask App 🧠",
+  "assistant.welcome": "Welcome to Ask App",
   "assistant.infoLabel": "What can I ask?",
   "assistant.hint": "Ask about this application — its features, how to sign in, or what the audit data shows.",
   "assistant.screening": "Messages are screened server-side; don't paste credentials or personal data.",

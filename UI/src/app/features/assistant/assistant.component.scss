@@ -31,6 +31,12 @@
   font-size: 1.7rem;
   font-weight: 600;
   color: var(--fg);
+
+  // The mind mark, matching the favicon: the emoji desaturated + brightened to read white.
+  .mind {
+    display: inline-block;
+    filter: grayscale(1) brightness(1.9);
+  }
 }
 
 // Info affordance next to the greeting: the hint + sample prompts live in a popover shown on
