@@ -12,7 +12,6 @@
   "nav.trends": "Trends",
   "nav.log": "Activity Logs",
   "nav.refdata": "Reference data",
-
   "login.title": "Sign in",
   "login.username": "Username",
   "login.password": "Password",
@@ -26,7 +25,6 @@
   "login.failed": "Login failed — check the demo credentials and that the Auth service is running.",
   "login.googleNote": "Google sign-in is limited to users registered as testers in this app's Google Cloud project (its OAuth consent screen is in testing mode) — everyone else, use the demo login above.",
   "login.demoNote": "Demo account: demo / demo. Pick ROLE_ADMIN to exercise admin-gated actions.",
-
   "audit.entityType": "Entity type",
   "audit.action": "Action",
   "audit.details": "Details",
@@ -35,6 +33,10 @@
   "audit.to": "To",
   "audit.includeDeleted": "Include deleted",
   "audit.applyFilters": "Apply filters",
+  "audit.filtersBlurb": "Narrow the activity log by feature, action, detail text, or time window — the matching count, trends, and log below all follow the same filter.",
+  "audit.summaryBlurb": "Headline activity for the last 24 hours — deliberately independent of the filters, so it always answers “what is happening on this deployment right now”. The matching count and charts below do follow the filters.",
+  "audit.trendsBlurb": "Events over time for the current filter — hourly across the last 24 hours or daily across the last 7 days, aggregated in the database.",
+  "audit.logBlurb": "The event-sourced audit trail: every user and agent action, published to Kafka and consumed into an immutable log. Sortable, paginated, and filtered by the controls above.",
   "audit.all": "All",
   "audit.demoLogs": "Demo logs",
   "audit.addDemoLogs": "Add demo logs",
@@ -64,7 +66,6 @@
   "audit.demoAdded": "Added {count} demo logs.",
   "audit.systemViewBlurb": "This dashboard is the domain view — what users and agents did. Server metrics, logs and traces live in the system view.",
   "audit.systemViewLink": "Open the system view (Grafana) →",
-
   "refdata.title": "Reference data",
   "refdata.blurb": "Security-master reference data — a batch-loaded, read-heavy dataset. Bulk-loaded on startup and extended by a small daily batch.",
   "refdata.assetClass": "Asset class",
@@ -76,7 +77,6 @@
   "refdata.colAsOf": "As of",
   "refdata.empty": "No securities match.",
   "refdata.loadError": "Could not load reference data — is the Audit service running and are you signed in?",
-
   "assistant.welcome": "Welcome to Ask App",
   "assistant.infoLabel": "What can I ask?",
   "assistant.hint": "Ask about this application — its features, how to sign in, or what the audit data shows.",
@@ -93,7 +93,6 @@
   "assistant.copied": "Copied",
   "assistant.error503": "The assistant is not available right now (it may not be configured on this server).",
   "assistant.errorGeneric": "Something went wrong — please try again.",
-
   "profile.title": "Your profile",
   "profile.userId": "User ID",
   "profile.email": "Email",

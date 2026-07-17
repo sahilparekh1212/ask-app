@@ -5,6 +5,32 @@
 }
 
 .audit {
+  // Titled dashboard sections (Filters / Summary / Trends / Activity Logs), mirroring the
+  // Reference-data panel's h3 + blurb pattern so every "On this page" anchor has a visible
+  // heading. The first panel skips the divider — nothing above it to divide from.
+  .panel {
+    margin-top: 2rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--border);
+
+    > h3 {
+      font-size: 1rem;
+      margin: 0 0 0.35rem;
+    }
+
+    &:first-child {
+      margin-top: 0;
+      padding-top: 0;
+      border-top: none;
+    }
+  }
+
+  .panel-blurb {
+    margin: 0 0 1rem;
+    font-size: 0.85rem;
+    color: var(--fg-muted);
+  }
+
   .filters {
     display: flex;
     flex-wrap: wrap;
@@ -159,10 +185,18 @@
       padding-top: 1rem;
       border-top: 1px solid var(--border);
 
+      // Standalone in the Trends panel (the panel title replaces the old inline heading),
+      // so the internal divider that used to separate it from the bar charts goes away.
+      &:first-child {
+        margin-top: 0;
+        padding-top: 0;
+        border-top: none;
+      }
+
       .timeline-head {
         display: flex;
         align-items: center;
-        justify-content: space-between;
+        justify-content: flex-end;
         gap: 0.75rem;
       }
 

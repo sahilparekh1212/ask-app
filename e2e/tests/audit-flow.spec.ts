@@ -28,9 +28,9 @@ async function openAudit(page: Page): Promise<void> {
   await expect(page.locator('.stats .total')).toBeVisible();
 }
 
-/** Parses "Page 1 of N · M total" from the audit log's pager (the sibling of #log). */
+/** Parses "Page 1 of N · M total" from the audit log's pager (inside the #log section). */
 async function totalElements(page: Page): Promise<number> {
-  const text = (await page.locator('#log ~ .pager span').innerText()).replace(/[,.\s]/g, ' ');
+  const text = (await page.locator('#log .pager span').innerText()).replace(/[,.\s]/g, ' ');
   const match = text.match(/(\d+)\s+total/);
   expect(match, `pager text should contain a total: "${text}"`).not.toBeNull();
   return Number(match![1]);
