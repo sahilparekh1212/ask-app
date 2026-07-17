@@ -15,7 +15,7 @@ ask-app is a production-shaped full-stack portfolio application:
 - Angular 21 single-page application served by nginx;
 - Spring Boot Auth and Audit services;
 - Google OAuth2, RSA-signed JWTs, JWKS, and role-based access control;
-- asynchronous audit events through Kafka/Redpanda;
+- asynchronous audit events through Apache Kafka;
 - PostgreSQL and pgvector for audit data and repository RAG;
 - a server-side Claude assistant and public MCP knowledge-search endpoint;
 - Prometheus, Loki, Tempo, Grafana, Google Analytics 4, and Sentry; and

@@ -590,6 +590,25 @@ profile pinned bottom-left) is live. Requested refinements:
       verified visually in the dev server.
 
 ### Ops roadmap
+- [x] **Swap Redpanda for an actual Apache Kafka broker — done (2026-07-16).** Owner request: run
+      the real broker instead of the Kafka-API-compatible Redpanda, for stack authenticity. Landed
+      exactly as scoped — a **pure infra swap, zero application code changes** (the services speak
+      the Kafka wire protocol via `spring-kafka` either way, which the diff itself now proves):
+      `apache/kafka:4.3.1` in **single-node KRaft** mode (broker = its own controller, still no
+      sidecar) in `docker-compose.yml` + `kafka/docker-compose.yml`, same listener shape as before
+      (in-network `kafka:9092`, host `localhost:19092`), `KAFKA_HEAP_OPTS=-Xmx512m` sized for the
+      prod VM (JVM broker vs Redpanda's C++ binary), healthcheck via the bundled
+      `kafka-broker-api-versions.sh` CLI (the image ships no curl/nc; generous interval +
+      `start_period` since each probe spawns a JVM). Gotcha worth telling: setting *any* `KAFKA_*`
+      env var makes the `apache/kafka` image ignore its bundled `server.properties`, so the compose
+      service must carry the **complete** KRaft config, not an override. `redpanda-console` →
+      `kafbat/kafka-ui` locally; in prod the UI joins Adminer/Redis Insight behind the
+      never-activated `local-tools` profile (its predecessor ran port-withdrawn and unreachable —
+      idle weight, now cut). Docs/e2e comments updated (7 files); decision + reversal recorded in
+      **ADR-0011**. Verified live on the rebuilt local stack: broker healthy, `audit.events`
+      auto-created, demo login LOGIN row 143→144 through the new broker, a grounded chat turn's
+      `Assistant/CHAT` event 98→99 (AI-feature events flow too), Kafka UI answering on :8080,
+      prod overlay `config` valid with kafka in / kafka-ui out.
 - [x] **End-to-end deployment plan — written.** [`docs/deployment.md`](docs/deployment.md) walks
       the whole app from commit to running system: what we deploy, the environment/profile matrix,
       the build-once/promote-by-digest GHCR registry flow (marked planned vs built), config vs

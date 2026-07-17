@@ -78,7 +78,7 @@ carry the detail.
 |---|---|
 | **Statelessness** — services keep no server-side session, so any pod can serve any request and Auth scales horizontally | JWTs verified locally against Auth's JWKS (no per-request call back to Auth); the one piece of state, the single-use refresh token, is a `RefreshTokenStore` **Strategy** — in-memory for dev, **Redis** (atomic `GETDEL`) when scaled ([ADR-0007](docs/adr/0007-redis-refresh-token-store-for-statelessness.md)). The rate limiter stays *per-pod* on purpose (it's a thread-interrupt dedup, not a counter) |
 | **RBAC & token security** — verifiers must check identity + role locally and must not be able to mint tokens | **Google OAuth2** → **RSA-signed JWT** (asymmetric: verifiers hold only the public key) published at a **JWKS** endpoint; `roles` claim → Spring authorities; admin actions gated with `@PreAuthorize` ([ADR-0001](docs/adr/README.md)) |
-| **Event-driven architecture** — recording an audit trail is a side effect of an action, not part of it; the producer shouldn't block on or be coupled to the sink | Auth (and the Audit service's own AI features) publish `AuditEvent`s to a **Kafka** topic `audit.events` `@Async` fire-and-forget; Audit consumes them. Kafka API via **Redpanda** locally, managed/multi-broker in prod ([ADR-0006](docs/adr/README.md)) |
+| **Event-driven architecture** — recording an audit trail is a side effect of an action, not part of it; the producer shouldn't block on or be coupled to the sink | Auth (and the Audit service's own AI features) publish `AuditEvent`s to a **Kafka** topic `audit.events` `@Async` fire-and-forget; Audit consumes them. **Apache Kafka** (single-node KRaft) locally, managed/multi-broker in prod ([ADR-0006](docs/adr/README.md), [ADR-0011](docs/adr/README.md)) |
 | **Idempotency** — at-least-once delivery means the consumer *will* occasionally see a duplicate | Consumer dedups by `eventId` backed by a **unique index** (`idx_audit_event_id`); retries, then dead-letters to `audit.events.DLT`. So a redelivered event is a no-op, never a double row |
 | **RDBMS** — audit rows are relational and queried by filters / ranges / grouped aggregations that want real indexes and durability | **PostgreSQL 16** via **Spring Data JPA**; the same `AuditLogSpecifications` builds *both* the paginated search and the database-side `GROUP BY` stats, so rows and counts can never disagree; **H2** only for tests / the LOCAL profile |
 | **Database schema management** — the schema should be a versioned, reviewable artifact, not silent Hibernate DDL that drifts between environments | **Liquibase** owns the schema (`ddl-auto=none`); changesets are **expand/contract** (add before remove) so a rolling deploy and a rollback stay safe |
@@ -143,7 +143,7 @@ CI runs the same suite against a freshly built stack on every system-affecting P
 ## Run locally
 
 **One command, the whole system:** `docker compose up --build` (root `docker-compose.yml`) —
-Postgres, Kafka (Redpanda), both services, and Prometheus/Loki/Grafana. See the file's header
+Postgres, Kafka, both services, and Prometheus/Loki/Grafana. See the file's header
 comment for URLs and the zero-setup demo login. First build takes a few minutes.
 
 **Skip the build entirely** with the GHCR pull variant — runs the exact CI-built images CD
@@ -260,7 +260,7 @@ manager and never commit them — see [§ External database](#external-database-
 | Postgres | `localhost:5432` | `postgres:5432` | `auditdb` | `audit` | `audit` |
 | Redis | `localhost:6379` | `redis:6379` | — | — | *(none)* |
 
-**Browser GUIs.** `docker compose up` runs one per store, next to the Redpanda console for Kafka
+**Browser GUIs.** `docker compose up` runs one per store, next to the Kafbat Kafka UI for Kafka
 — no desktop install needed. Use the *in-network* host name here (the GUI containers reach the
 stores over the compose network):
 
@@ -268,11 +268,11 @@ stores over the compose network):
 |-------|-----|-----|-------|
 | Postgres | Adminer | http://localhost:8082 | System **PostgreSQL**, Server `postgres` (pre-filled), Username `audit`, Password `audit`, Database `auditdb` → **Login** |
 | Redis | Redis Insight | http://localhost:5540 | **Add Redis database** → Host `redis`, Port `6379`, leave username/password blank → **Add Database** |
-| Kafka | Redpanda console | http://localhost:8080 | auto-connected |
+| Kafka | Kafbat Kafka UI | http://localhost:8080 | auto-connected |
 
-These are local-only dev tools: the production override (`docker-compose.prod.yml`) puts Adminer
-and Redis Insight behind a `local-tools` profile it never activates, so they never run on the
-deployed host.
+These are local-only dev tools: the production override (`docker-compose.prod.yml`) puts the
+Kafka UI, Adminer, and Redis Insight behind a `local-tools` profile it never activates, so they
+never run on the deployed host.
 
 **Command line / desktop client.** Both stores also publish to the host, so connect directly with
 `localhost` (or with a desktop client — DBeaver / pgAdmin for Postgres, Redis Insight desktop for

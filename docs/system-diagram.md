@@ -19,7 +19,7 @@ flowchart LR
     Google -->|OAuth callback| Auth
     Audit -->|fetch public signing keys| Auth
     Auth <--> Redis[(Redis\nrefresh-token store)]
-    Auth -->|async audit.events| Kafka[[Kafka / Redpanda]]
+    Auth -->|async audit.events| Kafka[[Apache Kafka]]
     Audit -->|async AI-feature events| Kafka
     Kafka -->|idempotent consume| Audit
 

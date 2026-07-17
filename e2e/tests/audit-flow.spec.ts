@@ -3,7 +3,7 @@ import { expect, Page, test } from '@playwright/test';
 /**
  * End-to-end flows over the real compose stack. Nothing is mocked: the browser talks to the
  * nginx-served production UI bundle, which proxies /auth-api and /audit-api to the Auth and
- * Audit containers; a demo login publishes an AuditEvent to Redpanda that Audit consumes and
+ * Audit containers; a demo login publishes an AuditEvent to Kafka that Audit consumes and
  * persists to Postgres. These tests are the "how do you know the whole thing works?" answer.
  */
 
@@ -45,7 +45,7 @@ test('a login event flows through Kafka into a queryable audit row', async ({ pa
   await loginAsDemo(page);
   await openAudit(page);
 
-  // The LOGIN row for this session's demo login arrives asynchronously (Auth -> Redpanda ->
+  // The LOGIN row for this session's demo login arrives asynchronously (Auth -> Kafka ->
   // Audit consumer -> Postgres), so re-apply the filter until it shows up. Details are
   // "demo-user" (AuthController.DEMO_USER_ID), which the details-contains filter can target.
   await page.getByLabel('Details').fill('demo-user');

@@ -74,18 +74,18 @@ services:
     restart: unless-stopped
     ports: !reset []
 
-  redpanda:
+  kafka:
     restart: unless-stopped
     ports: !reset []
 
-  redpanda-console:
-    restart: unless-stopped
-    ports: !reset []
+  # Dev-only store GUIs (Kafka UI, Adminer, Redis Insight): never run in production — there's no
+  # reason to run an admin UI on the deployed host (its predecessor, redpanda-console, used to run
+  # here port-withdrawn and unreachable — pure idle weight; a JVM-based UI makes that waste worth
+  # cutting). They stay default-on in the local docker-compose.yml; assigning them a profile the
+  # prod deploy never activates keeps them out of the prod stack entirely.
+  kafka-ui:
+    profiles: ["local-tools"]
 
-  # Dev-only DB/Redis GUIs (Adminer, Redis Insight): never run in production — there's no reason
-  # to expose a database admin UI on the deployed host. They stay default-on in the local
-  # docker-compose.yml; assigning them a profile the prod deploy never activates keeps them out of
-  # the prod stack entirely (not merely port-withdrawn like the services above).
   adminer:
     profiles: ["local-tools"]
 

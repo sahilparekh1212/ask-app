@@ -25,9 +25,9 @@ to the repository root; the backend lives under `Backend/`, the Angular SPA unde
 These are the files tied to the Docker / container setup. If you are asked "which files are
 tied to the Docker setup?", this is the list:
 
-- `Backend/docker-compose.yml` — the main stack: Postgres (pgvector image), Redpanda + console,
-  Prometheus/Loki/Grafana/Tempo, and the Auth, Audit and UI services. `docker compose up --build`
-  brings up the whole system on `:4200`.
+- `Backend/docker-compose.yml` — the main stack: Postgres (pgvector image), Apache Kafka
+  (single-node KRaft) + Kafbat Kafka UI, Prometheus/Loki/Grafana/Tempo, and the Auth, Audit and
+  UI services. `docker compose up --build` brings up the whole system on `:4200`.
 - `Backend/docker-compose.prod.yml` — production override: Caddy on 80/443 as the only published
   port (every other port withdrawn via `!reset`), `SPRING_PROFILES_ACTIVE=PROD`, real-domain CORS.
 - `Backend/docker-compose.ghcr.yml` — override that **pulls** pre-built images from GHCR instead of
@@ -43,7 +43,7 @@ tied to the Docker setup?", this is the list:
 - `UI/nginx.conf` — SPA fallback (`try_files … /index.html`) and same-origin reverse proxies
   `/auth-api/` → `auth:8085`, `/audit-api/` → `audit:8083` (so the browser needs no CORS).
 - `UI/.dockerignore` — trims the UI build context.
-- `Backend/kafka/docker-compose.yml` — standalone Redpanda + console, for a smaller local loop.
+- `Backend/kafka/docker-compose.yml` — standalone Kafka broker + Kafka UI, for a smaller local loop.
 - `Backend/monitoring/docker-compose.yml` — standalone Prometheus/Loki/Grafana/Tempo stack.
 
 ## Deployment & cloud (GCP, Caddy, OpenShift)
@@ -113,7 +113,7 @@ topic and Audit consumes and persists them. Files tied to this pipeline:
   `@KafkaListener` that persists events as `AuditLog` rows, idempotent by `eventId`.
 - `Backend/Audit/src/main/java/com/askapp/audit/config/KafkaConsumerConfig.java` — retry +
   dead-letter (`audit.events.DLT`) error handling for the listener.
-- `Backend/kafka/docker-compose.yml` — the local Redpanda broker + console.
+- `Backend/kafka/docker-compose.yml` — the local Kafka broker + Kafka UI.
 
 ## Auth service (Java — `Backend/Auth/`)
 

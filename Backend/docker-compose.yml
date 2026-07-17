@@ -1,4 +1,4 @@
-# One-command way to run the whole system: the Angular UI, Postgres, Kafka (Redpanda), Auth,
+# One-command way to run the whole system: the Angular UI, Postgres, Kafka, Auth,
 # Audit, and the observability stack (Prometheus/Grafana/Loki/Tempo).
 #
 #   docker compose up --build
@@ -9,7 +9,7 @@
 #   Auth Swagger:      http://localhost:8085/swagger-ui.html
 #   Audit Swagger:     http://localhost:8083/swagger-ui.html
 #   Grafana:           http://localhost:4200/grafana    (anonymous read-only; admin / admin to edit)
-#   Redpanda console:  http://localhost:8080
+#   Kafka UI:          http://localhost:8080
 #   Adminer (Postgres):http://localhost:8082            (server "postgres", audit / audit, db "auditdb")
 #   Redis Insight:     http://localhost:5540            (add a DB: host "redis", port 6379, no auth)
 #   Postgres:          localhost:5432                    (audit / audit, db "auditdb")
@@ -19,7 +19,7 @@
 # {"username":"demo","password":"demo"} issues a JWT good against both services. To use real
 # Google sign-in instead, export GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET before starting.
 #
-# Narrower alternatives for a smaller local loop: kafka/docker-compose.yml (just Redpanda) and
+# Narrower alternatives for a smaller local loop: kafka/docker-compose.yml (just Kafka) and
 # monitoring/docker-compose.yml (just Prometheus/Loki/Grafana) — this file inlines both rather
 # than composing them so it stays a single, predictable `docker compose up`.
 services:
@@ -45,7 +45,7 @@ services:
 
   adminer:
     # Lightweight single-file web GUI for the Postgres above (the local parallel to the
-    # redpanda-console GUI for Kafka). ADMINER_DEFAULT_SERVER pre-fills the login form's server
+    # kafka-ui GUI for Kafka). ADMINER_DEFAULT_SERVER pre-fills the login form's server
     # field with the `postgres` service name — then log in with audit / audit, database auditdb.
     image: adminer:4.8.1
     container_name: askapp-adminer
@@ -56,36 +56,61 @@ services:
     environment:
       ADMINER_DEFAULT_SERVER: postgres
 
-  redpanda:
-    image: redpandadata/redpanda:v24.2.7
-    container_name: askapp-redpanda
-    command:
-      - redpanda
-      - start
-      - --mode=dev-container
-      - --smp=1
-      - --default-log-level=info
-      # Two listeners: 'internal' for in-network clients (Auth/Audit/console), 'external' for the host.
-      - --kafka-addr=internal://0.0.0.0:9092,external://0.0.0.0:19092
-      - --advertise-kafka-addr=internal://redpanda:9092,external://localhost:19092
+  kafka:
+    # Apache Kafka in single-node KRaft mode (the broker is its own controller — no ZooKeeper).
+    # Replaced Redpanda (a Kafka-API-compatible reimplementation) with the real broker; the
+    # services never noticed — they speak the Kafka wire protocol via spring-kafka either way.
+    # See ADR-0011. NOTE: setting any KAFKA_* env var makes the image ignore its bundled
+    # server.properties, so this is the complete KRaft config, not an override of defaults.
+    image: apache/kafka:4.3.1
+    container_name: askapp-kafka
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@localhost:9093
+      # Two client listeners (same shape Redpanda had): INTERNAL for in-network clients
+      # (Auth/Audit/kafka-ui), EXTERNAL for host apps; plus the KRaft controller listener.
+      KAFKA_LISTENERS: INTERNAL://0.0.0.0:9092,EXTERNAL://0.0.0.0:19092,CONTROLLER://0.0.0.0:9093
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:9092,EXTERNAL://localhost:19092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      # Single broker: the internal topics can't have more than one replica.
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      # audit.events / audit.events.DLT are auto-created on first use (Kafka's default; the
+      # services define no NewTopic beans — made explicit here so it survives config drift).
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_LOG_DIRS: /tmp/kraft-combined-logs
+      # A JVM broker defaults to a 1G heap; this workload is one topic + its DLT, so cap it —
+      # keeps the swap affordable on the prod e2-standard-2 VM (Redpanda was a single C++ binary).
+      KAFKA_HEAP_OPTS: -Xmx512m -Xms256m
     ports:
-      - "19092:19092" # host -> broker
-      - "9644:9644"   # admin API
+      - "19092:19092" # host -> broker (EXTERNAL listener)
     healthcheck:
-      test: ["CMD-SHELL", "rpk cluster health | grep -q 'Healthy:.*true'"]
+      # The bundled CLI is the least-worst probe (the image ships no curl/nc); it spawns a JVM
+      # per check, hence the generous interval + start_period.
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 > /dev/null 2>&1"]
       interval: 10s
-      timeout: 5s
+      timeout: 10s
       retries: 10
+      start_period: 20s
 
-  redpanda-console:
-    image: redpandadata/console:v2.7.2
-    container_name: askapp-redpanda-console
+  kafka-ui:
+    # Web GUI for the broker (topics, messages, consumer groups, the audit.events.DLT
+    # dead-letter topic) — the Kafka parallel to Adminer/Redis Insight. Kafbat is the
+    # maintained fork of the former provectus/kafka-ui.
+    image: kafbat/kafka-ui:v1.5.0
+    container_name: askapp-kafka-ui
     depends_on:
-      - redpanda
+      - kafka
     ports:
       - "8080:8080"
     environment:
-      KAFKA_BROKERS: redpanda:9092
+      KAFKA_CLUSTERS_0_NAME: askapp
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
 
   prometheus:
     image: prom/prometheus:v2.54.1
@@ -180,7 +205,7 @@ services:
     container_name: askapp-auth
     environment:
       SPRING_PROFILES_ACTIVE: DEV
-      KAFKA_BOOTSTRAP_SERVERS: redpanda:9092
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       LOKI_URL: http://loki:3100/loki/api/v1/push
       OTEL_EXPORTER_OTLP_ENDPOINT: http://tempo:4318/v1/traces
       CORS_ALLOWED_ORIGINS: http://localhost:4200
@@ -208,7 +233,7 @@ services:
     ports:
       - "8085:8085"
     depends_on:
-      redpanda:
+      kafka:
         condition: service_healthy
       tempo:
         condition: service_started
@@ -255,7 +280,7 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/auditdb
       SPRING_DATASOURCE_USERNAME: audit
       SPRING_DATASOURCE_PASSWORD: audit
-      KAFKA_BOOTSTRAP_SERVERS: redpanda:9092
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       LOKI_URL: http://loki:3100/loki/api/v1/push
       OTEL_EXPORTER_OTLP_ENDPOINT: http://tempo:4318/v1/traces
       CORS_ALLOWED_ORIGINS: http://localhost:4200
@@ -278,7 +303,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      redpanda:
+      kafka:
         condition: service_healthy
       tempo:
         condition: service_started

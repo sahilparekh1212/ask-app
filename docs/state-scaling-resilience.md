@@ -6,7 +6,7 @@ _Part of the [ask-app](../README.md) documentation._
 |---|---|
 | UI/nginx, Auth, Audit | Stateless compute: services can be replicated |
 | Redis | Shared single-use refresh-token state |
-| Kafka/Redpanda | Durable audit-event log and dead-letter flow |
+| Kafka | Durable audit-event log and dead-letter flow |
 | PostgreSQL + pgvector | Durable audit records and vector index |
 | Prometheus, Loki, Tempo | Persistent telemetry stores |
 | Grafana | Config-as-code dashboards and datasources; anonymous read-only viewing |

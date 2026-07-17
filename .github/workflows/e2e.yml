@@ -1,7 +1,7 @@
 name: E2E
 
 # Playwright against the full compose stack: browser -> nginx-served UI -> proxied Auth/Audit ->
-# Kafka (Redpanda) -> Postgres. This is the one place the whole system is exercised as one thing,
+# Kafka -> Postgres. This is the one place the whole system is exercised as one thing,
 # not module by module. Deliberately NOT a required branch-protection check (yet): it triggers
 # only on paths that can affect the running system, so making it required would hit the same
 # never-triggers-on-docs-PRs asymmetry the backend checks solved with broad path filters.

@@ -19,7 +19,7 @@ an environment-specific value the operator supplies.
 | Audit service | `Audit/Dockerfile` | 8083 | Stateless; ≥2 replicas; owns the audit schema via Liquibase; hosts the LLM assistant proxy |
 | SPA | `UI/Dockerfile` (node build → `nginx:1.28-alpine`) | 80/4200 | Serves static bundles + reverse-proxies `/auth-api`, `/audit-api` |
 | PostgreSQL | `openshift/postgres/` (`pgvector/pgvector:pg16`) or a managed instance | 5432 | Audit's database of record (audit rows + pgvector RAG index) |
-| Kafka (Redpanda) | `redpanda` | 9092 | `audit.events` topic + `audit.events.DLT` |
+| Kafka | `kafka` (`apache/kafka`, single-node KRaft) | 9092 | `audit.events` topic + `audit.events.DLT` |
 | Redis | `openshift/redis/` | 6379 | Auth's shared refresh-token store (statelessness) |
 | Observability | Prometheus, Grafana, Loki, Tempo | — | Metrics, logs, traces; all tagged by pod |
 
@@ -108,9 +108,9 @@ Vault / Sealed Secrets / External Secrets Operator) rather than hand-applied fil
   `SPRING_DATASOURCE_URL` at it. **Liquibase owns the schema** and runs on Audit startup
   (`ddl-auto=none`), so a fresh database is migrated automatically; PROD runs the same changelog.
   Single points of failure to remove for real prod: run Postgres HA (primary + replica).
-- **Kafka** — the dev container is a single-broker Redpanda; production wants a multi-broker
-  cluster (managed MSK/Redpanda Cloud/Strimzi on the cluster) with replication ≥3 for
-  `audit.events` and its DLT.
+- **Kafka** — the dev container is a single-broker Apache Kafka in KRaft mode; production wants
+  a multi-broker cluster (managed MSK/Confluent Cloud/Strimzi on the cluster) with replication ≥3
+  for `audit.events` and its DLT.
 - **Redis** — `openshift/redis/` is single-replica; production wants Sentinel or a managed HA
   Redis. Auth degrades safely if Redis is down (refresh fails, login still works), but a
   scaled Auth **requires** a shared Redis (see [ADR-0007](adr/0007-redis-refresh-token-store-for-statelessness.md)).
