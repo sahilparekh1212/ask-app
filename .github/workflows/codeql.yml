@@ -6,16 +6,21 @@ on:
     branches: [main]
     paths:
       - 'Backend/**'
-      # See backend-ci.yml: broadened to .github/** and UI/** so this required check reports on
-      # CI/automation and frontend-only PRs too, otherwise they can never satisfy branch protection.
+      # See backend-ci.yml: broadened to .github/**, UI/**, docs/** and **/*.md so this required
+      # check still reports on CI/automation, frontend-only, and docs-only PRs — otherwise they
+      # can never satisfy branch protection.
       - '.github/**'
       - 'UI/**'
+      - 'docs/**'
+      - '**/*.md'
   pull_request:
     branches: [main]
     paths:
       - 'Backend/**'
       - '.github/**'
       - 'UI/**'
+      - 'docs/**'
+      - '**/*.md'
   schedule:
     - cron: '0 6 * * 1' # weekly, so newly-published rules catch existing code
 

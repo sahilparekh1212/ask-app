@@ -27,6 +27,7 @@ What's in it:
 | [🗺️ System diagram](docs/system-diagram.md) | End-to-end runtime topology (Mermaid) |
 | [🎨 Frontend (UI)](docs/frontend.md) | Angular 21 SPA, signals-first state, same-origin auth |
 | [🔄 Core runtime flows](docs/runtime-flows.md) | Auth/authz, event-driven audit trail, assistant + RAG + MCP |
+| [🔌 API endpoints & access](docs/api-endpoints.md) | Every endpoint on both services and who can reach it (directly/indirectly) |
 | [🧩 Component map](docs/component-map.md) | Each area's responsibility and where it lives |
 | [⚖️ State, scaling & resilience](docs/state-scaling-resilience.md) | State models, replication, the newest-wins limiter |
 | [🗄️ Data, schema & profiles](docs/data-and-profiles.md) | Liquibase schema, indexes, views, retention, H2/Postgres by profile |
