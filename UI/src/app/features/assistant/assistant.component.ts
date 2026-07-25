@@ -1,10 +1,11 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, OnDestroy, computed, inject, signal } from '@angular/core';
 import { Location } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
 import { AssistantService } from './assistant.service';
 import { ChatTurn } from './assistant.models';
 import { TranslatePipe } from '../../core/i18n/translate.pipe';
 import { MarkdownPipe } from '../../core/markdown/markdown.pipe';
+import { VoiceService } from '../../core/voice/voice.service';
 
 /** A rendered chat entry; `blocked` marks the server's local guardrail refusals. */
 interface DisplayTurn extends ChatTurn {
@@ -17,10 +18,18 @@ interface DisplayTurn extends ChatTurn {
   templateUrl: './assistant.component.html',
   styleUrl: './assistant.component.scss',
 })
-export class AssistantComponent {
+export class AssistantComponent implements OnDestroy {
   private readonly fb = inject(FormBuilder);
   private readonly assistant = inject(AssistantService);
   private readonly location = inject(Location);
+  private readonly voice = inject(VoiceService);
+
+  // Voice I/O via the browser's Web Speech API (no backend). Controls hide where unsupported.
+  readonly canListen = this.voice.canListen;
+  readonly canSpeak = this.voice.canSpeak;
+  readonly listening = this.voice.listening;
+  // Index of the assistant turn currently being read aloud (null = nothing speaking).
+  readonly speakingIndex = signal<number | null>(null);
 
   // Pre-filled (not placeholder) so a visitor can hit Send immediately — and the default is
   // a conceptual question the RAG grounding answers well, doubling as a feature demo.
@@ -56,6 +65,10 @@ export class AssistantComponent {
     if (!message || this.busy()) {
       return;
     }
+    // A new question ends any dictation/read-aloud in progress.
+    this.voice.stopDictation();
+    this.voice.stopSpeaking();
+    this.speakingIndex.set(null);
     this.startConversationIfNeeded();
     // History = everything said so far, minus guardrail refusals (they carry no context).
     const history: ChatTurn[] = this.turns()
@@ -124,6 +137,60 @@ export class AssistantComponent {
       .catch(() => {
         /* clipboard blocked (permissions / insecure context) — nothing to show */
       });
+  }
+
+  /**
+   * Toggle voice dictation (Web Speech API). While listening, the transcript-so-far streams into
+   * the composer input; clicking again (or a natural pause) stops it. A no-op where unsupported.
+   */
+  dictate(): void {
+    if (this.listening()) {
+      this.voice.stopDictation();
+      return;
+    }
+    // Don't dictate over an in-progress read-aloud.
+    this.voice.stopSpeaking();
+    this.speakingIndex.set(null);
+    this.voice.startDictation((text) => this.input.setValue(text));
+  }
+
+  /**
+   * Read an assistant reply aloud, or stop it if that same reply is already being read. The reply
+   * is Markdown, so it's flattened to plain prose first (bullets/backticks/links shouldn't be
+   * spoken literally).
+   */
+  speak(text: string, index: number): void {
+    if (this.speakingIndex() === index) {
+      this.voice.stopSpeaking();
+      this.speakingIndex.set(null);
+      return;
+    }
+    const started = this.voice.speak(this.toPlainText(text), () => {
+      if (this.speakingIndex() === index) {
+        this.speakingIndex.set(null);
+      }
+    });
+    if (started) {
+      this.speakingIndex.set(index);
+    }
+  }
+
+  /** Flatten Markdown to speakable prose — strip fences/inline code, turn links into their text. */
+  private toPlainText(markdown: string): string {
+    return markdown
+      .replace(/```[\s\S]*?```/g, ' code block ')
+      .replace(/`([^`]+)`/g, '$1')
+      .replace(/!\[[^\]]*\]\([^)]*\)/g, '')
+      .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
+      .replace(/[#>*_~`-]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  ngOnDestroy(): void {
+    // Leaving the page must not leave the mic open or a reply talking.
+    this.voice.stopDictation();
+    this.voice.stopSpeaking();
   }
 
   private scrollToEnd(): void {

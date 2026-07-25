@@ -57,6 +57,11 @@ Legacy paths `/audit`, `/assistant`, and `/flashcards` redirect to `/observabili
   **`POST {auditApiUrl}/api/v1/assistant/chat`** with body `{ message, history }` (history capped at
   the last 20 turns).
 - Backend: `AssistantController.chat()` in the Audit service (`assistant/AssistantController.java`).
+- **Voice chat** (client-side only): a **mic button** in the composer dictates a question into the
+  input, and a **speaker button** on each assistant reply reads it aloud — both via the browser's
+  **Web Speech API** (`SpeechRecognition` / `SpeechSynthesis`), wrapped by
+  `core/voice/voice.service.ts`. No backend or API key is involved; the controls capability-detect
+  and hide where the browser doesn't support them, and reply audio is off until the speaker is clicked.
 
 ## Audit dashboard page
 
