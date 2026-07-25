@@ -131,7 +131,7 @@ public class McpController {
 				"name", TOOL_SEARCH,
 				"description", "Semantic search over this repository's documentation (README, "
 					+ "ADRs, deployment guide). Returns the most relevant doc chunks with their "
-					+ "source file, heading and similarity score.",
+					+ "source file, heading and relevance score.",
 				"inputSchema", searchSchema),
 			Map.of(
 				"name", TOOL_SOURCES,
