@@ -15,12 +15,12 @@ config-driven and fully dormant when their key/DSN is empty.
 
 ## Routes
 
-| Route                       | What it does                                                             | Auth    |
-| --------------------------- | ------------------------------------------------------------------------ | ------- |
-| `/login`, `/login/callback` | Demo login form, Google OAuth fragment handoff                           | public  |
-| `/observability`            | Paginated/sorted/filtered audit table, KPI cards, events-over-time chart | guarded |
+| Route                       | What it does                                                              | Auth    |
+| --------------------------- | ------------------------------------------------------------------------- | ------- |
+| `/login`, `/login/callback` | Demo login form, Google OAuth fragment handoff                            | public  |
+| `/observability`            | Paginated/sorted/filtered audit table, KPI cards, events-over-time chart  | guarded |
 | `/chat`                     | Chat over the server-side Claude proxy (RAG-grounded), optional voice I/O | guarded |
-| `/profile`                  | `/auth/me` profile view                                                  | guarded |
+| `/profile`                  | `/auth/me` profile view                                                   | guarded |
 
 ## Design decisions — what & how
 
@@ -34,7 +34,7 @@ config-driven and fully dormant when their key/DSN is empty.
 | **i18n** — text from data, not hardcoded                                                                                       | Hand-rolled `TranslateService` + `t` pipe fed by `public/i18n/<code>.json`; currently **English-only by decision**, runtime kept so a language is one JSON file away                                                                                                                                                         |
 | **Analytics / error monitoring**                                                                                               | **GA4** (`gtag.js`, typed, page_view per route change) and **Sentry**; both fully disabled when their key/DSN is empty                                                                                                                                                                                                       |
 | **Dependency-free data viz**                                                                                                   | CSS-only stat bars + hand-built column chart, sharing the design tokens                                                                                                                                                                                                                                                      |
-| **Voice chat** — hands-free Q&A, no backend or keys                                                                             | Browser **Web Speech API**: `SpeechRecognition` dictates a question into the composer (mic button), `SpeechSynthesis` reads a reply aloud (speaker toggle, default off). A `VoiceService` in [`src/app/core/voice/`](src/app/core/voice/) capability-detects support so the controls hide where the browser lacks it          |
+| **Voice chat** — hands-free Q&A, no backend or keys                                                                            | Browser **Web Speech API**: `SpeechRecognition` dictates a question into the composer (mic button), `SpeechSynthesis` reads a reply aloud (speaker toggle, default off). A `VoiceService` in [`src/app/core/voice/`](src/app/core/voice/) capability-detects support so the controls hide where the browser lacks it         |
 | **CI**                                                                                                                         | `frontend-ci.yml`: Prettier, angular-eslint, prod build, headless Karma/Jasmine on every `UI/**` PR                                                                                                                                                                                                                          |
 | **E2E where the seams are**                                                                                                    | **Playwright** ([`e2e/`](../e2e/)) drives the real compose stack — login through nginx, Kafka-produced audit rows appearing in the table                                                                                                                                                                                     |
 | **Container**                                                                                                                  | Two-stage Docker build (Node 22 → `nginx:1.28-alpine`): SPA fallback, immutable cache on hashed bundles, `no-cache` on `index.html`                                                                                                                                                                                          |

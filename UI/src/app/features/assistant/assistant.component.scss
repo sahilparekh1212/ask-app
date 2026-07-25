@@ -275,6 +275,19 @@
   opacity: 1;
 }
 
+// The read-aloud + copy controls sit in a row under a reply.
+.turn-actions {
+  display: flex;
+  gap: 0.25rem;
+}
+
+// A reply that's being read aloud keeps its speaker control visible and highlighted.
+.speak-btn.active {
+  opacity: 1;
+  color: var(--fg);
+  background: var(--canvas-overlay);
+}
+
 .error {
   color: var(--danger);
   margin: 0;
@@ -324,6 +337,40 @@
 
     &::placeholder {
       color: var(--fg-subtle);
+    }
+  }
+
+  // Dictation toggle: a ghost circle that turns solid red while the mic is live, so "we're
+  // listening" is unmistakable. Hidden entirely where the browser has no SpeechRecognition.
+  .mic-btn {
+    flex: none;
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--fg-muted);
+    cursor: pointer;
+
+    svg {
+      width: 18px;
+      height: 18px;
+      fill: currentColor;
+    }
+
+    &:hover {
+      color: var(--fg);
+      background: var(--canvas-overlay);
+    }
+
+    &.active {
+      color: #ffffff;
+      background: var(--danger);
+      border-color: var(--danger);
     }
   }
 

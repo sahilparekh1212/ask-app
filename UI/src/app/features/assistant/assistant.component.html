@@ -12,32 +12,65 @@
           } @else {
             <p class="bubble">{{ turn.content }}</p>
           }
-          <button
-            class="copy-btn"
-            type="button"
-            (click)="copy(turn.content, $index)"
-            [attr.aria-label]="'assistant.copy' | t"
-            [title]="'assistant.copy' | t"
-          >
-            @if (copiedIndex() === $index) {
-              <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
-                <path
-                  d="M13.78 4.22a.75.75 0 0 1 0 1.06l-7.25 7.25a.75.75 0 0 1-1.06 0L2.22 9.28a.751.751 0 0 1 .018-1.042.751.751 0 0 1 1.042-.018L6 10.94l6.72-6.72a.75.75 0 0 1 1.06 0Z"
-                />
-              </svg>
-              {{ 'assistant.copied' | t }}
-            } @else {
-              <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
-                <path
-                  d="M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 0 1 0 1.5h-1.5a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-1.5a.75.75 0 0 1 1.5 0v1.5A1.75 1.75 0 0 1 9.25 16h-7.5A1.75 1.75 0 0 1 0 14.25Z"
-                />
-                <path
-                  d="M5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0 1 14.25 11h-7.5A1.75 1.75 0 0 1 5 9.25Zm1.75-.25a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-7.5a.25.25 0 0 0-.25-.25Z"
-                />
-              </svg>
-              {{ 'assistant.copy' | t }}
+          <div class="turn-actions">
+            @if (canSpeak && turn.role === 'assistant' && !turn.blocked) {
+              <button
+                class="copy-btn speak-btn"
+                type="button"
+                [class.active]="speakingIndex() === $index"
+                (click)="speak(turn.content, $index)"
+                [attr.aria-pressed]="speakingIndex() === $index"
+                [attr.aria-label]="
+                  (speakingIndex() === $index ? 'assistant.stopReading' : 'assistant.readAloud') | t
+                "
+                [title]="
+                  (speakingIndex() === $index ? 'assistant.stopReading' : 'assistant.readAloud') | t
+                "
+              >
+                @if (speakingIndex() === $index) {
+                  <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+                    <path
+                      d="M3.75 3h8.5a.75.75 0 0 1 .75.75v8.5a.75.75 0 0 1-.75.75h-8.5a.75.75 0 0 1-.75-.75v-8.5A.75.75 0 0 1 3.75 3Z"
+                    />
+                  </svg>
+                  {{ 'assistant.stopReading' | t }}
+                } @else {
+                  <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+                    <path
+                      d="M9.383 3.076A1 1 0 0 1 10 4v8a1 1 0 0 1-1.707.707L5.586 10H3.5A1.5 1.5 0 0 1 2 8.5v-1A1.5 1.5 0 0 1 3.5 6h2.086l2.707-2.707a1 1 0 0 1 1.09-.217ZM12.53 5.47a.75.75 0 0 1 1.06 0 3.5 3.5 0 0 1 0 5.06.75.75 0 0 1-1.06-1.06 2 2 0 0 0 0-2.94.75.75 0 0 1 0-1.06Z"
+                    />
+                  </svg>
+                  {{ 'assistant.readAloud' | t }}
+                }
+              </button>
             }
-          </button>
+            <button
+              class="copy-btn"
+              type="button"
+              (click)="copy(turn.content, $index)"
+              [attr.aria-label]="'assistant.copy' | t"
+              [title]="'assistant.copy' | t"
+            >
+              @if (copiedIndex() === $index) {
+                <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+                  <path
+                    d="M13.78 4.22a.75.75 0 0 1 0 1.06l-7.25 7.25a.75.75 0 0 1-1.06 0L2.22 9.28a.751.751 0 0 1 .018-1.042.751.751 0 0 1 1.042-.018L6 10.94l6.72-6.72a.75.75 0 0 1 1.06 0Z"
+                  />
+                </svg>
+                {{ 'assistant.copied' | t }}
+              } @else {
+                <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+                  <path
+                    d="M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 0 1 0 1.5h-1.5a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-1.5a.75.75 0 0 1 1.5 0v1.5A1.75 1.75 0 0 1 9.25 16h-7.5A1.75 1.75 0 0 1 0 14.25Z"
+                  />
+                  <path
+                    d="M5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0 1 14.25 11h-7.5A1.75 1.75 0 0 1 5 9.25Zm1.75-.25a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-7.5a.25.25 0 0 0-.25-.25Z"
+                  />
+                </svg>
+                {{ 'assistant.copy' | t }}
+              }
+            </button>
+          </div>
         </div>
       }
       @if (busy()) {
@@ -87,6 +120,26 @@
       [attr.disabled]="busy() ? '' : null"
       [attr.aria-label]="'assistant.placeholder' | t"
     />
+    @if (canListen) {
+      <button
+        type="button"
+        class="mic-btn"
+        [class.active]="listening()"
+        (click)="dictate()"
+        [attr.aria-pressed]="listening()"
+        [attr.aria-label]="(listening() ? 'assistant.stopDictation' : 'assistant.dictate') | t"
+        [title]="(listening() ? 'assistant.stopDictation' : 'assistant.dictate') | t"
+      >
+        <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+          <path
+            d="M8 1.75a1.75 1.75 0 0 0-1.75 1.75v3a1.75 1.75 0 1 0 3.5 0v-3A1.75 1.75 0 0 0 8 1.75Z"
+          />
+          <path
+            d="M3.5 6.75a.75.75 0 0 1 .75.75v.25a3.75 3.75 0 0 0 7.5 0V7.5a.75.75 0 0 1 1.5 0v.25a5.25 5.25 0 0 1-4.5 5.196V14.5a.75.75 0 0 1-1.5 0v-1.554A5.25 5.25 0 0 1 2.75 7.75V7.5a.75.75 0 0 1 .75-.75Z"
+          />
+        </svg>
+      </button>
+    }
     <button
       type="submit"
       class="send-btn"

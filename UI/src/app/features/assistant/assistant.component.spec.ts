@@ -1,22 +1,48 @@
 import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing';
 import { Location } from '@angular/common';
 import { provideLocationMocks } from '@angular/common/testing';
+import { signal } from '@angular/core';
 import { of, throwError } from 'rxjs';
 
 import { AssistantComponent } from './assistant.component';
 import { AssistantService } from './assistant.service';
+import { VoiceService } from '../../core/voice/voice.service';
 
 describe('AssistantComponent', () => {
   let fixture: ComponentFixture<AssistantComponent>;
   let component: AssistantComponent;
   let assistant: jasmine.SpyObj<AssistantService>;
   let location: Location;
+  let voice: {
+    canListen: boolean;
+    canSpeak: boolean;
+    listening: ReturnType<typeof signal<boolean>>;
+    speaking: ReturnType<typeof signal<boolean>>;
+    startDictation: jasmine.Spy;
+    stopDictation: jasmine.Spy;
+    speak: jasmine.Spy;
+    stopSpeaking: jasmine.Spy;
+  };
 
   beforeEach(async () => {
     assistant = jasmine.createSpyObj('AssistantService', ['chat']);
+    voice = {
+      canListen: true,
+      canSpeak: true,
+      listening: signal(false),
+      speaking: signal(false),
+      startDictation: jasmine.createSpy('startDictation').and.returnValue(true),
+      stopDictation: jasmine.createSpy('stopDictation'),
+      speak: jasmine.createSpy('speak').and.returnValue(true),
+      stopSpeaking: jasmine.createSpy('stopSpeaking'),
+    };
     await TestBed.configureTestingModule({
       imports: [AssistantComponent],
-      providers: [{ provide: AssistantService, useValue: assistant }, provideLocationMocks()],
+      providers: [
+        { provide: AssistantService, useValue: assistant },
+        { provide: VoiceService, useValue: voice },
+        provideLocationMocks(),
+      ],
     }).compileComponents();
 
     location = TestBed.inject(Location);
@@ -127,5 +153,40 @@ describe('AssistantComponent', () => {
     component.send();
 
     expect(location.path()).toBe(firstUrl);
+  });
+
+  it('dictate() starts recognition and streams the transcript into the composer input', () => {
+    component.dictate();
+
+    expect(voice.startDictation).toHaveBeenCalled();
+    const onTranscript = voice.startDictation.calls.mostRecent().args[0] as (t: string) => void;
+    onTranscript('what does this app do');
+
+    expect(component.input.value).toBe('what does this app do');
+  });
+
+  it('dictate() while already listening stops dictation instead of starting a new one', () => {
+    voice.listening.set(true);
+
+    component.dictate();
+
+    expect(voice.stopDictation).toHaveBeenCalled();
+    expect(voice.startDictation).not.toHaveBeenCalled();
+  });
+
+  it('speak() reads a reply aloud (markdown flattened) and toggles the speaking index', () => {
+    component.speak('**Bold** with `code` and a [link](https://x)', 2);
+
+    expect(voice.speak).toHaveBeenCalled();
+    const spokenText = voice.speak.calls.mostRecent().args[0] as string;
+    expect(spokenText).not.toContain('**');
+    expect(spokenText).not.toContain('`');
+    expect(spokenText).toContain('link');
+    expect(component.speakingIndex()).toBe(2);
+
+    // Clicking the same reply again stops it.
+    component.speak('anything', 2);
+    expect(voice.stopSpeaking).toHaveBeenCalled();
+    expect(component.speakingIndex()).toBeNull();
   });
 });
