@@ -18,6 +18,17 @@ class FakeRecognition {
   }
 }
 
+/** A stand-in for SpeechSynthesisUtterance that just records what the service set on it. */
+class FakeUtterance {
+  voice: SpeechSynthesisVoice | null = null;
+  lang = '';
+  rate = 1;
+  pitch = 1;
+  onend: (() => void) | null = null;
+  onerror: (() => void) | null = null;
+  constructor(public text: string) {}
+}
+
 describe('VoiceService', () => {
   const win = window as unknown as Record<string, unknown>;
   let originalRecognition: unknown;
@@ -103,7 +114,11 @@ describe('VoiceService', () => {
   });
 
   it('does not speak blank text', () => {
-    const fakeSynth = { cancel: jasmine.createSpy(), speak: jasmine.createSpy() };
+    const fakeSynth = {
+      cancel: jasmine.createSpy(),
+      speak: jasmine.createSpy(),
+      getVoices: () => [],
+    };
     const original = Object.getOwnPropertyDescriptor(window, 'speechSynthesis');
     Object.defineProperty(window, 'speechSynthesis', { value: fakeSynth, configurable: true });
     try {
@@ -114,6 +129,40 @@ describe('VoiceService', () => {
       if (original) {
         Object.defineProperty(window, 'speechSynthesis', original);
       }
+    }
+  });
+
+  it('reads aloud with the most natural available voice, not the robotic default', () => {
+    const robotic = {
+      name: 'Microsoft David',
+      lang: 'en-US',
+      localService: true,
+    } as SpeechSynthesisVoice;
+    const natural = {
+      name: 'Google US English',
+      lang: 'en-US',
+      localService: false,
+    } as SpeechSynthesisVoice;
+    const spoken: FakeUtterance[] = [];
+    const fakeSynth = {
+      cancel: jasmine.createSpy('cancel'),
+      speak: jasmine.createSpy('speak').and.callFake((u: FakeUtterance) => spoken.push(u)),
+      getVoices: () => [robotic, natural],
+    };
+    const originalSynth = Object.getOwnPropertyDescriptor(window, 'speechSynthesis');
+    const originalUtterance = win['SpeechSynthesisUtterance'];
+    Object.defineProperty(window, 'speechSynthesis', { value: fakeSynth, configurable: true });
+    win['SpeechSynthesisUtterance'] = FakeUtterance;
+    try {
+      const service = new VoiceService();
+      expect(service.speak('hello')).toBeTrue();
+      expect(spoken[0].voice).toBe(natural);
+      expect(spoken[0].lang).toBe('en-US');
+    } finally {
+      if (originalSynth) {
+        Object.defineProperty(window, 'speechSynthesis', originalSynth);
+      }
+      win['SpeechSynthesisUtterance'] = originalUtterance;
     }
   });
 });
