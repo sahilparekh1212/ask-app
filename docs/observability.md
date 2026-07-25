@@ -9,3 +9,8 @@ _Part of the [ask-app](../README.md) documentation._
   ID is configured.
 - UI, Auth, and Audit send errors to Sentry only when their DSNs are configured;
   performance tracing remains with Tempo.
+- The assistant records each chat / MCP-search interaction to an `ai_trace` table
+  (query, pre/post-rerank rankings, model, reply, latencies, tokens) plus Micrometer
+  metrics, for measuring and improving answer accuracy — see
+  [Backend observability guide](../Backend/docs/observability.md#ai-answer-quality-traces-ai_trace)
+  and [ADR-0014](../Backend/docs/adr/0014-ai-interaction-tracing.md).

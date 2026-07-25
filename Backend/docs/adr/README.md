@@ -19,3 +19,4 @@ system does; these explain *why* it's built this way.
 | [0011](0011-apache-kafka-over-redpanda.md) | Apache Kafka (single-node KRaft) over Redpanda in the compose stack — run the real broker |
 | [0012](0012-query-reranking.md) | Two-stage retrieval — cosine recall then a Voyage reranker for top-k precision |
 | [0013](0013-rag-evaluation-and-quality-gate.md) | RAG retrieval evaluation over a 100-question ground-truth set, wired as a secret-gated build quality gate |
+| [0014](0014-ai-interaction-tracing.md) | AI interaction tracing — a separate `ai_trace` table + metrics for answer-quality measurement, keeping the audit trail non-PII |
