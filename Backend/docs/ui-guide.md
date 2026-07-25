@@ -62,6 +62,8 @@ Legacy paths `/audit`, `/assistant`, and `/flashcards` redirect to `/observabili
   **Web Speech API** (`SpeechRecognition` / `SpeechSynthesis`), wrapped by
   `core/voice/voice.service.ts`. No backend or API key is involved; the controls capability-detect
   and hide where the browser doesn't support them, and reply audio is off until the speaker is clicked.
+  Read-aloud picks the **most natural voice the browser exposes** (`speechSynthesis.getVoices()`
+  filtered for neural / "Online" / Google voices) rather than the robotic default.
 
 ## Audit dashboard page
 

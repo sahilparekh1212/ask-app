@@ -29,6 +29,18 @@ export class VoiceService {
   /** Whether a reply is currently being read aloud. */
   readonly speaking = signal(false);
 
+  // The most natural installed voice for read-aloud (null → let the browser choose its default).
+  private preferredVoice: SpeechSynthesisVoice | null = null;
+
+  constructor() {
+    if (this.canSpeak) {
+      this.loadVoices();
+      // The voice list often loads asynchronously (Chrome fetches its network voices), so refresh
+      // the pick when it changes. Assigning the handler is safe — this is a root singleton.
+      window.speechSynthesis.onvoiceschanged = () => this.loadVoices();
+    }
+  }
+
   /**
    * Start dictation, streaming the transcript-so-far to {@link onTranscript} as the user speaks;
    * {@link onEnd} fires when recognition stops (a pause, an error, or {@link stopDictation}).
@@ -79,6 +91,12 @@ export class VoiceService {
     window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = 'en-US';
+    // Use the most natural installed voice instead of the browser's (often robotic) default.
+    if (this.preferredVoice) {
+      utterance.voice = this.preferredVoice;
+    }
+    utterance.rate = 1;
+    utterance.pitch = 1;
     const finish = () => {
       this.speaking.set(false);
       onEnd?.();
@@ -96,6 +114,36 @@ export class VoiceService {
     }
     this.speaking.set(false);
   }
+
+  private loadVoices(): void {
+    const voices = window.speechSynthesis.getVoices?.() ?? [];
+    this.preferredVoice = pickNaturalVoice(voices);
+  }
+}
+
+/**
+ * Choose the most natural-sounding English voice from those installed. The default `en-US` voice is
+ * frequently the robotic one even when better voices exist, so this scores by the markers of a
+ * neural / network voice — "natural"/"neural" in the name, Google voices, "online" (server-side)
+ * voices, and non-local-service voices — preferring en-US. Returns null when there's no English
+ * voice (the browser then uses its own default).
+ */
+function pickNaturalVoice(voices: SpeechSynthesisVoice[]): SpeechSynthesisVoice | null {
+  const english = voices.filter((voice) => voice.lang.toLowerCase().startsWith('en'));
+  if (english.length === 0) {
+    return null;
+  }
+  const score = (voice: SpeechSynthesisVoice): number => {
+    const name = voice.name.toLowerCase();
+    let value = 0;
+    if (/natural|neural/.test(name)) value += 100;
+    if (name.includes('google')) value += 60;
+    if (name.includes('online')) value += 40;
+    if (!voice.localService) value += 20; // network voices are usually the good ones
+    if (voice.lang.toLowerCase() === 'en-us') value += 10;
+    return value;
+  };
+  return english.reduce((best, voice) => (score(voice) > score(best) ? voice : best));
 }
 
 // ── Minimal typing for the non-standard SpeechRecognition (absent from lib.dom.d.ts) ──────────
