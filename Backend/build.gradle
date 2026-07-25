@@ -27,6 +27,12 @@ subprojects {
 	group = 'com.askapp'
 	version = '0.0.1-SNAPSHOT'
 
+	// Security override: bump the BOM-managed PostgreSQL JDBC driver to patch CVE-2026-54291 (HIGH,
+	// fixed in 42.7.12). Spring Boot 3.5.16's dependency BOM still pins 42.7.11, which the Trivy gate
+	// flags. This overrides the managed version for every module that pulls it. Drop once the Boot
+	// BOM catches up.
+	ext['postgresql.version'] = '42.7.12'
+
 	// Keep build output out of the OneDrive-synced working tree. OneDrive grabs file handles
 	// on build/**/*.class mid-sync, so Gradle's clean/recompile fails with "Unable to delete
 	// directory". Redirect each module's build dir to a non-synced location (LOCALAPPDATA on
