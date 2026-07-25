@@ -91,6 +91,40 @@ Trace → logs is wired: the log icon on any span jumps to the matching Loki lin
 log line carries `traceId=` in plain text (the datasource does a substring search — no custom
 label mapping needed).
 
+## AI answer-quality traces (`ai_trace`)
+
+Beyond system health, the assistant records each chat / MCP-search interaction for **answer-quality**
+analysis (ADR-0014) — two views:
+
+**Metrics (Prometheus → Grafana):** emitted per interaction, tagged `feature` (`chat` / `mcp_search`):
+
+```promql
+# Retrieval throughput (interactions/s) by feature
+sum by (feature) (rate(ai_retrieval_latency_seconds_count[5m]))
+# p95 retrieval latency (embed → rerank) by feature
+histogram_quantile(0.95, sum by (le, feature) (rate(ai_retrieval_latency_seconds_bucket[5m])))
+# Top retrieved score — mean of the best chunk's relevance (a grounding-strength signal)
+sum by (feature) (rate(ai_retrieval_top_score_sum[5m])) / sum by (feature) (rate(ai_retrieval_top_score_count[5m]))
+# Blocked chat rate by screener category
+sum by (category) (rate(ai_assistant_chat_blocked_total[5m]))
+```
+
+**Per-interaction detail (SQL over the `ai_trace` table):** query text, pre/post-rerank candidates
+with scores, model, reply, latencies and tokens — for opening up individual answers. Reach the DB via
+Adminer (DEV) or `psql` (see [How-to: Postgres](how-to/postgres.md)); at LOCAL it's H2. Examples:
+
+```sql
+-- Weakest-grounded recent chats (low best-chunk score first) — candidates to improve
+SELECT created_at, top_score, retrieved_count, query_text
+FROM ai_trace WHERE feature = 'CHAT' ORDER BY top_score ASC LIMIT 20;
+
+-- Daily volume + mean grounding strength + latency, via the reporting view
+SELECT * FROM v_ai_trace_daily ORDER BY event_date DESC, feature;
+```
+
+`ai.trace.capture-content=false` keeps the scores/latencies/ranks but drops the raw `query_text` /
+`reply_text` (retrieval scores are public corpus metadata, always captured).
+
 ## Try it end-to-end (2 minutes)
 
 1. Sign in at the app (demo / demo) and click around the dashboard and chat.

@@ -4,6 +4,9 @@ import com.askapp.audit.event.AuditEventPublisher;
 import com.askapp.audit.rag.RagService;
 import com.askapp.audit.rag.ScoredChunk;
 import com.askapp.audit.rag.SourceSummary;
+import com.askapp.audit.trace.AiMetrics;
+import com.askapp.audit.trace.AiTraceRecord;
+import com.askapp.audit.trace.AiTraceService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -54,12 +57,16 @@ public class McpController {
 	private final RagService ragService;
 	private final ObjectMapper objectMapper;
 	private final AuditEventPublisher auditEventPublisher;
+	private final AiTraceService aiTraceService;
+	private final AiMetrics aiMetrics;
 
 	public McpController(RagService ragService, ObjectMapper objectMapper,
-			AuditEventPublisher auditEventPublisher) {
+			AuditEventPublisher auditEventPublisher, AiTraceService aiTraceService, AiMetrics aiMetrics) {
 		this.ragService = ragService;
 		this.objectMapper = objectMapper;
 		this.auditEventPublisher = auditEventPublisher;
+		this.aiTraceService = aiTraceService;
+		this.aiMetrics = aiMetrics;
 	}
 
 	/** Spec: a server that offers no server-initiated SSE stream answers GET with 405. */
@@ -131,7 +138,7 @@ public class McpController {
 				"name", TOOL_SEARCH,
 				"description", "Semantic search over this repository's documentation (README, "
 					+ "ADRs, deployment guide). Returns the most relevant doc chunks with their "
-					+ "source file, heading and similarity score.",
+					+ "source file, heading and relevance score.",
 				"inputSchema", searchSchema),
 			Map.of(
 				"name", TOOL_SOURCES,
@@ -193,7 +200,13 @@ public class McpController {
 			throw new IllegalArgumentException("'query' is required and must be a non-empty string");
 		}
 		Integer topK = arguments.hasNonNull("top_k") ? arguments.get("top_k").asInt() : null;
-		List<ScoredChunk> chunks = ragService.search(query, topK);
+		long retrievalStart = System.nanoTime();
+		RagService.Retrieval retrieval = ragService.retrieve(query, topK);
+		long retrievalMs = (System.nanoTime() - retrievalStart) / 1_000_000;
+		List<ScoredChunk> chunks = retrieval.results();
+		// Record the search for answer-quality analysis (ADR-0014) — best-effort and async.
+		aiTraceService.record(AiTraceRecord.mcpSearch(query, retrieval, retrievalMs));
+		aiMetrics.recordRetrieval("mcp_search", retrievalMs, retrieval);
 		if (chunks.isEmpty()) {
 			return toolText("No matching documentation found (the index may be empty).");
 		}

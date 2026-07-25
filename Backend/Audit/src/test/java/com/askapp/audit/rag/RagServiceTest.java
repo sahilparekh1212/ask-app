@@ -1,5 +1,7 @@
 package com.askapp.audit.rag;
 
+import com.askapp.audit.rag.rerank.IdentityReranker;
+import com.askapp.audit.rag.rerank.Reranker;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -7,6 +9,7 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -25,7 +28,13 @@ class RagServiceTest {
 	private final VectorStore vectorStore = mock(VectorStore.class);
 
 	private RagService service(RagProperties properties) {
-		return new RagService(properties, embeddingClient, vectorStore);
+		// Default to the identity reranker so the pool collapses to top-k and these assertions read
+		// as single-stage retrieval; the reranking path has its own tests below.
+		return service(properties, new IdentityReranker());
+	}
+
+	private RagService service(RagProperties properties, Reranker reranker) {
+		return new RagService(properties, embeddingClient, vectorStore, reranker);
 	}
 
 	@Test
@@ -63,6 +72,61 @@ class RagServiceTest {
 
 		service(CONFIGURED).search("q", 0);
 		verify(vectorStore).search(any(), eq(1));
+	}
+
+	@Test
+	void searchRecallsAWiderPoolThenReranksToTopK() {
+		Reranker reranker = mock(Reranker.class);
+		float[] queryVector = {1, 0};
+		List<ScoredChunk> pool = List.of(
+			new ScoredChunk("a.md", "A", "aa", 0.9),
+			new ScoredChunk("b.md", "B", "bb", 0.7),
+			new ScoredChunk("c.md", "C", "cc", 0.5));
+		List<ScoredChunk> reranked = List.of(
+			new ScoredChunk("b.md", "B", "bb", 0.99),
+			new ScoredChunk("a.md", "A", "aa", 0.95));
+		when(reranker.candidatePoolSize(5)).thenReturn(20);
+		when(embeddingClient.embedQuery("q")).thenReturn(queryVector);
+		when(vectorStore.search(queryVector, 20)).thenReturn(pool);
+		when(reranker.rerank("q", pool, 5)).thenReturn(reranked);
+
+		assertThat(service(CONFIGURED, reranker).search("q", null)).isEqualTo(reranked);
+		// The store is asked for the wider pool (20), not the returned k (5).
+		verify(vectorStore).search(queryVector, 20);
+	}
+
+	@Test
+	void retrieveExposesBothRerankStages() {
+		Reranker reranker = mock(Reranker.class);
+		float[] queryVector = {1, 0};
+		List<ScoredChunk> pool = List.of(
+			new ScoredChunk("a.md", "A", "aa", 0.9),
+			new ScoredChunk("b.md", "B", "bb", 0.7),
+			new ScoredChunk("c.md", "C", "cc", 0.5));
+		List<ScoredChunk> reranked = List.of(
+			new ScoredChunk("b.md", "B", "bb", 0.99),
+			new ScoredChunk("a.md", "A", "aa", 0.95));
+		when(reranker.candidatePoolSize(5)).thenReturn(20);
+		when(embeddingClient.embedQuery("q")).thenReturn(queryVector);
+		when(vectorStore.search(queryVector, 20)).thenReturn(pool);
+		when(reranker.rerank("q", pool, 5)).thenReturn(reranked);
+
+		RagService.Retrieval retrieval = service(CONFIGURED, reranker).retrieve("q", null);
+
+		assertThat(retrieval.results()).isEqualTo(reranked);
+		assertThat(retrieval.candidates()).isEqualTo(pool);
+	}
+
+	@Test
+	void candidatePoolIsCappedSoARogueRerankerCannotOverfetch() {
+		Reranker reranker = mock(Reranker.class);
+		when(reranker.candidatePoolSize(5)).thenReturn(1000);
+		when(embeddingClient.embedQuery(any())).thenReturn(new float[] {1, 0});
+		when(vectorStore.search(any(), anyInt())).thenReturn(List.of());
+
+		service(CONFIGURED, reranker).search("q", null);
+
+		verify(vectorStore).search(any(), eq(RagService.MAX_CANDIDATE_POOL));
 	}
 
 	@Test

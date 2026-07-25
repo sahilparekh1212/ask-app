@@ -1,0 +1,57 @@
+name: RAG eval
+
+# Retrieval-quality gate (ADR-0013): scores the real embed → rerank pipeline over a 100-question
+# ground-truth set and fails the build when recall@k / MRR / nDCG@k drop below the thresholds in
+# Backend/Audit/src/test/resources/rag-eval/. It needs a real VOYAGE_API_KEY (it calls the live
+# embeddings + rerank API), which fork PRs can't provide — so the gate step skips gracefully when
+# the secret is absent and enforces only where it is present. Its own job, not a required check.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'Backend/**'
+      - '.github/workflows/rag-eval.yml'
+  pull_request:
+    paths:
+      - 'Backend/**'
+      - '.github/workflows/rag-eval.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: rag-eval-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  rag-eval:
+    name: RAG retrieval-quality gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v6
+
+      # Runs the gate only when the Voyage secret is available. Present (this repo's PRs/pushes):
+      # below-threshold ⇒ gradle exits non-zero ⇒ this job fails. Absent (fork PRs): skip, stay green.
+      - name: RAG retrieval eval
+        working-directory: Backend
+        env:
+          VOYAGE_API_KEY: ${{ secrets.VOYAGE_API_KEY }}
+        run: |
+          if [ -z "$VOYAGE_API_KEY" ]; then
+            echo "VOYAGE_API_KEY not available (fork PR or unset secret) — skipping the RAG eval gate."
+            exit 0
+          fi
+          ./gradlew :Audit:ragEval
+
+      - name: Upload RAG eval report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: rag-eval-report
+          path: Backend/Audit/build/rag-eval/
+          if-no-files-found: ignore

@@ -45,7 +45,7 @@ class AssistantControllerSecurityTest {
 	@Test
 	void userRoleChatsAgainstAggregateOnlyContext() throws Exception {
 		when(llmClient.complete(contains("role is USER"), anyList(), anyString()))
-			.thenReturn("aggregate answer");
+			.thenReturn(LlmResult.text("aggregate answer"));
 
 		mockMvc.perform(post("/api/v1/assistant/chat")
 				.with(jwt().authorities(new SimpleGrantedAuthority("ROLE_USER")))
@@ -59,7 +59,7 @@ class AssistantControllerSecurityTest {
 	@Test
 	void adminRoleChatsAgainstRawRowContext() throws Exception {
 		when(llmClient.complete(contains("role is ADMIN"), anyList(), anyString()))
-			.thenReturn("admin answer");
+			.thenReturn(LlmResult.text("admin answer"));
 
 		mockMvc.perform(post("/api/v1/assistant/chat")
 				.with(jwt().authorities(new SimpleGrantedAuthority("ROLE_ADMIN")))

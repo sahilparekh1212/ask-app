@@ -48,9 +48,15 @@ claude mcp add --transport http ask-app https://ask-app.sahilparekh1212.com/audi
 # then, inside Claude Code: "why is there no API gateway?" → grounded in ADR-0005
 ```
 
-Tools: `search_knowledge` (top-k chunks by cosine similarity with source/heading/score) and
-`list_sources` (index inventory). Raw JSON-RPC works too — `initialize`, `tools/list`,
-`tools/call`.
+Tools: `search_knowledge` (top-k chunks with source/heading/score) and `list_sources` (index
+inventory). Raw JSON-RPC works too — `initialize`, `tools/list`, `tools/call`.
+
+Retrieval is **two-stage** ([ADR-0012](../../Backend/docs/adr/0012-query-reranking.md)): a wider
+candidate pool is pulled by cosine similarity, then a cross-encoder reranker (Voyage
+`rerank-2.5-lite`, same `VOYAGE_API_KEY`) re-scores those candidates against the query and keeps the
+best k — so the returned `score` reflects **relevance**, not embedding distance. Reranking is
+fail-soft (a rerank outage falls back to cosine order) and can be turned off with
+`RAG_RERANK_ENABLED=false`.
 
 ### Try chat
 
@@ -71,4 +77,14 @@ chat work?") demonstrates the grounding. Or via API: demo-login for a token, the
   data are never indexed, which is why `/mcp` can be unauthenticated
   ([ADR-0010](../../Backend/docs/adr/0010-rag-mcp-server.md)).
 - Tunables: `ASSISTANT_MODEL` (default `claude-opus-4-8`; `claude-haiku-4-5` for cost),
-  `ASSISTANT_MAX_TOKENS`.
+  `ASSISTANT_MAX_TOKENS`; retrieval reranking via `RAG_RERANK_ENABLED` (default on),
+  `RAG_RERANK_MODEL` (default `rerank-2.5-lite`), `RAG_RERANK_CANDIDATE_POOL_SIZE` (default 20).
+
+## Evaluating retrieval
+
+Retrieval quality is measured against a fixed **100-question ground-truth set** and gated on a
+threshold — recall@k, MRR and nDCG@k over the real (embed → rerank) pipeline. Run it with a key:
+`cd Backend && VOYAGE_API_KEY=pa-... ./gradlew :Audit:ragEval`. Questions and thresholds are config
+files (no recompile to tune). Full methodology:
+[Backend/docs/rag-eval.md](../../Backend/docs/rag-eval.md),
+[ADR-0013](../../Backend/docs/adr/0013-rag-evaluation-and-quality-gate.md).

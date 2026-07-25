@@ -5,6 +5,9 @@ import com.askapp.audit.assistant.dto.ChatResponse;
 import com.askapp.audit.event.AuditEventPublisher;
 import com.askapp.audit.rag.RagService;
 import com.askapp.audit.rag.ScoredChunk;
+import com.askapp.audit.trace.AiMetrics;
+import com.askapp.audit.trace.AiTraceRecord;
+import com.askapp.audit.trace.AiTraceService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -16,6 +19,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
@@ -36,6 +40,8 @@ class AssistantServiceTest {
 	private final LlmClient llmClient = mock(LlmClient.class);
 	private final RagService ragService = mock(RagService.class);
 	private final AuditEventPublisher auditEventPublisher = mock(AuditEventPublisher.class);
+	private final AiTraceService aiTraceService = mock(AiTraceService.class);
+	private final AiMetrics aiMetrics = mock(AiMetrics.class);
 
 	@BeforeEach
 	void stubContext() {
@@ -47,7 +53,11 @@ class AssistantServiceTest {
 	private AssistantService service(String apiKey) {
 		AssistantProperties properties = new AssistantProperties(apiKey, "claude-opus-4-8", 1024);
 		return new AssistantService(properties, screener, contextBuilder, new AuditQueryDetector(),
-			llmClient, ragService, auditEventPublisher);
+			llmClient, ragService, auditEventPublisher, aiTraceService, aiMetrics);
+	}
+
+	private static RagService.Retrieval retrieval(List<ScoredChunk> chunks) {
+		return new RagService.Retrieval(chunks, chunks);
 	}
 
 	@Test
@@ -88,8 +98,22 @@ class AssistantServiceTest {
 	}
 
 	@Test
+	void blockedTurnRecordsABlockedAiTrace() {
+		ChatRequest dirty = new ChatRequest("my password=hunter2 fails", null);
+
+		service("key").chat(dirty, false);
+
+		ArgumentCaptor<AiTraceRecord> trace = ArgumentCaptor.forClass(AiTraceRecord.class);
+		verify(aiTraceService).record(trace.capture());
+		assertThat(trace.getValue().blocked()).isTrue();
+		assertThat(trace.getValue().blockedCategory()).isNotBlank();
+		assertThat(trace.getValue().retrieval()).isNull();
+		verify(aiMetrics).recordBlockedChat(anyString());
+	}
+
+	@Test
 	void cleanInputIsForwardedWithTheRoleScopedPrompt() {
-		when(llmClient.complete(anyString(), anyList(), anyString())).thenReturn("It stores audit rows.");
+		when(llmClient.complete(anyString(), anyList(), anyString())).thenReturn(LlmResult.text("It stores audit rows."));
 
 		ChatResponse response = service("key").chat(CLEAN, true);
 
@@ -104,8 +128,8 @@ class AssistantServiceTest {
 	void successfulChatEmitsANonPiiChatEvent() {
 		List<ScoredChunk> chunks = List.of(new ScoredChunk("docs/adr/0001.md", "Decision", "text", 0.9));
 		when(ragService.isReady()).thenReturn(true);
-		when(ragService.search(eq(CLEAN.message()), isNull())).thenReturn(chunks);
-		when(llmClient.complete(anyString(), anyList(), anyString())).thenReturn("grounded reply");
+		when(ragService.retrieve(eq(CLEAN.message()), isNull())).thenReturn(retrieval(chunks));
+		when(llmClient.complete(anyString(), anyList(), anyString())).thenReturn(LlmResult.text("grounded reply"));
 
 		service("key").chat(CLEAN, false);
 
@@ -117,8 +141,33 @@ class AssistantServiceTest {
 			.contains("retrievedChunks=1")
 			.contains("auditGrounded=false")
 			.contains("latencyMs=");
-		// No message or reply text in the audit detail.
+		// No message or reply text in the audit detail (that content goes only to the ai_trace table).
 		assertThat(details.getValue()).doesNotContain(CLEAN.message()).doesNotContain("grounded reply");
+	}
+
+	@Test
+	void successfulChatRecordsAFullAiTraceAndMetrics() {
+		List<ScoredChunk> chunks = List.of(new ScoredChunk("docs/adr/0001.md", "Decision", "text", 0.9));
+		RagService.Retrieval retrieval = retrieval(chunks);
+		when(ragService.isReady()).thenReturn(true);
+		when(ragService.retrieve(eq(CLEAN.message()), isNull())).thenReturn(retrieval);
+		when(llmClient.complete(anyString(), anyList(), anyString()))
+			.thenReturn(new LlmResult("grounded reply", 11, 22));
+
+		service("key").chat(CLEAN, false);
+
+		ArgumentCaptor<AiTraceRecord> trace = ArgumentCaptor.forClass(AiTraceRecord.class);
+		verify(aiTraceService).record(trace.capture());
+		AiTraceRecord rec = trace.getValue();
+		assertThat(rec.feature()).isEqualTo(AiTraceRecord.CHAT);
+		assertThat(rec.query()).isEqualTo(CLEAN.message());
+		assertThat(rec.reply()).isEqualTo("grounded reply");
+		assertThat(rec.retrieval()).isSameAs(retrieval);
+		assertThat(rec.inputTokens()).isEqualTo(11);
+		assertThat(rec.outputTokens()).isEqualTo(22);
+		assertThat(rec.blocked()).isFalse();
+		verify(aiMetrics).recordRetrieval(eq("chat"), anyLong(), eq(retrieval));
+		verify(aiMetrics).recordChat(anyLong());
 	}
 
 	@Test
@@ -133,7 +182,7 @@ class AssistantServiceTest {
 
 	@Test
 	void userRoleFlagIsPassedThroughToTheContextBuilder() {
-		when(llmClient.complete(anyString(), anyList(), anyString())).thenReturn("ok");
+		when(llmClient.complete(anyString(), anyList(), anyString())).thenReturn(LlmResult.text("ok"));
 
 		service("key").chat(CLEAN, false);
 
@@ -142,7 +191,7 @@ class AssistantServiceTest {
 
 	@Test
 	void genericQuestionDoesNotAttachLiveAuditData() {
-		when(llmClient.complete(anyString(), anyList(), anyString())).thenReturn("ok");
+		when(llmClient.complete(anyString(), anyList(), anyString())).thenReturn(LlmResult.text("ok"));
 
 		service("key").chat(CLEAN, false);
 
@@ -152,7 +201,7 @@ class AssistantServiceTest {
 
 	@Test
 	void stateQuestionAttachesLiveAuditData() {
-		when(llmClient.complete(anyString(), anyList(), anyString())).thenReturn("42 logins.");
+		when(llmClient.complete(anyString(), anyList(), anyString())).thenReturn(LlmResult.text("42 logins."));
 
 		service("key").chat(STATE, true);
 
@@ -167,8 +216,8 @@ class AssistantServiceTest {
 	void retrievedChunksAreAppendedToThePromptWhenRagIsReady() {
 		List<ScoredChunk> chunks = List.of(new ScoredChunk("docs/adr/0001.md", "Decision", "text", 0.9));
 		when(ragService.isReady()).thenReturn(true);
-		when(ragService.search(eq(CLEAN.message()), isNull())).thenReturn(chunks);
-		when(llmClient.complete(anyString(), anyList(), anyString())).thenReturn("grounded reply");
+		when(ragService.retrieve(eq(CLEAN.message()), isNull())).thenReturn(retrieval(chunks));
+		when(llmClient.complete(anyString(), anyList(), anyString())).thenReturn(LlmResult.text("grounded reply"));
 
 		service("key").chat(CLEAN, false);
 
@@ -178,8 +227,8 @@ class AssistantServiceTest {
 	@Test
 	void retrievalFailureDegradesToTheUnretrievedPrompt() {
 		when(ragService.isReady()).thenReturn(true);
-		when(ragService.search(anyString(), any())).thenThrow(new RuntimeException("provider down"));
-		when(llmClient.complete(anyString(), anyList(), anyString())).thenReturn("still works");
+		when(ragService.retrieve(anyString(), any())).thenThrow(new RuntimeException("provider down"));
+		when(llmClient.complete(anyString(), anyList(), anyString())).thenReturn(LlmResult.text("still works"));
 
 		ChatResponse response = service("key").chat(CLEAN, false);
 

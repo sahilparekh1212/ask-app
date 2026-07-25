@@ -24,6 +24,11 @@ git hooks — so every change is gated the same way no matter who pushes it.
   (browser → nginx → Auth → Kafka → Audit → PostgreSQL), nothing mocked.
 - 🧬 **Mutation testing** — PIT runs report-only to surface weak assertions that
   line coverage alone would miss.
+- 🎯 **RAG retrieval quality** — a 100-question ground-truth eval scores the real
+  retrieval pipeline (embed → rerank) on recall@k / MRR / nDCG@k and **fails the
+  build** below configured thresholds. Runs in its own job, gated on the Voyage
+  API key (so fork PRs without the secret skip it rather than fail);
+  see [ADR-0013](../Backend/docs/adr/0013-rag-evaluation-and-quality-gate.md).
 
 ## 🚀 Delivery (on merge to `main`)
 

@@ -45,6 +45,10 @@ security-master reference data is indexed alongside — public, non-PII only; au
 never indexed ([ADR-0010](docs/adr/0010-rag-mcp-server.md)). Tools: `search_knowledge`,
 `list_sources`. Enable indexing with `VOYAGE_API_KEY`.
 
+Retrieval is two-stage: a wider candidate pool by cosine similarity, then a Voyage cross-encoder
+**reranker** (`rerank-2.5-lite`) re-scores those candidates against the query for top-k precision —
+fail-soft and toggleable with `RAG_RERANK_ENABLED` ([ADR-0012](docs/adr/0012-query-reranking.md)).
+
 ```bash
 claude mcp add --transport http ask-app https://ask-app.sahilparekh1212.com/audit-api/mcp
 # then, inside Claude Code: "why is there no API gateway?" → grounded in ADR-0005
@@ -64,12 +68,12 @@ claude mcp add --transport http ask-app https://ask-app.sahilparekh1212.com/audi
 | **Schema as code** | **Liquibase** owns the schema (`ddl-auto=none`); expand/contract changesets keep rolling deploys safe |
 | **Rate limiting** — newest request wins, shed gracefully | Newest-wins per `userId+method+path`: superseded request's thread interrupted, its `@Transactional` work rolled back, client gets **429 + `Retry-After`** (see [Rate limiting](#rate-limiting)) |
 | **Guarded LLM proxy** — the data flow is the security boundary | Server-side key, inbound secret/PII screening, no auth-header forwarding, role-scoped context in one allowlist class ([ADR-0009](docs/adr/0009-llm-chat-assistant-data-flow.md)) |
-| **RAG + vector search** — ground answers in the code that's actually deployed | **pgvector** on the existing Postgres + **Voyage** embeddings; content-hash incremental indexing ([ADR-0010](docs/adr/0010-rag-mcp-server.md)) |
+| **RAG + vector search** — ground answers in the code that's actually deployed | **pgvector** on the existing Postgres + **Voyage** embeddings; content-hash incremental indexing ([ADR-0010](docs/adr/0010-rag-mcp-server.md)); **two-stage retrieval** — cosine recall then a Voyage cross-encoder **reranker** for top-k precision, fail-soft ([ADR-0012](docs/adr/0012-query-reranking.md)) |
 | **MCP server** | Hand-rolled stateless JSON-RPC `/mcp` (`initialize`/`tools/list`/`tools/call`) — the SDK's session/SSE machinery isn't needed |
 | **Metrics / logs / traces** | **Micrometer → Prometheus**; structured JSON → **Loki**; OpenTelemetry → **Tempo**, one trace across the async Kafka hop (see [Observability](#observability)) |
 | **Domain analytics vs system health** | The event-sourced audit trail feeds the in-app dashboard; Grafana/Prometheus/Loki/Tempo answer the *system* question — two views, deliberately separate |
 | **API contract safety** | springdoc emits OpenAPI from running code; an **openapi-diff** PR gate fails only on incompatible changes |
-| **Testing depth** | JUnit + **90% JaCoCo gate** per module, diff-cover, **PIT** mutation baseline, **Playwright** E2E vs the compose stack, **k6** load tests |
+| **Testing depth** | JUnit + **90% JaCoCo gate** per module, diff-cover, **PIT** mutation baseline, **Playwright** E2E vs the compose stack, **k6** load tests, a **RAG retrieval-quality gate** (100 ground-truth questions → recall@k / MRR / nDCG@k thresholds, [ADR-0013](docs/adr/0013-rag-evaluation-and-quality-gate.md)) |
 | **CI / CD / supply chain** | GitHub Actions: build/test/coverage, CodeQL, Trivy, Dependabot, gitleaks, commit lint → versioned GHCR images on merge, **cosign** keyless signing + **syft** SBOM attestations, keyless **WIF** deploy to the VM |
 | **Config & secrets** | Profile matrix (LOCAL…PROD) selects behaviour; keys and passwords come from the environment; nothing sensitive committed |
 
