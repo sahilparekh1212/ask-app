@@ -44,13 +44,28 @@ public class RagService {
 	}
 
 	public List<ScoredChunk> search(String query, Integer topK) {
+		return retrieve(query, topK).results();
+	}
+
+	/**
+	 * Both stages of retrieval for one query: the reranked {@code results} (what grounds the answer)
+	 * and the pre-rerank {@code candidates} pool they were selected from. {@code search} returns only
+	 * the results; tracing (ADR-0014) uses {@code retrieve} so it can record how the reranker
+	 * reordered the pool.
+	 */
+	public Retrieval retrieve(String query, Integer topK) {
 		if (!isConfigured()) {
 			throw new IllegalStateException("RAG is not configured (missing VOYAGE_API_KEY)");
 		}
 		int k = topK == null ? properties.getDefaultTopK() : Math.min(Math.max(topK, 1), MAX_TOP_K);
 		int poolSize = Math.min(reranker.candidatePoolSize(k), MAX_CANDIDATE_POOL);
 		List<ScoredChunk> candidates = vectorStore.search(embeddingClient.embedQuery(query), poolSize);
-		return reranker.rerank(query, candidates, k);
+		List<ScoredChunk> results = reranker.rerank(query, candidates, k);
+		return new Retrieval(results, candidates);
+	}
+
+	/** The two stages of a retrieval: post-rerank {@code results} and the pre-rerank {@code candidates}. */
+	public record Retrieval(List<ScoredChunk> results, List<ScoredChunk> candidates) {
 	}
 
 	public List<SourceSummary> sources() {

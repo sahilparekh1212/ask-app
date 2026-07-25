@@ -43,7 +43,7 @@ public class AnthropicLlmClient implements LlmClient {
 	}
 
 	@Override
-	public String complete(String systemPrompt, List<ChatTurn> history, String message) {
+	public LlmResult complete(String systemPrompt, List<ChatTurn> history, String message) {
 		MessageCreateParams.Builder params = MessageCreateParams.builder()
 			.model(properties.getModel())
 			.maxTokens(properties.getMaxTokens())
@@ -59,10 +59,29 @@ public class AnthropicLlmClient implements LlmClient {
 		params.addUserMessage(message);
 
 		Message response = getClient().messages().create(params.build());
-		return response.content().stream()
+		String text = response.content().stream()
 			.flatMap(block -> block.text().stream())
-			.map(text -> text.text())
+			.map(textBlock -> textBlock.text())
 			.collect(Collectors.joining());
+		return new LlmResult(text, inputTokens(response), outputTokens(response));
+	}
+
+	// Token usage is best-effort: it feeds the AI trace (ADR-0014), never a control decision, so a
+	// provider that omits usage (or an SDK shape change) leaves the counts null rather than failing.
+	private static Integer inputTokens(Message response) {
+		try {
+			return Math.toIntExact(response.usage().inputTokens());
+		} catch (RuntimeException e) {
+			return null;
+		}
+	}
+
+	private static Integer outputTokens(Message response) {
+		try {
+			return Math.toIntExact(response.usage().outputTokens());
+		} catch (RuntimeException e) {
+			return null;
+		}
 	}
 
 	// Package-private so tests can cover the lazy build/memoization without a network call

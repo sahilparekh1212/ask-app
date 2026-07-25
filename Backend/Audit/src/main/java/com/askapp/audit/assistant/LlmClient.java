@@ -12,12 +12,12 @@ import java.util.List;
 public interface LlmClient {
 
 	/**
-	 * Sends one grounded conversation to the model and returns its text reply.
+	 * Sends one grounded conversation to the model and returns its text reply plus token usage.
 	 *
 	 * @param systemPrompt the role-scoped system prompt from {@link AssistantContextBuilder}
 	 * @param history      prior turns, oldest first (already screened)
 	 * @param message      the user's new message (already screened)
 	 */
-	String complete(String systemPrompt, List<ChatTurn> history, String message);
+	LlmResult complete(String systemPrompt, List<ChatTurn> history, String message);
 
 }

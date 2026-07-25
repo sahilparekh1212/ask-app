@@ -96,6 +96,28 @@ class RagServiceTest {
 	}
 
 	@Test
+	void retrieveExposesBothRerankStages() {
+		Reranker reranker = mock(Reranker.class);
+		float[] queryVector = {1, 0};
+		List<ScoredChunk> pool = List.of(
+			new ScoredChunk("a.md", "A", "aa", 0.9),
+			new ScoredChunk("b.md", "B", "bb", 0.7),
+			new ScoredChunk("c.md", "C", "cc", 0.5));
+		List<ScoredChunk> reranked = List.of(
+			new ScoredChunk("b.md", "B", "bb", 0.99),
+			new ScoredChunk("a.md", "A", "aa", 0.95));
+		when(reranker.candidatePoolSize(5)).thenReturn(20);
+		when(embeddingClient.embedQuery("q")).thenReturn(queryVector);
+		when(vectorStore.search(queryVector, 20)).thenReturn(pool);
+		when(reranker.rerank("q", pool, 5)).thenReturn(reranked);
+
+		RagService.Retrieval retrieval = service(CONFIGURED, reranker).retrieve("q", null);
+
+		assertThat(retrieval.results()).isEqualTo(reranked);
+		assertThat(retrieval.candidates()).isEqualTo(pool);
+	}
+
+	@Test
 	void candidatePoolIsCappedSoARogueRerankerCannotOverfetch() {
 		Reranker reranker = mock(Reranker.class);
 		when(reranker.candidatePoolSize(5)).thenReturn(1000);

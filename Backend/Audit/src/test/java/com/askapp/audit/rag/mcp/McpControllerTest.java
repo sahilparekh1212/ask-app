@@ -4,6 +4,9 @@ import com.askapp.audit.event.AuditEventPublisher;
 import com.askapp.audit.rag.RagService;
 import com.askapp.audit.rag.ScoredChunk;
 import com.askapp.audit.rag.SourceSummary;
+import com.askapp.audit.trace.AiMetrics;
+import com.askapp.audit.trace.AiTraceRecord;
+import com.askapp.audit.trace.AiTraceService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -34,12 +37,19 @@ class McpControllerTest {
 
 	private final RagService ragService = mock(RagService.class);
 	private final AuditEventPublisher auditEventPublisher = mock(AuditEventPublisher.class);
+	private final AiTraceService aiTraceService = mock(AiTraceService.class);
+	private final AiMetrics aiMetrics = mock(AiMetrics.class);
 	private final MockMvc mvc = MockMvcBuilders
-		.standaloneSetup(new McpController(ragService, new ObjectMapper(), auditEventPublisher))
+		.standaloneSetup(new McpController(ragService, new ObjectMapper(), auditEventPublisher,
+			aiTraceService, aiMetrics))
 		.build();
 
 	private org.springframework.test.web.servlet.ResultActions postRpc(String body) throws Exception {
 		return mvc.perform(post("/mcp").contentType(MediaType.APPLICATION_JSON).content(body));
+	}
+
+	private static RagService.Retrieval retrieval(List<ScoredChunk> chunks) {
+		return new RagService.Retrieval(chunks, chunks);
 	}
 
 	@Test
@@ -95,8 +105,8 @@ class McpControllerTest {
 	@Test
 	void searchToolReturnsRankedChunksAsTextContent() throws Exception {
 		when(ragService.isConfigured()).thenReturn(true);
-		when(ragService.search(eq("how does auth work?"), isNull())).thenReturn(List.of(
-			new ScoredChunk("docs/adr/0002.md", "Decision", "JWTs are issued by Auth.", 0.91)));
+		when(ragService.retrieve(eq("how does auth work?"), isNull())).thenReturn(retrieval(List.of(
+			new ScoredChunk("docs/adr/0002.md", "Decision", "JWTs are issued by Auth.", 0.91))));
 
 		postRpc("""
 			{"jsonrpc":"2.0","id":5,"method":"tools/call",
@@ -113,7 +123,7 @@ class McpControllerTest {
 	@Test
 	void searchToolPassesTopKThrough() throws Exception {
 		when(ragService.isConfigured()).thenReturn(true);
-		when(ragService.search(eq("q"), eq(3))).thenReturn(List.of());
+		when(ragService.retrieve(eq("q"), eq(3))).thenReturn(retrieval(List.of()));
 
 		postRpc("""
 			{"jsonrpc":"2.0","id":6,"method":"tools/call",
@@ -153,7 +163,7 @@ class McpControllerTest {
 	@Test
 	void toolExecutionFailureIsReturnedInsideTheResultWithIsError() throws Exception {
 		when(ragService.isConfigured()).thenReturn(true);
-		when(ragService.search(eq("q"), isNull())).thenThrow(new IllegalStateException("provider down"));
+		when(ragService.retrieve(eq("q"), isNull())).thenThrow(new IllegalStateException("provider down"));
 
 		postRpc("""
 			{"jsonrpc":"2.0","id":9,"method":"tools/call",
@@ -235,8 +245,8 @@ class McpControllerTest {
 	@Test
 	void searchToolEmitsARagSearchEvent() throws Exception {
 		when(ragService.isConfigured()).thenReturn(true);
-		when(ragService.search(eq("how does auth work?"), isNull())).thenReturn(List.of(
-			new ScoredChunk("docs/adr/0002.md", "Decision", "JWTs are issued by Auth.", 0.91)));
+		when(ragService.retrieve(eq("how does auth work?"), isNull())).thenReturn(retrieval(List.of(
+			new ScoredChunk("docs/adr/0002.md", "Decision", "JWTs are issued by Auth.", 0.91))));
 
 		postRpc("""
 			{"jsonrpc":"2.0","id":20,"method":"tools/call",
@@ -280,7 +290,7 @@ class McpControllerTest {
 	@Test
 	void toolExecutionFailureEmitsNoAuditEvent() throws Exception {
 		when(ragService.isConfigured()).thenReturn(true);
-		when(ragService.search(eq("q"), isNull())).thenThrow(new IllegalStateException("provider down"));
+		when(ragService.retrieve(eq("q"), isNull())).thenThrow(new IllegalStateException("provider down"));
 
 		postRpc("""
 			{"jsonrpc":"2.0","id":23,"method":"tools/call",
@@ -290,6 +300,26 @@ class McpControllerTest {
 
 		// The call threw before completing, so no event is emitted (the failure is logged instead).
 		verifyNoInteractions(auditEventPublisher);
+	}
+
+	@Test
+	void searchToolRecordsAnAiTrace() throws Exception {
+		when(ragService.isConfigured()).thenReturn(true);
+		when(ragService.retrieve(eq("how does auth work?"), isNull())).thenReturn(retrieval(List.of(
+			new ScoredChunk("docs/adr/0002.md", "Decision", "JWTs are issued by Auth.", 0.91))));
+
+		postRpc("""
+			{"jsonrpc":"2.0","id":24,"method":"tools/call",
+			 "params":{"name":"search_knowledge","arguments":{"query":"how does auth work?"}}}
+			""")
+			.andExpect(jsonPath("$.result.isError").value(false));
+
+		ArgumentCaptor<AiTraceRecord> trace = ArgumentCaptor.forClass(AiTraceRecord.class);
+		verify(aiTraceService).record(trace.capture());
+		assertThat(trace.getValue().feature()).isEqualTo(AiTraceRecord.MCP_SEARCH);
+		assertThat(trace.getValue().query()).isEqualTo("how does auth work?");
+		verify(aiMetrics).recordRetrieval(eq("mcp_search"), org.mockito.ArgumentMatchers.anyLong(),
+			org.mockito.ArgumentMatchers.any());
 	}
 
 }

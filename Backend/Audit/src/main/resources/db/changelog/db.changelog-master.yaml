@@ -248,3 +248,125 @@ databaseChangeLog:
       rollback:
         - dropView:
             viewName: v_audit_daily_summary
+
+  # AI interaction traces (see ADR-0014). A purpose-built table holding per-interaction detail for the
+  # chat assistant and MCP search — the query, pre/post-rerank candidates, model, reply, latencies and
+  # tokens — used to measure and improve answer accuracy from real data. Deliberately SEPARATE from
+  # audit_logs so that table's non-PII guarantee is untouched. Runs on every database (plain relational
+  # columns; CLOB for the free-text / JSON fields); the AiTrace entity maps onto it under ddl-auto=none.
+  - changeSet:
+      id: 007-create-ai-trace
+      author: aisandbox
+      changes:
+        - createTable:
+            tableName: ai_trace
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: TIMESTAMP
+              - column:
+                  name: feature
+                  type: VARCHAR(32)
+              - column:
+                  name: query_text
+                  type: VARCHAR(4000)
+              - column:
+                  name: model
+                  type: VARCHAR(128)
+              - column:
+                  name: reranked
+                  type: BOOLEAN
+              - column:
+                  name: candidate_count
+                  type: INT
+              - column:
+                  name: retrieved_count
+                  type: INT
+              - column:
+                  name: top_score
+                  type: DOUBLE
+              - column:
+                  name: retrieved_json
+                  type: VARCHAR(8000)
+              - column:
+                  name: candidates_json
+                  type: VARCHAR(4000)
+              - column:
+                  name: reply_text
+                  type: VARCHAR(8000)
+              - column:
+                  name: reply_length
+                  type: INT
+              - column:
+                  name: blocked
+                  type: BOOLEAN
+              - column:
+                  name: blocked_category
+                  type: VARCHAR(64)
+              - column:
+                  name: retrieval_ms
+                  type: BIGINT
+              - column:
+                  name: llm_ms
+                  type: BIGINT
+              - column:
+                  name: input_tokens
+                  type: INT
+              - column:
+                  name: output_tokens
+                  type: INT
+              - column:
+                  name: admin
+                  type: BOOLEAN
+              - column:
+                  name: audit_grounded
+                  type: BOOLEAN
+        # Time-ordered reads per feature (the dashboards + the "recent weak answers" analysis).
+        - createIndex:
+            indexName: idx_ai_trace_feature_created
+            tableName: ai_trace
+            columns:
+              - column:
+                  name: feature
+              - column:
+                  name: created_at
+        - createIndex:
+            indexName: idx_ai_trace_created_at
+            tableName: ai_trace
+            columns:
+              - column:
+                  name: created_at
+      rollback:
+        - dropTable:
+            tableName: ai_trace
+
+  # Reporting view over ai_trace: per calendar day / feature — interaction volume, mean grounding
+  # strength (top_score), mean retrieval latency, and blocked count. Dialect-neutral
+  # (CAST(... AS DATE), SUM(CASE ...)) so it runs on H2 and Postgres alike, mirroring
+  # v_audit_daily_summary. A read-only convenience for Grafana / BI; nothing in the app depends on it.
+  - changeSet:
+      id: 008-create-ai-trace-daily-view
+      author: aisandbox
+      changes:
+        - createView:
+            viewName: v_ai_trace_daily
+            replaceIfExists: true
+            selectQuery: >-
+              SELECT CAST(created_at AS DATE) AS event_date,
+                     feature,
+                     COUNT(*) AS interaction_count,
+                     AVG(top_score) AS avg_top_score,
+                     AVG(retrieval_ms) AS avg_retrieval_ms,
+                     SUM(CASE WHEN blocked THEN 1 ELSE 0 END) AS blocked_count
+              FROM ai_trace
+              GROUP BY CAST(created_at AS DATE), feature
+      rollback:
+        - dropView:
+            viewName: v_ai_trace_daily
