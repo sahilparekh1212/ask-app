@@ -73,7 +73,7 @@ claude mcp add --transport http ask-app https://ask-app.sahilparekh1212.com/audi
 | **Metrics / logs / traces** | **Micrometer → Prometheus**; structured JSON → **Loki**; OpenTelemetry → **Tempo**, one trace across the async Kafka hop (see [Observability](#observability)) |
 | **Domain analytics vs system health** | The event-sourced audit trail feeds the in-app dashboard; Grafana/Prometheus/Loki/Tempo answer the *system* question — two views, deliberately separate |
 | **API contract safety** | springdoc emits OpenAPI from running code; an **openapi-diff** PR gate fails only on incompatible changes |
-| **Testing depth** | JUnit + **90% JaCoCo gate** per module, diff-cover, **PIT** mutation baseline, **Playwright** E2E vs the compose stack, **k6** load tests |
+| **Testing depth** | JUnit + **90% JaCoCo gate** per module, diff-cover, **PIT** mutation baseline, **Playwright** E2E vs the compose stack, **k6** load tests, a **RAG retrieval-quality gate** (100 ground-truth questions → recall@k / MRR / nDCG@k thresholds, [ADR-0013](docs/adr/0013-rag-evaluation-and-quality-gate.md)) |
 | **CI / CD / supply chain** | GitHub Actions: build/test/coverage, CodeQL, Trivy, Dependabot, gitleaks, commit lint → versioned GHCR images on merge, **cosign** keyless signing + **syft** SBOM attestations, keyless **WIF** deploy to the VM |
 | **Config & secrets** | Profile matrix (LOCAL…PROD) selects behaviour; keys and passwords come from the environment; nothing sensitive committed |
 

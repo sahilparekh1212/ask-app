@@ -79,3 +79,12 @@ chat work?") demonstrates the grounding. Or via API: demo-login for a token, the
 - Tunables: `ASSISTANT_MODEL` (default `claude-opus-4-8`; `claude-haiku-4-5` for cost),
   `ASSISTANT_MAX_TOKENS`; retrieval reranking via `RAG_RERANK_ENABLED` (default on),
   `RAG_RERANK_MODEL` (default `rerank-2.5-lite`), `RAG_RERANK_CANDIDATE_POOL_SIZE` (default 20).
+
+## Evaluating retrieval
+
+Retrieval quality is measured against a fixed **100-question ground-truth set** and gated on a
+threshold — recall@k, MRR and nDCG@k over the real (embed → rerank) pipeline. Run it with a key:
+`cd Backend && VOYAGE_API_KEY=pa-... ./gradlew :Audit:ragEval`. Questions and thresholds are config
+files (no recompile to tune). Full methodology:
+[Backend/docs/rag-eval.md](../../Backend/docs/rag-eval.md),
+[ADR-0013](../../Backend/docs/adr/0013-rag-evaluation-and-quality-gate.md).
