@@ -44,11 +44,15 @@ or extended **without touching Java**:
 
   ```properties
   top-k=5
-  min-hit-rate=0.90
-  min-recall-at-k=0.85
-  min-mrr=0.75
+  min-hit-rate=0.92
+  min-recall-at-k=0.90
+  min-mrr=0.74
   min-ndcg-at-k=0.80
   ```
+
+  These are calibrated below the current pipeline's measured baseline (hit-rate 1.00, recall@k
+  1.00, MRR 0.83, nDCG@k 0.88) with headroom — tight enough to catch a real regression, loose
+  enough not to flake on normal run-to-run variation.
 
   Any value is overridable at run time with a system property of the same dotted name, e.g.
   `-Drag.eval.min-mrr=0.70` — so CI can tighten or relax the bar without editing the file.

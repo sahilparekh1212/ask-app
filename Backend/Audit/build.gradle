@@ -97,3 +97,38 @@ processResources {
 		into 'rag-corpus/UI'
 	}
 }
+
+// ── RAG retrieval-quality eval (ADR-0013) ────────────────────────────────────
+// The eval is a JUnit test tagged 'eval'. It is kept OUT of the normal `test` task so the default
+// keyless build and its 90% coverage gate are unaffected, and run on its own by the `ragEval` task
+// below — which needs a real VOYAGE_API_KEY (it calls the live embeddings + rerank API) and fails
+// the build when a metric drops below the thresholds in src/test/resources/rag-eval/.
+tasks.named('test') {
+	useJUnitPlatform {
+		excludeTags 'eval'
+	}
+}
+
+tasks.register('ragEval', Test) {
+	description = 'Runs the RAG retrieval-quality eval (needs VOYAGE_API_KEY); fails below thresholds.'
+	group = 'verification'
+	useJUnitPlatform {
+		includeTags 'eval'
+	}
+	testClassesDirs = sourceSets.test.output.classesDirs
+	classpath = sourceSets.test.runtimeClasspath
+	systemProperty 'rag.eval.report.dir', layout.buildDirectory.dir('rag-eval').get().asFile.absolutePath
+	// Forward any -Drag.eval.* overrides from the Gradle CLI into the forked test JVM, so thresholds
+	// (and top-k) can be tuned at run time without editing thresholds.properties (see docs/rag-eval.md).
+	System.properties.each { key, value ->
+		if (key.toString().startsWith('rag.eval.')) {
+			systemProperty key.toString(), value
+		}
+	}
+	// It calls a live API — always re-run rather than serve a cached UP-TO-DATE result.
+	outputs.upToDateWhen { false }
+	testLogging {
+		showStandardStreams = true
+		events 'passed', 'skipped', 'failed'
+	}
+}

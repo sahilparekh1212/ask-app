@@ -1,0 +1,100 @@
+{"id": "adr-rsa-jwt", "question": "Why does the app sign JWTs with RSA asymmetric keys instead of HMAC?", "expectedSources": ["docs/adr/0001-rsa-jwt-signing.md"], "tags": ["adr", "auth"]}
+{"id": "adr-inmem-first", "question": "Why were rate limiting and the refresh-token store originally kept in memory rather than in Redis?", "expectedSources": ["docs/adr/0002-in-memory-rate-limit-and-refresh-store.md"], "tags": ["adr"]}
+{"id": "adr-h2-tests", "question": "Why do the tests run against H2 instead of Testcontainers?", "expectedSources": ["docs/adr/0003-h2-over-testcontainers.md"], "tags": ["adr", "testing"]}
+{"id": "adr-liquibase", "question": "Why does Liquibase own the database schema instead of Hibernate ddl-auto?", "expectedSources": ["docs/adr/0004-liquibase-schema-ownership.md"], "tags": ["adr", "data"]}
+{"id": "adr-no-gateway", "question": "Why is there no API gateway or BFF in front of the services?", "expectedSources": ["docs/adr/0005-no-api-gateway-yet.md"], "tags": ["adr"]}
+{"id": "adr-fire-forget", "question": "Why are audit events published fire-and-forget with no transactional outbox?", "expectedSources": ["docs/adr/0006-fire-and-forget-audit-events.md"], "tags": ["adr", "kafka"]}
+{"id": "adr-redis-refresh", "question": "Why was the refresh-token store moved to Redis to make Auth stateless?", "expectedSources": ["docs/adr/0007-redis-refresh-token-store-for-statelessness.md"], "tags": ["adr", "auth"]}
+{"id": "adr-ratelimit-perpod", "question": "Why does the rate limiter stay per-pod instead of moving to Redis like the refresh store?", "expectedSources": ["docs/adr/0007-redis-refresh-token-store-for-statelessness.md"], "tags": ["adr"]}
+{"id": "adr-single-spa", "question": "Why is the frontend one Angular SPA instead of a microfrontend shell with remotes?", "expectedSources": ["docs/adr/0008-no-microfrontend-split.md"], "tags": ["adr", "ui"]}
+{"id": "adr-llm-dataflow", "question": "What live data can and cannot reach the LLM provider in the chat assistant?", "expectedSources": ["docs/adr/0009-llm-chat-assistant-data-flow.md"], "tags": ["adr", "llm"]}
+{"id": "adr-pgvector", "question": "Why does RAG use pgvector on the existing Postgres instead of a dedicated vector database like Qdrant?", "expectedSources": ["docs/adr/0010-rag-mcp-server.md"], "tags": ["adr", "rag"]}
+{"id": "adr-voyage", "question": "Why are embeddings done with the Voyage API rather than a local ONNX model?", "expectedSources": ["docs/adr/0010-rag-mcp-server.md"], "tags": ["adr", "rag"]}
+{"id": "adr-mcp-handrolled", "question": "Why is the MCP server hand-rolled instead of using the MCP Java SDK?", "expectedSources": ["docs/adr/0010-rag-mcp-server.md"], "tags": ["adr", "mcp"]}
+{"id": "adr-kafka-redpanda", "question": "Why run Apache Kafka instead of Redpanda in the compose stack?", "expectedSources": ["docs/adr/0011-apache-kafka-over-redpanda.md"], "tags": ["adr", "kafka"]}
+{"id": "adr-rerank", "question": "Why is retrieval two-stage with a reranker instead of just cosine similarity?", "expectedSources": ["docs/adr/0012-query-reranking.md"], "tags": ["adr", "rag"]}
+{"id": "adr-eval-gate", "question": "How is retrieval quality measured and gated in the build?", "expectedSources": ["docs/adr/0013-rag-evaluation-and-quality-gate.md"], "tags": ["adr", "rag", "ci"]}
+{"id": "rag-service", "question": "Which class is the shared retrieval facade used by both the MCP tool and the chat assistant?", "expectedSources": ["audit/rag/RagService.java"], "tags": ["rag", "code"]}
+{"id": "voyage-embed", "question": "How are document and query embeddings requested from Voyage, and why with different input types?", "expectedSources": ["audit/rag/VoyageEmbeddingClient.java"], "tags": ["rag", "code"]}
+{"id": "voyage-rerank-class", "question": "Which class calls the Voyage rerank API and falls back to cosine order on failure?", "expectedSources": ["audit/rag/rerank/VoyageReranker.java"], "tags": ["rag", "code"]}
+{"id": "identity-rerank", "question": "What does the reranker do when reranking is turned off?", "expectedSources": ["audit/rag/rerank/IdentityReranker.java"], "tags": ["rag", "code"]}
+{"id": "inmem-store", "question": "Which vector store is used for LOCAL and tests, and why is it exact rather than approximate?", "expectedSources": ["audit/rag/InMemoryVectorStore.java"], "tags": ["rag", "code"]}
+{"id": "pgvector-store", "question": "How does the pgvector store perform cosine search in SQL?", "expectedSources": ["audit/rag/PgVectorVectorStore.java"], "tags": ["rag", "code"]}
+{"id": "corpus-loader", "question": "How is the RAG corpus discovered on the classpath at index time?", "expectedSources": ["audit/rag/CorpusLoader.java"], "tags": ["rag", "code"]}
+{"id": "code-chunker", "question": "How are source-code files split into chunks for indexing?", "expectedSources": ["audit/rag/CodeChunker.java"], "tags": ["rag", "code"]}
+{"id": "md-chunker", "question": "How are markdown documents chunked by heading for indexing?", "expectedSources": ["audit/rag/MarkdownChunker.java"], "tags": ["rag", "code"]}
+{"id": "rag-indexer", "question": "How does startup indexing avoid re-embedding unchanged chunks on restart?", "expectedSources": ["audit/rag/RagIndexer.java"], "tags": ["rag", "code"]}
+{"id": "dochunk-id", "question": "How is a chunk's id derived so that indexing stays incremental?", "expectedSources": ["audit/rag/DocChunk.java"], "tags": ["rag", "code"]}
+{"id": "mcp-controller", "question": "Which class implements the MCP JSON-RPC endpoint at /mcp?", "expectedSources": ["audit/rag/mcp/McpController.java"], "tags": ["mcp", "code"]}
+{"id": "refdata-chunker", "question": "How is the synthetic security-master reference data turned into retrievable chunks?", "expectedSources": ["audit/rag/ReferenceDataChunker.java"], "tags": ["rag", "code"]}
+{"id": "rag-props", "question": "Which properties configure the RAG feature and how does it degrade without a key?", "expectedSources": ["audit/rag/RagProperties.java"], "tags": ["rag", "code"]}
+{"id": "rerank-props", "question": "Which properties configure the reranking stage and its candidate pool size?", "expectedSources": ["audit/rag/rerank/RerankProperties.java"], "tags": ["rag", "code"]}
+{"id": "assistant-service", "question": "Which class orchestrates one chat turn: screen, assemble context, call the provider?", "expectedSources": ["audit/assistant/AssistantService.java"], "tags": ["llm", "code"]}
+{"id": "context-builder", "question": "Which class is the single data-access allowlist that assembles the assistant's system prompt?", "expectedSources": ["audit/assistant/AssistantContextBuilder.java"], "tags": ["llm", "code"]}
+{"id": "prompt-screener", "question": "How are credentials or personal data in a chat message blocked before reaching the provider?", "expectedSources": ["audit/assistant/PromptScreener.java"], "tags": ["llm", "security", "code"]}
+{"id": "anthropic-client", "question": "Which class calls Claude via the Anthropic SDK, and how is that client built lazily?", "expectedSources": ["audit/assistant/AnthropicLlmClient.java"], "tags": ["llm", "code"]}
+{"id": "audit-query-detector", "question": "How does the assistant decide whether to attach live audit data to a question?", "expectedSources": ["audit/assistant/AuditQueryDetector.java"], "tags": ["llm", "code"]}
+{"id": "llm-client-seam", "question": "What interface lets the LLM provider be mocked in tests?", "expectedSources": ["audit/assistant/LlmClient.java"], "tags": ["llm", "code"]}
+{"id": "chat-request", "question": "What is the request body shape for the chat endpoint, including history?", "expectedSources": ["audit/assistant/dto/ChatRequest.java"], "tags": ["llm", "code"]}
+{"id": "chat-response", "question": "What does the chat endpoint return, including the blocked case?", "expectedSources": ["audit/assistant/dto/ChatResponse.java"], "tags": ["llm", "code"]}
+{"id": "assistant-controller", "question": "Which controller exposes the chat endpoint and on what path?", "expectedSources": ["audit/assistant/AssistantController.java"], "tags": ["llm", "code"]}
+{"id": "assistant-props", "question": "Which properties configure the assistant, and what is the default Claude model?", "expectedSources": ["audit/assistant/AssistantProperties.java"], "tags": ["llm", "code"]}
+{"id": "audit-consumer", "question": "Which class consumes audit events from Kafka and how does it dedupe them?", "expectedSources": ["audit/event/AuditEventConsumer.java"], "tags": ["kafka", "code"]}
+{"id": "audit-publisher", "question": "How does the Audit service publish its own AI-feature events back onto Kafka?", "expectedSources": ["audit/event/AuditEventPublisher.java"], "tags": ["kafka", "code"]}
+{"id": "audit-event-contract", "question": "Which shared record is the Kafka audit-event contract between Auth and Audit?", "expectedSources": ["common/event/AuditEvent.java"], "tags": ["kafka", "code"]}
+{"id": "audit-log-model", "question": "What columns and indexes does the audit log entity define?", "expectedSources": ["audit/model/AuditLog.java"], "tags": ["data", "code"]}
+{"id": "auditable-entity", "question": "How are createdAt, updatedAt and request ids populated on entities automatically?", "expectedSources": ["audit/model/AuditableEntity.java"], "tags": ["data", "code"]}
+{"id": "audit-service-class", "question": "Which service builds both the search page and the aggregated stats from one specification?", "expectedSources": ["audit/service/AuditLogService.java"], "tags": ["code"]}
+{"id": "audit-specs", "question": "How is one JPA Specification reused for both search and the grouped stats aggregation?", "expectedSources": ["audit/repository/AuditLogSpecifications.java"], "tags": ["data", "code"]}
+{"id": "audit-repo", "question": "Which repository backs the audit log and enforces event-id idempotency?", "expectedSources": ["audit/repository/AuditLogRepository.java"], "tags": ["data", "code"]}
+{"id": "purge-service", "question": "How are old audit rows purged on a schedule, and what is the default retention window?", "expectedSources": ["audit/service/AuditLogPurgeService.java"], "tags": ["code"]}
+{"id": "demo-generator", "question": "How are demo audit rows generated and what event vocabulary do they use?", "expectedSources": ["audit/service/DemoDataGenerator.java"], "tags": ["code"]}
+{"id": "ratelimit-interceptor", "question": "How does newest-request-wins rate limiting per user and endpoint work?", "expectedSources": ["common/ratelimit/RateLimitInterceptor.java"], "tags": ["code"]}
+{"id": "ratelimit-registry", "question": "How are active requests tracked so a superseded one can be interrupted?", "expectedSources": ["common/ratelimit/ActiveRequestRegistry.java"], "tags": ["code"]}
+{"id": "web-config-enum", "question": "How does the Audit service bind case-insensitive enum request params like interval=hour?", "expectedSources": ["audit/config/WebConfig.java"], "tags": ["code"]}
+{"id": "secmaster-model", "question": "What fields does the security-master reference-data entity have?", "expectedSources": ["audit/model/SecurityMaster.java"], "tags": ["data", "code"]}
+{"id": "refdata-generator", "question": "How is synthetic security-master data generated deterministically by index?", "expectedSources": ["audit/service/RefDataGenerator.java"], "tags": ["code"]}
+{"id": "refdata-ingest-scheduler", "question": "How does the daily reference-data batch append only new rows without regenerating existing ones?", "expectedSources": ["audit/service/RefDataIngestScheduler.java"], "tags": ["code"]}
+{"id": "refdata-batch-config", "question": "How is the Spring Batch job for reference-data ingestion configured?", "expectedSources": ["audit/config/RefDataBatchConfig.java"], "tags": ["code"]}
+{"id": "refdata-seeder", "question": "How is the security master bulk-seeded on first startup?", "expectedSources": ["audit/config/RefDataSeeder.java"], "tags": ["code"]}
+{"id": "refdata-controller", "question": "Which endpoint serves the reference-data listing with filters?", "expectedSources": ["audit/controller/RefDataController.java"], "tags": ["code"]}
+{"id": "secmaster-specs", "question": "How are reference-data filters like asset class and currency built as specifications?", "expectedSources": ["audit/repository/SecurityMasterSpecifications.java"], "tags": ["data", "code"]}
+{"id": "refdata-service", "question": "Which service reads reference data for the API and RAG indexing?", "expectedSources": ["audit/service/RefDataService.java"], "tags": ["code"]}
+{"id": "auth-token-service", "question": "Which service mints the RSA-signed JWT access and refresh tokens?", "expectedSources": ["auth/service/TokenService.java"], "tags": ["auth", "code"]}
+{"id": "auth-jwks", "question": "Which endpoint publishes the public keys used to verify JWTs?", "expectedSources": ["auth/controller/JwksController.java"], "tags": ["auth", "code"]}
+{"id": "auth-oauth-handler", "question": "What happens on a successful Google OAuth2 login?", "expectedSources": ["auth/handler/OAuth2LoginSuccessHandler.java"], "tags": ["auth", "code"]}
+{"id": "auth-refresh-iface", "question": "What interface abstracts the refresh-token store across in-memory and Redis?", "expectedSources": ["auth/service/RefreshTokenStore.java"], "tags": ["auth", "code"]}
+{"id": "auth-redis-store", "question": "How does the Redis refresh-token store make refresh single-use across replicas?", "expectedSources": ["auth/service/RedisRefreshTokenStore.java"], "tags": ["auth", "code"]}
+{"id": "auth-inmem-store", "question": "What is the default refresh-token store for dev and test?", "expectedSources": ["auth/service/InMemoryRefreshTokenStore.java"], "tags": ["auth", "code"]}
+{"id": "auth-controller", "question": "Which controller handles login, token refresh, and demo login?", "expectedSources": ["auth/controller/AuthController.java"], "tags": ["auth", "code"]}
+{"id": "auth-jwt-config", "question": "How is the RSA key material loaded and the JWT encoder/decoder configured?", "expectedSources": ["auth/config/JwtConfig.java"], "tags": ["auth", "code"]}
+{"id": "auth-security-config", "question": "How is the Auth service's security filter chain configured for OAuth2 and JWT?", "expectedSources": ["auth/config/SecurityConfig.java"], "tags": ["auth", "code"]}
+{"id": "auth-async-tracing", "question": "How is trace context propagated across the async fire-and-forget publish in Auth?", "expectedSources": ["auth/config/AsyncTracingConfig.java"], "tags": ["auth", "observability", "code"]}
+{"id": "prometheus-config", "question": "In the compose stack, how is Prometheus told which service targets to scrape?", "expectedSources": ["monitoring/prometheus/prometheus.yml"], "tags": ["observability"]}
+{"id": "loki-config", "question": "How is Loki configured as the log storage backend?", "expectedSources": ["monitoring/loki/loki-config.yaml"], "tags": ["observability"]}
+{"id": "tempo-config", "question": "How is Tempo configured to receive OTLP traces?", "expectedSources": ["monitoring/tempo/tempo.yaml"], "tags": ["observability"]}
+{"id": "grafana-datasources", "question": "How are Grafana's Prometheus, Loki and Tempo data sources provisioned?", "expectedSources": ["monitoring/grafana/provisioning/datasources/datasources.yml"], "tags": ["observability"]}
+{"id": "grafana-dashboard", "question": "Which file defines the overview Grafana dashboard?", "expectedSources": ["monitoring/grafana/dashboards/askapp-overview.json"], "tags": ["observability"]}
+{"id": "observability-doc", "question": "How do the in-app audit dashboard and Grafana differ as observability views?", "expectedSources": ["docs/observability.md"], "tags": ["observability", "docs"]}
+{"id": "tracing-props", "question": "How is distributed tracing (OTLP endpoint and sampling) configured for the Audit service?", "expectedSources": ["Audit/src/main/resources/application.properties"], "tags": ["observability"]}
+{"id": "mdc-logging", "question": "How are requestId and userId added to every log line for correlation?", "expectedSources": ["audit/logging/MdcLoggingFilter.java"], "tags": ["observability", "code"]}
+{"id": "audit-interceptor", "question": "How is per-request duration logged with an AUDIT marker?", "expectedSources": ["audit/audit/AuditInterceptor.java"], "tags": ["observability", "code"]}
+{"id": "prometheus-openshift", "question": "How is Prometheus scraping configured on OpenShift?", "expectedSources": ["openshift/monitoring/prometheus/configmap.yaml"], "tags": ["observability", "deploy"]}
+{"id": "compose-stack", "question": "Which file defines the full local Docker compose stack?", "expectedSources": ["docker-compose.yml"], "tags": ["deploy"]}
+{"id": "compose-prod", "question": "How does the production compose file terminate TLS and withdraw internal ports?", "expectedSources": ["docker-compose.prod.yml"], "tags": ["deploy"]}
+{"id": "compose-scale", "question": "How is the two-replica statelessness demo run with compose?", "expectedSources": ["docker-compose.scale.yml"], "tags": ["deploy"]}
+{"id": "compose-ghcr", "question": "How does the GHCR compose override pull images instead of building them?", "expectedSources": ["docker-compose.ghcr.yml"], "tags": ["deploy"]}
+{"id": "deployment-doc", "question": "What is the commit to registry to environments to rollout deployment flow?", "expectedSources": ["docs/deployment.md"], "tags": ["deploy", "docs"]}
+{"id": "openshift-audit-deploy", "question": "How is the Audit service deployed on OpenShift with liveness and readiness probes?", "expectedSources": ["openshift/audit/deployment.yaml"], "tags": ["deploy"]}
+{"id": "openshift-hpa", "question": "How is the Audit service horizontally autoscaled on OpenShift?", "expectedSources": ["openshift/audit/hpa.yaml"], "tags": ["deploy"]}
+{"id": "openshift-route", "question": "How is the Audit service exposed externally via an OpenShift route?", "expectedSources": ["openshift/audit/route.yaml"], "tags": ["deploy"]}
+{"id": "audit-buildgradle", "question": "How is the RAG corpus bundled into the Audit jar at build time?", "expectedSources": ["Audit/build.gradle"], "tags": ["ci", "rag"]}
+{"id": "kafka-compose", "question": "How is single-node KRaft Kafka configured in the standalone Kafka compose file?", "expectedSources": ["kafka/docker-compose.yml"], "tags": ["kafka", "deploy"]}
+{"id": "code-map", "question": "Which document is a file-by-file map of the repository grouped by concern?", "expectedSources": ["docs/code-map.md"], "tags": ["docs"]}
+{"id": "ui-guide", "question": "Which document maps each Angular page to its component, elements and backend endpoint?", "expectedSources": ["docs/ui-guide.md"], "tags": ["docs", "ui"]}
+{"id": "ui-auth-interceptor", "question": "How does the Angular HTTP interceptor attach the token and retry once on a 401?", "expectedSources": ["core/auth/auth.interceptor.ts"], "tags": ["ui", "code"]}
+{"id": "ui-auth-service", "question": "How does the Angular AuthService expose authentication state using signals?", "expectedSources": ["core/auth/auth.service.ts"], "tags": ["ui", "code"]}
+{"id": "ui-auth-guard", "question": "How does the Angular route guard redirect unauthenticated users with a returnUrl?", "expectedSources": ["core/auth/auth.guard.ts"], "tags": ["ui", "code"]}
+{"id": "ui-assistant-component", "question": "Which Angular component implements the chat page and its composer?", "expectedSources": ["features/assistant/assistant.component.ts"], "tags": ["ui", "code"]}
+{"id": "ui-nginx", "question": "How does the UI nginx config proxy the API prefixes and do SPA fallback?", "expectedSources": ["UI/nginx.conf"], "tags": ["ui", "deploy"]}
+{"id": "ui-routes", "question": "Where are the Angular application routes defined?", "expectedSources": ["app/app.routes.ts"], "tags": ["ui", "code"]}
