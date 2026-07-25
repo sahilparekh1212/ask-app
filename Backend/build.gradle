@@ -32,6 +32,9 @@ subprojects {
 	// flags. This overrides the managed version for every module that pulls it. Drop once the Boot
 	// BOM catches up.
 	ext['postgresql.version'] = '42.7.12'
+	// Same story for Netty: CVE-2026-59901 (HIGH, Bzip2Decoder infinite loop) is fixed in
+	// 4.1.136.Final; the Boot BOM still pins 4.1.135.Final. Overrides all netty-* modules.
+	ext['netty.version'] = '4.1.136.Final'
 
 	// Keep build output out of the OneDrive-synced working tree. OneDrive grabs file handles
 	// on build/**/*.class mid-sync, so Gradle's clean/recompile fails with "Unable to delete
