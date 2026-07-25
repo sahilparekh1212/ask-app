@@ -57,6 +57,18 @@ What's in it:
 | [Prometheus, Loki & Tempo](docs/how-to/prometheus-loki-tempo.md) | Reaching the telemetry backends directly at each level |
 | [LLM chat, RAG & MCP](docs/how-to/llm-rag-mcp.md) | Provider keys, indexing, trying MCP, the guardrails |
 
+## 🗺️ Roadmap
+
+Planned enhancements, all under one theme — **make the assistant's answers measurably good, and
+keep them that way** — plus a hands-free way to use them.
+
+| Status | Item | What it adds |
+|---|---|---|
+| 🚧 In progress | **RAG evaluation & quality gate** | A ground-truth set of 100 questions with retrieval metrics (recall@k, MRR, nDCG@k, citation hit-rate). Thresholds live in config, and a CI job fails the build when retrieval quality drops below standard — the same "gate on every PR" posture already applied to coverage and CVEs. |
+| 🚧 In progress | **Query reranking** | A second-stage reranker (Voyage `rerank-2.5`) over a wider candidate set, so the top-K chunks the assistant and MCP tool are grounded on are the *most* relevant, not just the nearest by cosine. |
+| 🚧 In progress | **AI answer-quality observability** | Each retrieval + answer — the query, the candidate rankings before/after rerank, model input/output, latencies and token counts — is recorded so retrieval and answer accuracy can be measured and improved over time. These are quality signals for the system, not user profiling. |
+| 🧭 Planned | **Voice chat** | Ask by voice and hear the answer back: speech-to-text on the question, the existing grounded chat assistant in the middle, and text-to-speech on the reply — hands-free Q&A over the same pipeline. |
+
 ## 📄 License
 
 **Proprietary — all rights reserved.** Published for viewing/portfolio evaluation only;
