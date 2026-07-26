@@ -16,10 +16,11 @@ export class AssistantService {
   /** History is capped server-side at 20 turns; send only the most recent ones. */
   static readonly MAX_HISTORY = 20;
 
-  chat(message: string, history: ChatTurn[]): Observable<ChatResponse> {
+  chat(message: string, history: ChatTurn[], voice = false): Observable<ChatResponse> {
     return this.http.post<ChatResponse>(`${this.base}/chat`, {
       message,
       history: history.slice(-AssistantService.MAX_HISTORY),
+      voice,
     });
   }
 

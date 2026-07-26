@@ -112,15 +112,23 @@
   }
 
   <form class="composer" [formGroup]="form" (ngSubmit)="send()">
-    <input
-      type="text"
-      formControlName="message"
-      [placeholder]="'assistant.placeholder' | t"
-      maxlength="2000"
-      [attr.disabled]="busy() ? '' : null"
-      [attr.aria-label]="'assistant.placeholder' | t"
-    />
-    @if (canListen) {
+    @if (voiceMode()) {
+      <!-- Hands-free mode: the text field is replaced by a live status (listening/thinking/speaking). -->
+      <span class="voice-status" role="status" aria-live="polite">
+        <span class="voice-pulse" [class]="voicePhase()" aria-hidden="true"></span>
+        {{ voicePhaseLabel() | t }}
+      </span>
+    } @else {
+      <input
+        type="text"
+        formControlName="message"
+        [placeholder]="'assistant.placeholder' | t"
+        maxlength="2000"
+        [attr.disabled]="busy() ? '' : null"
+        [attr.aria-label]="'assistant.placeholder' | t"
+      />
+    }
+    @if (canListen && !voiceMode()) {
       <button
         type="button"
         class="mic-btn"
@@ -140,10 +148,36 @@
         </svg>
       </button>
     }
+    @if (canListen) {
+      <!-- Third control: hands-free "voice only" chat — tap to converse, tap to stop. -->
+      <button
+        type="button"
+        class="voice-chat-btn"
+        [class.active]="voiceMode()"
+        (click)="toggleVoiceChat()"
+        [attr.aria-pressed]="voiceMode()"
+        [attr.aria-label]="(voiceMode() ? 'assistant.stopVoiceChat' : 'assistant.voiceChat') | t"
+        [title]="(voiceMode() ? 'assistant.stopVoiceChat' : 'assistant.voiceChat') | t"
+      >
+        @if (voiceMode()) {
+          <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+            <path
+              d="M3.75 3h8.5a.75.75 0 0 1 .75.75v8.5a.75.75 0 0 1-.75.75h-8.5a.75.75 0 0 1-.75-.75v-8.5A.75.75 0 0 1 3.75 3Z"
+            />
+          </svg>
+        } @else {
+          <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+            <path
+              d="M2 6.5a.75.75 0 0 1 .75.75v1.5a.75.75 0 0 1-1.5 0v-1.5A.75.75 0 0 1 2 6.5Zm3-3a.75.75 0 0 1 .75.75v7.5a.75.75 0 0 1-1.5 0v-7.5A.75.75 0 0 1 5 3.5Zm3-2a.75.75 0 0 1 .75.75v11.5a.75.75 0 0 1-1.5 0V2.25A.75.75 0 0 1 8 1.5Zm3 2a.75.75 0 0 1 .75.75v7.5a.75.75 0 0 1-1.5 0v-7.5A.75.75 0 0 1 11 3.5Zm3 3a.75.75 0 0 1 .75.75v1.5a.75.75 0 0 1-1.5 0v-1.5A.75.75 0 0 1 14 6.5Z"
+            />
+          </svg>
+        }
+      </button>
+    }
     <button
       type="submit"
       class="send-btn"
-      [disabled]="busy() || !input.value.trim()"
+      [disabled]="busy() || voiceMode() || !input.value.trim()"
       [attr.aria-label]="'assistant.send' | t"
       [title]="'assistant.send' | t"
     >

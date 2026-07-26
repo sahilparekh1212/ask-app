@@ -374,6 +374,72 @@
     }
   }
 
+  // Hands-free "voice only" chat toggle: the same ghost circle as the mic, but its active state
+  // uses the accent (not the mic's red) so the two voice controls read as distinct.
+  .voice-chat-btn {
+    flex: none;
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--fg-muted);
+    cursor: pointer;
+
+    svg {
+      width: 18px;
+      height: 18px;
+      fill: currentColor;
+    }
+
+    &:hover {
+      color: var(--fg);
+      background: var(--canvas-overlay);
+    }
+
+    &.active {
+      color: var(--accent-fg);
+      background: var(--accent-emphasis);
+      border-color: var(--accent-emphasis);
+    }
+  }
+
+  // Replaces the text input while hands-free chat runs: a pulsing dot + the current phase.
+  .voice-status {
+    flex: 1;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--fg-muted);
+    font-size: 0.95rem;
+    padding: 0.55rem 0;
+
+    .voice-pulse {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: var(--fg-subtle);
+      animation: voice-pulse 1.2s ease-in-out infinite;
+
+      &.listening {
+        background: var(--danger); // mic is live
+      }
+
+      &.thinking {
+        background: var(--fg-subtle);
+        animation: none; // waiting on the model — hold steady
+      }
+
+      &.speaking {
+        background: var(--accent-emphasis);
+      }
+    }
+  }
+
   .send-btn {
     flex: none;
     width: 36px;
@@ -412,5 +478,18 @@
     margin: -1rem;
     min-height: calc(100vh - 52px); // 52px rail strip (no top bar)
     padding: 1rem;
+  }
+}
+
+// The hands-free status dot's breathing pulse (listening / speaking).
+@keyframes voice-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.35;
+    transform: scale(0.7);
   }
 }

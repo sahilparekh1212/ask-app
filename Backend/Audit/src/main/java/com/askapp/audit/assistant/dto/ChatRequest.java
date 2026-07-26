@@ -13,11 +13,19 @@ import java.util.List;
  *
  * @param message the user's new question (required)
  * @param history prior turns, oldest first (optional, max 20)
+ * @param voice   true for hands-free voice chat — the reply is read aloud, so the assistant is
+ *                told to answer in a few short, plain, speakable sentences (absent → false)
  */
 public record ChatRequest(
 	@NotBlank @Size(max = 2000) String message,
-	@Valid @Size(max = 20) List<ChatTurn> history
+	@Valid @Size(max = 20) List<ChatTurn> history,
+	boolean voice
 ) {
+
+	/** Text-mode request (the default): equivalent to {@code voice=false}. */
+	public ChatRequest(String message, List<ChatTurn> history) {
+		this(message, history, false);
+	}
 
 	public List<ChatTurn> historyOrEmpty() {
 		return history != null ? history : List.of();

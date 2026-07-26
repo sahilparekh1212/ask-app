@@ -62,6 +62,17 @@ public class AssistantContextBuilder {
 	 * so a generic design/architecture question stays docs-only (leaner, and exposes nothing).
 	 */
 	public String buildSystemPrompt(boolean admin, List<ScoredChunk> retrieved, boolean includeAuditData) {
+		return buildSystemPrompt(admin, retrieved, includeAuditData, false);
+	}
+
+	/**
+	 * As {@link #buildSystemPrompt(boolean, List, boolean)}, but {@code voice=true} appends a
+	 * voice-mode directive: the user is in hands-free voice chat and will <em>hear</em> the reply
+	 * read aloud, so the model must answer in a few short, plain, speakable sentences — no Markdown,
+	 * code blocks, lists, headings, or file paths (which sound wrong spoken).
+	 */
+	public String buildSystemPrompt(boolean admin, List<ScoredChunk> retrieved, boolean includeAuditData,
+			boolean voice) {
 		StringBuilder prompt = new StringBuilder();
 		prompt.append("""
 			You are the built-in assistant of ask-app, a portfolio application. Answer \
@@ -91,6 +102,19 @@ public class AssistantContextBuilder {
 			- Keep answers short and concrete. Brevity applies to your prose — a requested file \
 			list or the ready-to-paste code block may be as long as it needs to be.
 			""");
+		// Voice mode overrides the "list files / emit a code block" guidance above: the reply is
+		// spoken aloud, so it must be brief, plain prose with nothing that sounds wrong read out.
+		if (voice) {
+			prompt.append("""
+
+				VOICE MODE: The user is speaking to you hands-free and will HEAR your reply read \
+				aloud, not read it on screen. Reply in plain, conversational spoken English — at \
+				most two or three short sentences. Do NOT use Markdown, code blocks, bullet or \
+				numbered lists, headings, file paths, or URLs; they sound wrong when spoken. Give \
+				the single most useful point, and if there is more to say, offer to go into detail \
+				rather than listing everything.
+				""");
+		}
 		// The app overview doc grounds every answer (architecture, features, how-to).
 		prompt.append("\n<app_docs>\n").append(appDocs).append("\n</app_docs>\n");
 		// Live audit data — what users/agents actually did — is added only when the question is

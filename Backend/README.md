@@ -33,8 +33,11 @@ docs/source plus live audit data. Role-aware: every user chats against aggregate
 `ROLE_ADMIN` answers also see recent raw rows. Inbound text is screened server-side (JWT/token
 shapes, credential assignments, emails, card-like numbers → refused locally, never forwarded);
 auth headers are never proxied ([ADR-0009](docs/adr/0009-llm-chat-assistant-data-flow.md)).
-Enable with `ANTHROPIC_API_KEY`; without it the endpoint 503s and nothing else is affected.
-Tunables: `ASSISTANT_MODEL` (default `claude-opus-4-8`), `ASSISTANT_MAX_TOKENS`.
+A `voice=true` flag on the request (set by the SPA's hands-free voice chat) asks for a short,
+spoken-friendly answer — a few plain sentences, no Markdown, lists, or file paths — since the
+reply is read aloud rather than read on screen. Enable with `ANTHROPIC_API_KEY`; without it the
+endpoint 503s and nothing else is affected. Tunables: `ASSISTANT_MODEL` (default
+`claude-opus-4-8`), `ASSISTANT_MAX_TOKENS`.
 
 ### Read-aloud (text-to-speech)
 

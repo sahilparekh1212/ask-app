@@ -43,6 +43,22 @@ export class AssistantComponent implements OnDestroy {
   // another) can cancel a fetch that hasn't returned audio yet.
   private speakSub: Subscription | null = null;
 
+  // Hands-free "voice only" chat: tap once and it listens → sends → reads the reply aloud →
+  // listens again, an eyes-free conversation, until toggled off. Replies are asked to be short and
+  // spoken-friendly (the `voice` flag on the chat call). voicePhase drives the composer's status.
+  readonly voiceMode = signal(false);
+  readonly voicePhase = signal<'listening' | 'thinking' | 'speaking'>('listening');
+  readonly voicePhaseLabel = computed(
+    () =>
+      ({
+        listening: 'assistant.voiceListening',
+        thinking: 'assistant.voiceThinking',
+        speaking: 'assistant.voiceSpeaking',
+      })[this.voicePhase()],
+  );
+  // What the user has said so far in the current listening turn (sent when they pause).
+  private voiceTranscript = '';
+
   // Pre-filled (not placeholder) so a visitor can hit Send immediately — and the default is
   // a conceptual question the RAG grounding answers well, doubling as a feature demo.
   readonly input = this.fb.nonNullable.control('How does the RAG pipeline behind this chat work?');
@@ -77,9 +93,22 @@ export class AssistantComponent implements OnDestroy {
     if (!message || this.busy()) {
       return;
     }
-    // A new question ends any dictation/read-aloud in progress.
+    // A new typed question ends any dictation / read-aloud / hands-free chat in progress.
     this.voice.stopDictation();
     this.stopReadAloud();
+    if (this.voiceMode()) {
+      this.stopVoiceChat();
+    }
+    this.input.setValue('');
+    this.submitMessage(message, false);
+  }
+
+  /**
+   * Post a message to the assistant and append the reply. Shared by the typed {@link send} and the
+   * hands-free voice loop: {@code voice} asks the server for a short, speakable answer, and
+   * {@code onReply} (voice mode) receives the reply text to read aloud and continue the loop.
+   */
+  private submitMessage(message: string, voice: boolean, onReply?: (reply: string) => void): void {
     this.startConversationIfNeeded();
     // History = everything said so far, minus guardrail refusals (they carry no context).
     const history: ChatTurn[] = this.turns()
@@ -87,12 +116,11 @@ export class AssistantComponent implements OnDestroy {
       .map(({ role, content }) => ({ role, content }));
 
     this.turns.update((t) => [...t, { role: 'user', content: message }]);
-    this.input.setValue('');
     this.busy.set(true);
     this.error.set(null);
     this.scrollToEnd();
 
-    this.assistant.chat(message, history).subscribe({
+    this.assistant.chat(message, history, voice).subscribe({
       next: (res) => {
         this.busy.set(false);
         this.turns.update((t) => [
@@ -100,10 +128,15 @@ export class AssistantComponent implements OnDestroy {
           { role: 'assistant', content: res.reply, blocked: res.blocked },
         ]);
         this.scrollToEnd();
+        onReply?.(res.reply);
       },
       error: (err) => {
         this.busy.set(false);
         this.error.set(err?.status === 503 ? 'assistant.error503' : 'assistant.errorGeneric');
+        // A failed turn ends the hands-free loop rather than silently re-listening on an error.
+        if (this.voiceMode()) {
+          this.stopVoiceChat();
+        }
       },
     });
   }
@@ -155,6 +188,10 @@ export class AssistantComponent implements OnDestroy {
    * the composer input; clicking again (or a natural pause) stops it. A no-op where unsupported.
    */
   dictate(): void {
+    // Hands-free chat drives the mic itself; ignore the manual toggle while it's running.
+    if (this.voiceMode()) {
+      return;
+    }
     if (this.listening()) {
       this.voice.stopDictation();
       return;
@@ -162,6 +199,77 @@ export class AssistantComponent implements OnDestroy {
     // Don't dictate over an in-progress read-aloud.
     this.stopReadAloud();
     this.voice.startDictation((text) => this.input.setValue(text));
+  }
+
+  /**
+   * Toggle hands-free "voice only" chat: tap once and the assistant listens, answers aloud in a
+   * short spoken reply, then listens again — an eyes-free conversation. Tap again to end it.
+   * Requires dictation support (Chrome/Edge); a no-op otherwise.
+   */
+  toggleVoiceChat(): void {
+    if (this.voiceMode()) {
+      this.stopVoiceChat();
+      return;
+    }
+    if (!this.canListen) {
+      return;
+    }
+    // Starting a conversation supersedes any typing / dictation / read-aloud in progress.
+    this.voice.stopDictation();
+    this.stopReadAloud();
+    this.voiceMode.set(true);
+    this.listenForVoiceTurn();
+  }
+
+  /** End hands-free chat and quiet everything: the mic, any playback, and a pending synth fetch. */
+  private stopVoiceChat(): void {
+    this.voiceMode.set(false);
+    this.voice.stopDictation();
+    this.stopReadAloud();
+  }
+
+  /** One listening turn: capture speech; when the user pauses, send it (or re-listen if silent). */
+  private listenForVoiceTurn(): void {
+    if (!this.voiceMode()) {
+      return;
+    }
+    this.voicePhase.set('listening');
+    this.voiceTranscript = '';
+    const started = this.voice.startDictation(
+      (text) => (this.voiceTranscript = text),
+      () => this.onVoiceTurnSpoken(),
+    );
+    if (!started) {
+      this.stopVoiceChat();
+    }
+  }
+
+  /** The user paused: send what they said (a voice reply), or keep the ear open if nothing landed. */
+  private onVoiceTurnSpoken(): void {
+    if (!this.voiceMode()) {
+      return;
+    }
+    const spoken = this.voiceTranscript.trim();
+    if (!spoken) {
+      // Heard only silence/noise — re-listen rather than send an empty turn.
+      this.listenForVoiceTurn();
+      return;
+    }
+    this.voicePhase.set('thinking');
+    this.submitMessage(spoken, true, (reply) => this.speakReplyThenListen(reply));
+  }
+
+  /** Read the reply aloud, then (still hands-free) open the mic for the next question. */
+  private speakReplyThenListen(reply: string): void {
+    if (!this.voiceMode()) {
+      return;
+    }
+    this.voicePhase.set('speaking');
+    this.speakText(this.toPlainText(reply), () => {
+      if (this.voiceMode()) {
+        this.listenForVoiceTurn();
+      }
+    });
   }
 
   /**
@@ -176,19 +284,24 @@ export class AssistantComponent implements OnDestroy {
       return;
     }
     this.stopReadAloud();
-    const plain = this.toPlainText(text);
-    const onEnd = () => {
+    // Optimistic: reflect "reading" state now; cleared by onEnd (or if both voices are unavailable).
+    this.speakingIndex.set(index);
+    this.speakText(this.toPlainText(text), () => {
       if (this.speakingIndex() === index) {
         this.speakingIndex.set(null);
       }
-    };
-    // Optimistic: reflect "reading" state now; cleared by onEnd (or if both voices are unavailable).
-    this.speakingIndex.set(index);
+    });
+  }
+
+  /**
+   * Speak plain prose, preferring the server's natural neural voice (Google Cloud TTS) and falling
+   * back to the browser's own voice on 503/error; {@link onEnd} fires when speech finishes (or
+   * can't start at all). The in-flight synth fetch is tracked so {@link stopReadAloud} can cancel it.
+   */
+  private speakText(plain: string, onEnd: () => void): void {
     this.speakSub = this.assistant.speak(plain).subscribe({
       next: (audio) => this.voice.playAudio(audio, onEnd),
       error: () => {
-        // Server voice unavailable — fall back to the browser voice, clearing state if it can't
-        // speak either (e.g. no SpeechSynthesis support).
         if (!this.voice.speak(plain, onEnd)) {
           onEnd();
         }
@@ -217,7 +330,9 @@ export class AssistantComponent implements OnDestroy {
   }
 
   ngOnDestroy(): void {
-    // Leaving the page must not leave the mic open, a reply talking, or a synth fetch pending.
+    // Leaving the page must not leave the mic open, a reply talking, a synth fetch pending, or the
+    // hands-free loop running.
+    this.voiceMode.set(false);
     this.voice.stopDictation();
     this.stopReadAloud();
   }

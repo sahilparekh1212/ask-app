@@ -90,7 +90,7 @@ public class AssistantService {
 		long startNanos = System.nanoTime();
 		try {
 			LlmResult result = llmClient.complete(
-				contextBuilder.buildSystemPrompt(admin, retrieved, includeAuditData),
+				contextBuilder.buildSystemPrompt(admin, retrieved, includeAuditData, request.voice()),
 				request.historyOrEmpty(), request.message());
 			long latencyMs = (System.nanoTime() - startNanos) / 1_000_000;
 			String reply = result.text();
@@ -100,7 +100,7 @@ public class AssistantService {
 			// data was attached — never the message or the reply text.
 			auditEventPublisher.publish("Assistant", "CHAT", "blocked=false model="
 				+ properties.getModel() + " latencyMs=" + latencyMs + " retrievedChunks="
-				+ retrieved.size() + " auditGrounded=" + includeAuditData);
+				+ retrieved.size() + " auditGrounded=" + includeAuditData + " voice=" + request.voice());
 			// The full trace (content, rankings, tokens) goes to the separate ai_trace table.
 			aiTraceService.record(AiTraceRecord.chat(request.message(), retrieval, properties.getModel(),
 				reply, result, retrievalMs, latencyMs, admin, includeAuditData));

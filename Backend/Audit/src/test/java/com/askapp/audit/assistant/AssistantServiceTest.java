@@ -45,7 +45,8 @@ class AssistantServiceTest {
 
 	@BeforeEach
 	void stubContext() {
-		when(contextBuilder.buildSystemPrompt(anyBoolean(), anyList(), anyBoolean())).thenReturn("system prompt");
+		when(contextBuilder.buildSystemPrompt(anyBoolean(), anyList(), anyBoolean(), anyBoolean()))
+			.thenReturn("system prompt");
 		// Default: RAG not ready (unconfigured/empty index) — chat works exactly as pre-RAG.
 		when(ragService.isReady()).thenReturn(false);
 	}
@@ -119,8 +120,8 @@ class AssistantServiceTest {
 
 		assertThat(response.blocked()).isFalse();
 		assertThat(response.reply()).isEqualTo("It stores audit rows.");
-		// CLEAN is a design question → not about state → no live audit data attached.
-		verify(contextBuilder).buildSystemPrompt(true, List.of(), false);
+		// CLEAN is a design question → not about state → no live audit data attached; not voice.
+		verify(contextBuilder).buildSystemPrompt(true, List.of(), false, false);
 		verify(llmClient).complete(eq("system prompt"), eq(List.of()), eq(CLEAN.message()));
 	}
 
@@ -186,7 +187,21 @@ class AssistantServiceTest {
 
 		service("key").chat(CLEAN, false);
 
-		verify(contextBuilder).buildSystemPrompt(eq(false), anyList(), anyBoolean());
+		verify(contextBuilder).buildSystemPrompt(eq(false), anyList(), anyBoolean(), anyBoolean());
+	}
+
+	@Test
+	void voiceRequestBuildsAVoiceModePrompt() {
+		when(llmClient.complete(anyString(), anyList(), anyString())).thenReturn(LlmResult.text("Short one."));
+		ChatRequest voiceRequest = new ChatRequest("what is this app?", null, true);
+
+		service("key").chat(voiceRequest, false);
+
+		// The voice flag reaches the prompt builder (last arg), regardless of role/audit-data.
+		verify(contextBuilder).buildSystemPrompt(eq(false), anyList(), anyBoolean(), eq(true));
+		ArgumentCaptor<String> details = ArgumentCaptor.forClass(String.class);
+		verify(auditEventPublisher).publish(eq("Assistant"), eq("CHAT"), details.capture());
+		assertThat(details.getValue()).contains("voice=true");
 	}
 
 	@Test
@@ -196,7 +211,7 @@ class AssistantServiceTest {
 		service("key").chat(CLEAN, false);
 
 		// "What does the audit service do?" is about design, not activity → includeAuditData=false.
-		verify(contextBuilder).buildSystemPrompt(eq(false), anyList(), eq(false));
+		verify(contextBuilder).buildSystemPrompt(eq(false), anyList(), eq(false), eq(false));
 	}
 
 	@Test
@@ -206,7 +221,7 @@ class AssistantServiceTest {
 		service("key").chat(STATE, true);
 
 		// "How many logins were there today?" is about live state → includeAuditData=true.
-		verify(contextBuilder).buildSystemPrompt(eq(true), anyList(), eq(true));
+		verify(contextBuilder).buildSystemPrompt(eq(true), anyList(), eq(true), eq(false));
 		ArgumentCaptor<String> details = ArgumentCaptor.forClass(String.class);
 		verify(auditEventPublisher).publish(eq("Assistant"), eq("CHAT"), details.capture());
 		assertThat(details.getValue()).contains("auditGrounded=true");
@@ -221,7 +236,7 @@ class AssistantServiceTest {
 
 		service("key").chat(CLEAN, false);
 
-		verify(contextBuilder).buildSystemPrompt(false, chunks, false);
+		verify(contextBuilder).buildSystemPrompt(false, chunks, false, false);
 	}
 
 	@Test
@@ -233,7 +248,7 @@ class AssistantServiceTest {
 		ChatResponse response = service("key").chat(CLEAN, false);
 
 		assertThat(response.reply()).isEqualTo("still works");
-		verify(contextBuilder).buildSystemPrompt(false, List.of(), false);
+		verify(contextBuilder).buildSystemPrompt(false, List.of(), false, false);
 	}
 
 	@Test

@@ -86,7 +86,7 @@ describe('AssistantComponent', () => {
     form.dispatchEvent(new Event('submit'));
     fixture.detectChanges();
 
-    expect(assistant.chat).toHaveBeenCalledWith('hello there', []);
+    expect(assistant.chat).toHaveBeenCalledWith('hello there', [], false);
     expect(component.turns().length).toBe(2);
   });
 
@@ -215,5 +215,53 @@ describe('AssistantComponent', () => {
     component.speak('nothing can read this', 3);
 
     expect(component.speakingIndex()).toBeNull();
+  });
+
+  it('toggleVoiceChat() enters hands-free mode and starts listening', () => {
+    component.toggleVoiceChat();
+
+    expect(component.voiceMode()).toBeTrue();
+    expect(component.voicePhase()).toBe('listening');
+    expect(voice.startDictation).toHaveBeenCalled();
+  });
+
+  it('hands-free: sends the spoken transcript with voice=true, speaks the reply, then re-listens', () => {
+    assistant.chat.and.returnValue(
+      of({ reply: 'You sign in with the demo account.', blocked: false }),
+    );
+    // Make the server-voice playback resolve immediately so the loop continues to the next turn.
+    voice.playAudio.and.callFake((_audio: Blob, onEnd?: () => void) => onEnd?.());
+
+    component.toggleVoiceChat();
+    const firstTurn = voice.startDictation.calls.mostRecent().args;
+    (firstTurn[0] as (t: string) => void)('how does login work'); // transcript so far
+    (firstTurn[1] as () => void)(); // the user pauses → send
+
+    // Sent with the voice flag so the server answers short and speakable.
+    expect(assistant.chat).toHaveBeenCalledWith('how does login work', jasmine.any(Array), true);
+    // Reply spoken via the server voice, then the mic re-opens for the next question.
+    expect(voice.playAudio).toHaveBeenCalled();
+    expect(voice.startDictation).toHaveBeenCalledTimes(2);
+    expect(component.voiceMode()).toBeTrue();
+  });
+
+  it('hands-free: re-listens without sending when nothing was heard', () => {
+    component.toggleVoiceChat();
+    const firstTurn = voice.startDictation.calls.mostRecent().args;
+    (firstTurn[1] as () => void)(); // paused, but no transcript captured
+
+    expect(assistant.chat).not.toHaveBeenCalled();
+    expect(voice.startDictation).toHaveBeenCalledTimes(2); // opened the ear again
+  });
+
+  it('toggling voice chat off stops dictation and speaking and exits the mode', () => {
+    component.toggleVoiceChat();
+    expect(component.voiceMode()).toBeTrue();
+
+    component.toggleVoiceChat();
+
+    expect(component.voiceMode()).toBeFalse();
+    expect(voice.stopDictation).toHaveBeenCalled();
+    expect(voice.stopSpeaking).toHaveBeenCalled();
   });
 });

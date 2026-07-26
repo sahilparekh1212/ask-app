@@ -92,6 +92,19 @@ class AssistantContextBuilderTest {
 	}
 
 	@Test
+	void voiceModeAddsASpeakableBrevityDirective() {
+		String spoken = builder.buildSystemPrompt(false, List.of(), false, true);
+		String onScreen = builder.buildSystemPrompt(false, List.of(), false, false);
+
+		// Voice mode tells the model the reply is heard, not read, and to keep it short + plain.
+		assertThat(spoken).contains("VOICE MODE");
+		assertThat(spoken).containsIgnoringCase("read aloud");
+		assertThat(spoken).containsIgnoringCase("two or three short sentences");
+		// The default (on-screen) prompt carries no voice directive.
+		assertThat(onScreen).doesNotContain("VOICE MODE");
+	}
+
+	@Test
 	void emptyDataIsFormattedGracefully() {
 		when(auditLogService.aggregate(any())).thenReturn(new AuditLogStats(0, List.of(), List.of()));
 		when(auditLogService.search(any(), any(Pageable.class))).thenReturn(new PageImpl<>(List.of()));
