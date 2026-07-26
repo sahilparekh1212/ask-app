@@ -92,6 +92,19 @@ class AssistantContextBuilderTest {
 	}
 
 	@Test
+	void productionConfigBlockIsAlwaysPresentAndAuthoritative() {
+		// Attached to every prompt (no audit data, no voice) so prod-config questions aren't
+		// misled by the source-config defaults that apply to LOCAL/lower environments.
+		String prompt = builder.buildSystemPrompt(false, List.of(), false);
+
+		assertThat(prompt).contains("<production_config>");
+		assertThat(prompt).containsIgnoringCase("Sentry error monitoring");
+		assertThat(prompt).contains("RAG_VECTOR_STORE=pgvector");
+		// The rules tell the model to trust production_config over source defaults for prod questions.
+		assertThat(prompt).containsIgnoringCase("defer to <production_config>");
+	}
+
+	@Test
 	void voiceModeAddsASpeakableBrevityDirective() {
 		String spoken = builder.buildSystemPrompt(false, List.of(), false, true);
 		String onScreen = builder.buildSystemPrompt(false, List.of(), false, false);
