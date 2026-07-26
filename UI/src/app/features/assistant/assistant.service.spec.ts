@@ -31,8 +31,16 @@ describe('AssistantService', () => {
 
     const req = httpMock.expectOne(url);
     expect(req.request.method).toBe('POST');
-    expect(req.request.body).toEqual({ message: 'what now?', history });
+    expect(req.request.body).toEqual({ message: 'what now?', history, voice: false });
     req.flush({ reply: 'ok', blocked: false });
+  });
+
+  it('sets the voice flag when asked for a spoken-friendly answer', () => {
+    service.chat('how does login work?', [], true).subscribe();
+
+    const req = httpMock.expectOne(url);
+    expect(req.request.body.voice).toBe(true);
+    req.flush({ reply: 'You sign in with the demo account.', blocked: false });
   });
 
   it('caps replayed history at the server limit, keeping the most recent turns', () => {
