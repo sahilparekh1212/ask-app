@@ -12,6 +12,7 @@ import org.springframework.data.domain.Pageable;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -89,6 +90,13 @@ class AssistantContextBuilderTest {
 		assertThat(prompt).contains("<recent_audit_rows>");
 		assertThat(prompt).contains("details=user 42 signed in via Google");
 		assertThat(prompt).contains("role is ADMIN");
+	}
+
+	@Test
+	void missingGroundingResourceFailsFast() {
+		assertThatThrownBy(() -> AssistantContextBuilder.loadResource("assistant/does-not-exist.md"))
+			.isInstanceOf(java.io.UncheckedIOException.class)
+			.hasMessageContaining("missing from classpath");
 	}
 
 	@Test

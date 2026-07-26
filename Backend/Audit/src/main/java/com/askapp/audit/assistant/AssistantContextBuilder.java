@@ -205,7 +205,9 @@ public class AssistantContextBuilder {
 		return sb.toString();
 	}
 
-	private static String loadResource(String path) {
+	// Package-private so a test can cover the fail-fast path (a missing grounding resource is a
+	// packaging error we want to surface loudly at startup, not silently serve a prompt without it).
+	static String loadResource(String path) {
 		try {
 			return new ClassPathResource(path).getContentAsString(StandardCharsets.UTF_8);
 		} catch (IOException e) {
