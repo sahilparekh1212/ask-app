@@ -1,4 +1,4 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { AuthService } from '../../core/auth/auth.service';
 
@@ -12,6 +12,7 @@ import { AuthService } from '../../core/auth/auth.service';
   imports: [],
   templateUrl: './auth-callback.component.html',
   styleUrl: './auth-callback.component.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class AuthCallbackComponent implements OnInit {
   private readonly auth = inject(AuthService);
