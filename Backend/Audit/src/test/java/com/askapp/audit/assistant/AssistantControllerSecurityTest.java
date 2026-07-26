@@ -97,4 +97,32 @@ class AssistantControllerSecurityTest {
 			.andExpect(status().isBadRequest());
 	}
 
+	@Test
+	void speakRequiresAuthentication() throws Exception {
+		mockMvc.perform(post("/api/v1/assistant/speak")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("{\"text\":\"hello\"}"))
+			.andExpect(status().isUnauthorized());
+	}
+
+	@Test
+	void speakWithoutTtsKeyDegradesTo503() throws Exception {
+		// No tts.api-key is set in this context, so read-aloud degrades to 503 — the signal the
+		// SPA uses to fall back to the browser's built-in voice.
+		mockMvc.perform(post("/api/v1/assistant/speak")
+				.with(jwt().authorities(new SimpleGrantedAuthority("ROLE_USER")))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("{\"text\":\"hello\"}"))
+			.andExpect(status().isServiceUnavailable());
+	}
+
+	@Test
+	void blankSpeakTextFailsValidationWith400() throws Exception {
+		mockMvc.perform(post("/api/v1/assistant/speak")
+				.with(jwt().authorities(new SimpleGrantedAuthority("ROLE_USER")))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("{\"text\":\"  \"}"))
+			.andExpect(status().isBadRequest());
+	}
+
 }

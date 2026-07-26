@@ -104,6 +104,7 @@ jobs:
           GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}
           ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }}
           VOYAGE_API_KEY=${{ secrets.VOYAGE_API_KEY }}
+          GOOGLE_TTS_API_KEY=${{ secrets.GOOGLE_TTS_API_KEY }}
           GRAFANA_ADMIN_PASSWORD=${{ secrets.GRAFANA_ADMIN_PASSWORD }}
           SENTRY_ORG_SLUG=${{ vars.SENTRY_ORG_SLUG }}
           SENTRY_AUTH_TOKEN=${{ secrets.SENTRY_AUTH_TOKEN }}
