@@ -1,4 +1,11 @@
-import { Component, OnDestroy, computed, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  OnDestroy,
+  computed,
+  inject,
+  signal,
+} from '@angular/core';
 import { Location } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
 import { Subscription } from 'rxjs';
@@ -18,6 +25,7 @@ interface DisplayTurn extends ChatTurn {
   imports: [ReactiveFormsModule, TranslatePipe, MarkdownPipe],
   templateUrl: './assistant.component.html',
   styleUrl: './assistant.component.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class AssistantComponent implements OnDestroy {
   private readonly fb = inject(FormBuilder);

@@ -1,4 +1,11 @@
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  OnInit,
+  computed,
+  inject,
+  signal,
+} from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
 import { forkJoin } from 'rxjs';
@@ -42,6 +49,7 @@ const DAY_MS = 24 * HOUR_MS;
   imports: [ReactiveFormsModule, DatePipe, TranslatePipe],
   templateUrl: './audit.component.html',
   styleUrl: './audit.component.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class AuditComponent implements OnInit {
   private readonly fb = inject(FormBuilder);
