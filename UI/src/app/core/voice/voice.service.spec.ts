@@ -29,6 +29,15 @@ class FakeUtterance {
   constructor(public text: string) {}
 }
 
+/** A stand-in for HTMLAudioElement whose lifecycle events the test drives directly. */
+class FakeAudio {
+  onended: (() => void) | null = null;
+  onerror: (() => void) | null = null;
+  play = jasmine.createSpy('play').and.returnValue(Promise.resolve());
+  pause = jasmine.createSpy('pause');
+  constructor(public src: string) {}
+}
+
 describe('VoiceService', () => {
   const win = window as unknown as Record<string, unknown>;
   let originalRecognition: unknown;
@@ -163,6 +172,76 @@ describe('VoiceService', () => {
         Object.defineProperty(window, 'speechSynthesis', originalSynth);
       }
       win['SpeechSynthesisUtterance'] = originalUtterance;
+    }
+  });
+
+  /** Stub the global Audio ctor and object-URL helpers; returns cleanup + the created elements. */
+  function withFakeAudio(): { created: FakeAudio[]; revoke: jasmine.Spy; restore: () => void } {
+    const created: FakeAudio[] = [];
+    const originalAudio = win['Audio'];
+    win['Audio'] = function (src: string) {
+      const audio = new FakeAudio(src);
+      created.push(audio);
+      return audio;
+    } as unknown;
+    const fakeSynth = { cancel: jasmine.createSpy('cancel'), getVoices: () => [] };
+    const originalSynth = Object.getOwnPropertyDescriptor(window, 'speechSynthesis');
+    Object.defineProperty(window, 'speechSynthesis', { value: fakeSynth, configurable: true });
+    spyOn(URL, 'createObjectURL').and.returnValue('blob:fake-url');
+    const revoke = spyOn(URL, 'revokeObjectURL');
+    return {
+      created,
+      revoke,
+      restore: () => {
+        win['Audio'] = originalAudio;
+        if (originalSynth) {
+          Object.defineProperty(window, 'speechSynthesis', originalSynth);
+        }
+      },
+    };
+  }
+
+  it('plays server-synthesized audio and clears the speaking flag when it ends', () => {
+    const { created, revoke, restore } = withFakeAudio();
+    try {
+      const service = new VoiceService();
+      const blob = new Blob([new Uint8Array([1, 2])], { type: 'audio/mpeg' });
+      let ended = false;
+
+      service.playAudio(blob, () => (ended = true));
+
+      expect(created.length).toBe(1);
+      expect(created[0].src).toBe('blob:fake-url');
+      expect(created[0].play).toHaveBeenCalled();
+      expect(service.speaking()).toBeTrue();
+
+      created[0].onended?.();
+      expect(service.speaking()).toBeFalse();
+      expect(ended).toBeTrue();
+      expect(revoke).toHaveBeenCalledWith('blob:fake-url'); // no leaked object URL
+    } finally {
+      restore();
+    }
+  });
+
+  it('stopSpeaking halts in-progress server audio and revokes its object URL', () => {
+    const { created, revoke, restore } = withFakeAudio();
+    try {
+      const service = new VoiceService();
+      let ended = false;
+      service.playAudio(new Blob(['x']), () => (ended = true));
+      expect(service.speaking()).toBeTrue();
+
+      service.stopSpeaking();
+
+      expect(created[0].pause).toHaveBeenCalled();
+      expect(service.speaking()).toBeFalse();
+      expect(revoke).toHaveBeenCalledWith('blob:fake-url');
+      // Handlers are detached on stop, so a late 'ended' can't re-fire the onEnd callback.
+      created[0].onended?.();
+      expect(ended).toBeFalse();
+    } finally {
+      restore();
     }
   });
 });

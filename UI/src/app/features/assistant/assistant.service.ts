@@ -22,4 +22,13 @@ export class AssistantService {
       history: history.slice(-AssistantService.MAX_HISTORY),
     });
   }
+
+  /**
+   * Synthesize a reply to natural speech via the server's Google Cloud TTS proxy, returning the
+   * MP3 as a Blob. Errors (notably 503 when no TTS key is configured) are surfaced to the caller,
+   * which falls back to the browser's built-in voice.
+   */
+  speak(text: string): Observable<Blob> {
+    return this.http.post(`${this.base}/speak`, { text }, { responseType: 'blob' });
+  }
 }
