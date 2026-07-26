@@ -36,6 +36,16 @@ auth headers are never proxied ([ADR-0009](docs/adr/0009-llm-chat-assistant-data
 Enable with `ANTHROPIC_API_KEY`; without it the endpoint 503s and nothing else is affected.
 Tunables: `ASSISTANT_MODEL` (default `claude-opus-4-8`), `ASSISTANT_MAX_TOKENS`.
 
+### Read-aloud (text-to-speech)
+
+`POST /api/v1/assistant/speak` (Audit) synthesizes an assistant reply to natural speech with Google
+Cloud Text-to-Speech (Chirp3-HD — the neural voice tier behind Google Assistant) and returns MP3
+audio the SPA plays via `<audio>`. Same server-side-key posture as the assistant: the key lives only
+in the service's environment and no inbound request data reaches the provider. Enable with
+`GOOGLE_TTS_API_KEY`; without it the endpoint 503s and the SPA falls back to the browser's built-in
+voice, so read-aloud keeps working key-less (just less naturally). Tunables: `TTS_VOICE_NAME`
+(default `en-US-Chirp3-HD-Kore`), `TTS_LANGUAGE_CODE`, `TTS_MAX_CHARS`.
+
 ### RAG MCP server
 
 The Audit service is also an MCP server: `POST /mcp` exposes semantic search over the repo's own

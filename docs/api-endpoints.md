@@ -73,6 +73,7 @@ else `authenticated()`; two endpoints add `@PreAuthorize("hasRole('ADMIN')")`. S
 | `GET /api/v1/refdata/securities/{instrumentId}` | Authenticated | SPA |
 | `GET /api/v1/meta/features` | Authenticated | SPA (feature flags for the UI) |
 | `POST /api/v1/assistant/chat` | Authenticated (ADMIN gets audit-row grounding; USER aggregates only) | SPA chat → server-side Claude proxy |
+| `POST /api/v1/assistant/speak` | Authenticated | SPA read-aloud → server-side Google Cloud TTS (MP3; `503` without a key → browser-voice fallback) |
 | `POST /api/v1/audit-logs/demo` | Authenticated — **LOCAL/DEV only** (404 in SIT/UAT/PROD) | SPA "Add demo logs" button |
 | `GET /mcp` | Public → `405` by design | MCP clients probing for a stream |
 | `POST /mcp` | Public (unauthenticated by design — ADR-0010) | MCP clients: `initialize`, `ping`, `tools/list`, `tools/call` → `search_knowledge`, `list_sources` |
