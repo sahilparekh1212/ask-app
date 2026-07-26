@@ -1,9 +1,9 @@
 # ask-app — application overview (assistant grounding document)
 
 ask-app is a production-shaped backend engineering portfolio project: two Spring Boot
-microservices plus an Angular 19 SPA, connected by Kafka, backed by Postgres, and observed by
-Prometheus/Grafana/Loki/Tempo. Everything runs locally with one `docker compose up --build`
-from `Backend/`.
+microservices plus an Angular 21 SPA, connected by Kafka, backed by Postgres, observed by
+Prometheus/Grafana/Loki/Tempo, and error-monitored by Sentry. Everything runs locally with one
+`docker compose up --build` from `Backend/`.
 
 ## Services
 
@@ -41,6 +41,10 @@ from `Backend/`.
 - Assistant chat page: asks questions about the app, answered by a Claude model through a
   server-side proxy in the Audit service. It grounds answers on the repo's docs/source (RAG)
   and, only for questions about the app's live activity, on the audit stats/rows.
+- Voice chat: mic dictation and read-aloud of replies via the browser's Web Speech API, upgraded
+  to a natural Google Cloud Text-to-Speech neural voice through a server-side `/speak` proxy (it
+  falls back to the browser voice when no TTS key is set). A hands-free "voice only" mode listens,
+  answers aloud in a short spoken reply, then listens again.
 - An HTTP interceptor attaches `Authorization: Bearer <token>` to our APIs only and silently
   refreshes once on 401.
 
@@ -49,9 +53,20 @@ from `Backend/`.
   one, which rolls back and returns 429 with Retry-After.
 - **RBAC**: JWTs carry a `roles` claim; admin-gated endpoints use `@PreAuthorize`.
 - **Observability**: Prometheus metrics (with p95/p99 latency histograms), Loki logs, Tempo
-  distributed traces that follow a request across the Kafka hop, Grafana dashboards.
+  distributed traces that follow a request across the Kafka hop, and Grafana dashboards.
+- **Error monitoring**: **Sentry** captures unhandled exceptions in **both** backend services
+  (a separate Sentry project per service, `sentry.send-default-pii=false`) and uncaught errors in
+  the Angular SPA (`@sentry/angular`, initialised before bootstrap). It is enabled whenever a Sentry
+  DSN is configured — which it **is in the production deployment** — and cleanly disabled when the
+  DSN is empty (LOCAL/dev). Sentry issues are also reachable from Grafana via the installed Sentry
+  datasource, so errors sit alongside the metrics/logs/traces.
+- **AI answer-quality tracing**: every chat and MCP-search interaction is recorded (query,
+  pre/post-rerank retrieval rankings with scores, model, reply, latencies, tokens) to measure and
+  improve answer accuracy; Micrometer meters feed Grafana. It stores no user identity.
 - **CI/CD**: GitHub Actions — build + tests with a 90% line-coverage gate, k6 load tests,
-  gitleaks, CodeQL SAST, Trivy CVE scans of jars and Docker images, Dependabot.
+  gitleaks, CodeQL SAST, Trivy CVE scans of jars and Docker images, Dependabot, PIT mutation
+  testing, and Playwright E2E; images are cosign-signed with SBOM attestations and deployed keylessly
+  via Workload Identity Federation.
 - Architecture decisions are recorded as ADRs in `Backend/docs/adr/`.
 
 ## API documentation (Swagger / OpenAPI)
@@ -74,3 +89,26 @@ work whenever the service is reachable on its port — running it directly, or v
 80/443 are published and the service ports are withdrawn, so Swagger UI is a local/development tool
 there rather than a public URL. In CI, the `api-contract` workflow generates these OpenAPI specs
 from the running services and fails a PR on breaking API changes.
+
+## What's enabled in the production deployment
+
+The live site (`ask-app.sahilparekh1212.com`) runs on a single GCP Compute Engine VM with TLS
+terminated by Caddy. Every feature below is **active in that production deployment** (each is gated
+by a key or flag that is set in prod):
+
+- **LLM chat assistant** — Claude via the server-side proxy, grounded by **RAG**: pgvector on
+  Postgres with Voyage embeddings, content-hash incremental indexing, and **two-stage retrieval**
+  (cosine recall then a Voyage cross-encoder reranker). A 100-question retrieval-quality gate
+  (recall@k / MRR / nDCG) guards it in CI.
+- **MCP server** (`POST /mcp`) — semantic knowledge search over this corpus for any MCP client.
+- **Voice chat** — Web Speech dictation, Google Cloud Text-to-Speech read-aloud, and a hands-free
+  voice-only conversation mode.
+- **AI answer-quality tracing** — per-interaction retrieval rankings, latencies, and token usage.
+- **Sentry error monitoring** — both backend services and the SPA (details under Cross-cutting).
+- **Observability** — Prometheus, Loki, Tempo, and Grafana (published read-only in prod).
+- **Rate limiting**, **RBAC**, a Kafka-backed **audit trail**, and **Google OAuth + demo login**.
+- Shipped by a keyless GitHub Actions pipeline (Workload Identity Federation) with cosign image
+  signing and SBOM attestations.
+
+If asked what is running, enabled, or active in production, treat this list — including Sentry — as
+the current answer.
