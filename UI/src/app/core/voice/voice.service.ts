@@ -1,11 +1,13 @@
 import { Injectable, signal } from '@angular/core';
 
 /**
- * Thin wrapper over the browser's built-in **Web Speech API** for the chat assistant's voice I/O:
- * `SpeechRecognition` (dictation, speech → text) and `SpeechSynthesis` (reading a reply aloud,
- * text → speech). No backend and no API key — it all runs client-side. Both capabilities are
- * feature-detected ({@link canListen} / {@link canSpeak}) so callers can hide the controls where the
- * browser doesn't support them (recognition is Chrome/Edge-only; synthesis is broadly supported).
+ * Voice I/O for the chat assistant. Dictation (speech → text) uses the browser's **Web Speech API**
+ * `SpeechRecognition` — client-side, no backend. Read-aloud plays either server-synthesized audio
+ * (a natural neural voice from the `/speak` proxy, via {@link playAudio}) or, as a fallback, the
+ * browser's own `SpeechSynthesis` voice ({@link speak}); the assistant component prefers the server
+ * voice and falls back when it's unavailable. Both browser capabilities are feature-detected
+ * ({@link canListen} / {@link canSpeak}) so callers can hide the controls where unsupported
+ * (recognition is Chrome/Edge-only; synthesis is broadly supported).
  *
  * English-only, matching the app (the i18n language switcher was removed by decision).
  */
@@ -31,6 +33,11 @@ export class VoiceService {
 
   // The most natural installed voice for read-aloud (null → let the browser choose its default).
   private preferredVoice: SpeechSynthesisVoice | null = null;
+
+  // The <audio> element playing server-synthesized speech, and its object URL (revoked on stop/end
+  // to avoid leaking blobs). Non-null only while server audio is playing.
+  private audio: HTMLAudioElement | null = null;
+  private audioUrl: string | null = null;
 
   constructor() {
     if (this.canSpeak) {
@@ -108,9 +115,49 @@ export class VoiceService {
     return true;
   }
 
+  /**
+   * Play server-synthesized speech (an MP3 {@link Blob} from the `/speak` proxy); {@link onEnd}
+   * fires when it finishes, errors, or is stopped. Cancels any in-progress speech first so nothing
+   * overlaps, and revokes the object URL once done so blobs don't leak.
+   */
+  playAudio(blob: Blob, onEnd?: () => void): void {
+    this.stopSpeaking();
+    const url = URL.createObjectURL(blob);
+    const audio = new Audio(url);
+    const finish = () => {
+      if (this.audio === audio) {
+        this.audio = null;
+      }
+      if (this.audioUrl === url) {
+        URL.revokeObjectURL(url);
+        this.audioUrl = null;
+      }
+      this.speaking.set(false);
+      onEnd?.();
+    };
+    audio.onended = finish;
+    audio.onerror = finish;
+    this.audio = audio;
+    this.audioUrl = url;
+    this.speaking.set(true);
+    // play() rejects on autoplay policy or a decode error — treat that like a normal end.
+    void audio.play().catch(finish);
+  }
+
   stopSpeaking(): void {
     if (this.canSpeak) {
       window.speechSynthesis.cancel();
+    }
+    if (this.audio) {
+      // Detach handlers first so pausing doesn't re-enter the onEnd callback.
+      this.audio.onended = null;
+      this.audio.onerror = null;
+      this.audio.pause();
+      this.audio = null;
+    }
+    if (this.audioUrl) {
+      URL.revokeObjectURL(this.audioUrl);
+      this.audioUrl = null;
     }
     this.speaking.set(false);
   }

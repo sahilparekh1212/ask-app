@@ -21,11 +21,14 @@ describe('AssistantComponent', () => {
     startDictation: jasmine.Spy;
     stopDictation: jasmine.Spy;
     speak: jasmine.Spy;
+    playAudio: jasmine.Spy;
     stopSpeaking: jasmine.Spy;
   };
 
   beforeEach(async () => {
-    assistant = jasmine.createSpyObj('AssistantService', ['chat']);
+    assistant = jasmine.createSpyObj('AssistantService', ['chat', 'speak']);
+    // By default the server voice is available — read-aloud plays the returned audio.
+    assistant.speak.and.returnValue(of(new Blob([new Uint8Array([1])], { type: 'audio/mpeg' })));
     voice = {
       canListen: true,
       canSpeak: true,
@@ -34,6 +37,7 @@ describe('AssistantComponent', () => {
       startDictation: jasmine.createSpy('startDictation').and.returnValue(true),
       stopDictation: jasmine.createSpy('stopDictation'),
       speak: jasmine.createSpy('speak').and.returnValue(true),
+      playAudio: jasmine.createSpy('playAudio'),
       stopSpeaking: jasmine.createSpy('stopSpeaking'),
     };
     await TestBed.configureTestingModule({
@@ -174,19 +178,42 @@ describe('AssistantComponent', () => {
     expect(voice.startDictation).not.toHaveBeenCalled();
   });
 
-  it('speak() reads a reply aloud (markdown flattened) and toggles the speaking index', () => {
+  it('speak() prefers the server voice, playing the synthesized audio (markdown flattened)', () => {
     component.speak('**Bold** with `code` and a [link](https://x)', 2);
 
-    expect(voice.speak).toHaveBeenCalled();
-    const spokenText = voice.speak.calls.mostRecent().args[0] as string;
-    expect(spokenText).not.toContain('**');
-    expect(spokenText).not.toContain('`');
-    expect(spokenText).toContain('link');
+    expect(assistant.speak).toHaveBeenCalled();
+    const sentText = assistant.speak.calls.mostRecent().args[0] as string;
+    expect(sentText).not.toContain('**');
+    expect(sentText).not.toContain('`');
+    expect(sentText).toContain('link');
+    expect(voice.playAudio).toHaveBeenCalled();
+    // The browser voice isn't used when the server voice succeeds.
+    expect(voice.speak).not.toHaveBeenCalled();
     expect(component.speakingIndex()).toBe(2);
 
     // Clicking the same reply again stops it.
     component.speak('anything', 2);
     expect(voice.stopSpeaking).toHaveBeenCalled();
+    expect(component.speakingIndex()).toBeNull();
+  });
+
+  it('speak() falls back to the browser voice when the server voice is unavailable', () => {
+    assistant.speak.and.returnValue(throwError(() => ({ status: 503 })));
+
+    component.speak('read this aloud', 1);
+
+    expect(assistant.speak).toHaveBeenCalled();
+    expect(voice.playAudio).not.toHaveBeenCalled();
+    expect(voice.speak).toHaveBeenCalledWith('read this aloud', jasmine.any(Function));
+    expect(component.speakingIndex()).toBe(1);
+  });
+
+  it('speak() clears the reading state when neither the server nor the browser can speak', () => {
+    assistant.speak.and.returnValue(throwError(() => ({ status: 503 })));
+    voice.speak.and.returnValue(false); // browser synthesis unsupported too
+
+    component.speak('nothing can read this', 3);
+
     expect(component.speakingIndex()).toBeNull();
   });
 });

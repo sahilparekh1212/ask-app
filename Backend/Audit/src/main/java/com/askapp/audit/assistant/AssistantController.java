@@ -2,9 +2,13 @@ package com.askapp.audit.assistant;
 
 import com.askapp.audit.assistant.dto.ChatRequest;
 import com.askapp.audit.assistant.dto.ChatResponse;
+import com.askapp.audit.assistant.dto.SpeakRequest;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import org.springframework.http.CacheControl;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -24,9 +28,11 @@ import org.springframework.web.bind.annotation.RestController;
 public class AssistantController {
 
 	private final AssistantService assistantService;
+	private final SpeechService speechService;
 
-	public AssistantController(AssistantService assistantService) {
+	public AssistantController(AssistantService assistantService, SpeechService speechService) {
 		this.assistantService = assistantService;
+		this.speechService = speechService;
 	}
 
 	@PostMapping("/chat")
@@ -34,6 +40,18 @@ public class AssistantController {
 		+ "ADMIN sees answers grounded on recent audit rows; USER on aggregate stats only.")
 	public ChatResponse chat(@Valid @RequestBody ChatRequest request, Authentication authentication) {
 		return assistantService.chat(request, isAdmin(authentication));
+	}
+
+	@PostMapping(value = "/speak", produces = "audio/mpeg")
+	@Operation(summary = "Read an assistant reply aloud with a natural neural voice via server-side "
+		+ "Google Cloud Text-to-Speech. Returns MP3 audio; 503 when no TTS key is configured, so the "
+		+ "SPA falls back to the browser's built-in voice.")
+	public ResponseEntity<byte[]> speak(@Valid @RequestBody SpeakRequest request) {
+		byte[] audio = speechService.synthesize(request.text());
+		return ResponseEntity.ok()
+			.contentType(MediaType.parseMediaType("audio/mpeg"))
+			.cacheControl(CacheControl.noStore())
+			.body(audio);
 	}
 
 	private boolean isAdmin(Authentication authentication) {

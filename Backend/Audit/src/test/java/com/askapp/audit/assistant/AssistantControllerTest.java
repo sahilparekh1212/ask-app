@@ -2,7 +2,9 @@ package com.askapp.audit.assistant;
 
 import com.askapp.audit.assistant.dto.ChatRequest;
 import com.askapp.audit.assistant.dto.ChatResponse;
+import com.askapp.audit.assistant.dto.SpeakRequest;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -19,7 +21,8 @@ import static org.mockito.Mockito.when;
 class AssistantControllerTest {
 
 	private final AssistantService assistantService = mock(AssistantService.class);
-	private final AssistantController controller = new AssistantController(assistantService);
+	private final SpeechService speechService = mock(SpeechService.class);
+	private final AssistantController controller = new AssistantController(assistantService, speechService);
 
 	private static Authentication withRole(String role) {
 		return new UsernamePasswordAuthenticationToken("user", null,
@@ -55,6 +58,18 @@ class AssistantControllerTest {
 		controller.chat(request, null);
 
 		verify(assistantService).chat(request, false);
+	}
+
+	@Test
+	void speakDelegatesToSpeechServiceAndReturnsMpegAudio() {
+		byte[] mp3 = {1, 2, 3};
+		when(speechService.synthesize("read this")).thenReturn(mp3);
+
+		ResponseEntity<byte[]> response = controller.speak(new SpeakRequest("read this"));
+
+		assertThat(response.getStatusCode().value()).isEqualTo(200);
+		assertThat(response.getHeaders().getContentType()).hasToString("audio/mpeg");
+		assertThat(response.getBody()).isEqualTo(mp3);
 	}
 
 }

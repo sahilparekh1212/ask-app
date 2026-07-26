@@ -1,6 +1,7 @@
 import { Component, OnDestroy, computed, inject, signal } from '@angular/core';
 import { Location } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
+import { Subscription } from 'rxjs';
 import { AssistantService } from './assistant.service';
 import { ChatTurn } from './assistant.models';
 import { TranslatePipe } from '../../core/i18n/translate.pipe';
@@ -30,6 +31,9 @@ export class AssistantComponent implements OnDestroy {
   readonly listening = this.voice.listening;
   // Index of the assistant turn currently being read aloud (null = nothing speaking).
   readonly speakingIndex = signal<number | null>(null);
+  // In-flight request for server-synthesized speech, tracked so stopping read-aloud (or starting
+  // another) can cancel a fetch that hasn't returned audio yet.
+  private speakSub: Subscription | null = null;
 
   // Pre-filled (not placeholder) so a visitor can hit Send immediately — and the default is
   // a conceptual question the RAG grounding answers well, doubling as a feature demo.
@@ -67,8 +71,7 @@ export class AssistantComponent implements OnDestroy {
     }
     // A new question ends any dictation/read-aloud in progress.
     this.voice.stopDictation();
-    this.voice.stopSpeaking();
-    this.speakingIndex.set(null);
+    this.stopReadAloud();
     this.startConversationIfNeeded();
     // History = everything said so far, minus guardrail refusals (they carry no context).
     const history: ChatTurn[] = this.turns()
@@ -149,30 +152,48 @@ export class AssistantComponent implements OnDestroy {
       return;
     }
     // Don't dictate over an in-progress read-aloud.
-    this.voice.stopSpeaking();
-    this.speakingIndex.set(null);
+    this.stopReadAloud();
     this.voice.startDictation((text) => this.input.setValue(text));
   }
 
   /**
    * Read an assistant reply aloud, or stop it if that same reply is already being read. The reply
    * is Markdown, so it's flattened to plain prose first (bullets/backticks/links shouldn't be
-   * spoken literally).
+   * spoken literally). Prefers the server's natural neural voice (Google Cloud TTS); if that's
+   * unavailable — no key configured (503) or any error — it falls back to the browser's own voice.
    */
   speak(text: string, index: number): void {
     if (this.speakingIndex() === index) {
-      this.voice.stopSpeaking();
-      this.speakingIndex.set(null);
+      this.stopReadAloud();
       return;
     }
-    const started = this.voice.speak(this.toPlainText(text), () => {
+    this.stopReadAloud();
+    const plain = this.toPlainText(text);
+    const onEnd = () => {
       if (this.speakingIndex() === index) {
         this.speakingIndex.set(null);
       }
+    };
+    // Optimistic: reflect "reading" state now; cleared by onEnd (or if both voices are unavailable).
+    this.speakingIndex.set(index);
+    this.speakSub = this.assistant.speak(plain).subscribe({
+      next: (audio) => this.voice.playAudio(audio, onEnd),
+      error: () => {
+        // Server voice unavailable — fall back to the browser voice, clearing state if it can't
+        // speak either (e.g. no SpeechSynthesis support).
+        if (!this.voice.speak(plain, onEnd)) {
+          onEnd();
+        }
+      },
     });
-    if (started) {
-      this.speakingIndex.set(index);
-    }
+  }
+
+  /** Stop any read-aloud: cancel an in-flight synth request, stop playback, and reset the state. */
+  private stopReadAloud(): void {
+    this.speakSub?.unsubscribe();
+    this.speakSub = null;
+    this.voice.stopSpeaking();
+    this.speakingIndex.set(null);
   }
 
   /** Flatten Markdown to speakable prose — strip fences/inline code, turn links into their text. */
@@ -188,9 +209,9 @@ export class AssistantComponent implements OnDestroy {
   }
 
   ngOnDestroy(): void {
-    // Leaving the page must not leave the mic open or a reply talking.
+    // Leaving the page must not leave the mic open, a reply talking, or a synth fetch pending.
     this.voice.stopDictation();
-    this.voice.stopSpeaking();
+    this.stopReadAloud();
   }
 
   private scrollToEnd(): void {

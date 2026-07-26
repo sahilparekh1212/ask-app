@@ -290,6 +290,10 @@ services:
       # LLM chat assistant. Export ANTHROPIC_API_KEY on the host to enable it; with no key the
       # assistant endpoint returns 503 and the rest of the app is unaffected.
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      # Read-aloud speech synthesis (POST /api/v1/assistant/speak — Google Cloud Text-to-Speech).
+      # Export GOOGLE_TTS_API_KEY on the host to enable the natural neural voice; with no key the
+      # endpoint 503s and the SPA falls back to the browser's built-in voice.
+      GOOGLE_TTS_API_KEY: ${GOOGLE_TTS_API_KEY:-}
       # RAG MCP server (POST /mcp — vector search over the repo's own docs). Export
       # VOYAGE_API_KEY on the host to enable indexing; with no key the search tool reports
       # "not configured" and everything else is unaffected. pgvector = the real vector DB
