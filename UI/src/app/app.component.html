@@ -2,7 +2,7 @@
   <!-- Activity rail: primary sections up top, account pinned to the bottom (VS Code style). -->
   <nav class="rail" [attr.aria-label]="'nav.sections' | t">
     <div class="rail-items">
-      @for (s of sections; track s.key) {
+      @for (s of sections(); track s.key) {
         <a
           class="rail-item"
           [routerLink]="s.route"

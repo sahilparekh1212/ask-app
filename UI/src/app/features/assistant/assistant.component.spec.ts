@@ -7,6 +7,7 @@ import { of, throwError } from 'rxjs';
 import { AssistantComponent } from './assistant.component';
 import { AssistantService } from './assistant.service';
 import { VoiceService } from '../../core/voice/voice.service';
+import { FeatureFlagService } from '../../core/feature-flags/feature-flag.service';
 
 describe('AssistantComponent', () => {
   let fixture: ComponentFixture<AssistantComponent>;
@@ -45,6 +46,8 @@ describe('AssistantComponent', () => {
       providers: [
         { provide: AssistantService, useValue: assistant },
         { provide: VoiceService, useValue: voice },
+        // Voice/hints are also gated by feature flags; keep them on so these tests are unaffected.
+        { provide: FeatureFlagService, useValue: { isEnabled: () => true } },
         provideLocationMocks(),
       ],
     }).compileComponents();

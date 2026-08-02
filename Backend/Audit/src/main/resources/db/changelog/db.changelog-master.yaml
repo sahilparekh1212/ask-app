@@ -370,3 +370,133 @@ databaseChangeLog:
       rollback:
         - dropView:
             viewName: v_ai_trace_daily
+
+  # UI feature flags (see ADR-0015). A tiny reference table the SPA reads at startup to decide which
+  # major features to show. Seeded ON here — versioned and dialect-neutral (runs on H2 and Postgres),
+  # rather than via a Java runner, because the four rows are static (unlike the runtime-generated
+  # security_master seed). Read-only from the app; flip `enabled` via SQL/Adminer or a later changeset.
+  # Mirrors the FeatureFlag entity + its unique @Index so Hibernate can keep ddl-auto=none.
+  - changeSet:
+      id: 009-create-feature-flags
+      author: aisandbox
+      changes:
+        - createTable:
+            tableName: feature_flags
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: flag_key
+                  type: VARCHAR(64)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: enabled
+                  type: BOOLEAN
+                  defaultValueBoolean: true
+                  constraints:
+                    nullable: false
+              - column:
+                  name: description
+                  type: VARCHAR(255)
+              - column:
+                  name: created_at
+                  type: TIMESTAMP
+              - column:
+                  name: updated_at
+                  type: TIMESTAMP
+              - column:
+                  name: created_by_request_id
+                  type: VARCHAR(255)
+              - column:
+                  name: updated_by_request_id
+                  type: VARCHAR(255)
+        - createIndex:
+            indexName: idx_feature_flag_key
+            tableName: feature_flags
+            unique: true
+            columns:
+              - column:
+                  name: flag_key
+        # Seed the four gated features, all ON. created_by_request_id marks the seed's origin
+        # (there is no request); updated_* stay null until/unless a row is ever written by the app.
+        - insert:
+            tableName: feature_flags
+            columns:
+              - column:
+                  name: flag_key
+                  value: chat
+              - column:
+                  name: enabled
+                  valueBoolean: true
+              - column:
+                  name: description
+                  value: "LLM chat assistant (the default landing experience)."
+              - column:
+                  name: created_at
+                  valueComputed: CURRENT_TIMESTAMP
+              - column:
+                  name: created_by_request_id
+                  value: liquibase-009
+        - insert:
+            tableName: feature_flags
+            columns:
+              - column:
+                  name: flag_key
+                  value: voice
+              - column:
+                  name: enabled
+                  valueBoolean: true
+              - column:
+                  name: description
+                  value: "Voice chat for the assistant: dictation, read-aloud, and hands-free mode."
+              - column:
+                  name: created_at
+                  valueComputed: CURRENT_TIMESTAMP
+              - column:
+                  name: created_by_request_id
+                  value: liquibase-009
+        - insert:
+            tableName: feature_flags
+            columns:
+              - column:
+                  name: flag_key
+                  value: hints
+              - column:
+                  name: enabled
+                  valueBoolean: true
+              - column:
+                  name: description
+                  value: "AI hints and sample-prompt popover on the chat welcome screen."
+              - column:
+                  name: created_at
+                  valueComputed: CURRENT_TIMESTAMP
+              - column:
+                  name: created_by_request_id
+                  value: liquibase-009
+        - insert:
+            tableName: feature_flags
+            columns:
+              - column:
+                  name: flag_key
+                  value: observability
+              - column:
+                  name: enabled
+                  valueBoolean: true
+              - column:
+                  name: description
+                  value: "Observability / audit dashboard."
+              - column:
+                  name: created_at
+                  valueComputed: CURRENT_TIMESTAMP
+              - column:
+                  name: created_by_request_id
+                  value: liquibase-009
+      rollback:
+        - dropTable:
+            tableName: feature_flags

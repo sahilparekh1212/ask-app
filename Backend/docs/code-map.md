@@ -149,6 +149,9 @@ topic and Audit consumes and persists them. Files tied to this pipeline:
 - `controller/AuditLogV2Controller.java` — the `/api/v2` variant (URI versioning demo).
 - `controller/MetaController.java` — `/api/v1/meta/features`, the capability probe the UI uses to
   hide LOCAL/DEV-only affordances (e.g. the "Add demo logs" button) in prod.
+- `controller/FeatureFlagController.java` — `GET /api/v1/meta/flags`, the DB-backed UI feature flags
+  the SPA reads at startup to show/hide features (ADR-0015); read-only, backed by
+  `service/FeatureFlagService.java` → `repository/FeatureFlagRepository.java` → `model/FeatureFlag.java`.
 - `controller/DemoDataController.java` — `POST /api/v1/audit-logs/demo` bulk-insert (LOCAL/DEV only).
 - `service/AuditLogService.java` — search (filtered, paginated, sort-whitelisted) and database-side
   `GROUP BY` aggregation, both from the same JPA Specification.
@@ -162,7 +165,7 @@ topic and Audit consumes and persists them. Files tied to this pipeline:
 - `ratelimit/TransactionalRequestExecutor.java` — runs mutations through the shared rate-limit/
   transaction machinery.
 - `dto/*` — `PagedResponse`, `AuditLogStats`, `AuditLogCount`, `AuditLogFilter`, `DemoDataRequest`,
-  `DemoDataResponse`, `FeaturesResponse` (the API envelopes and filter/aggregate shapes).
+  `DemoDataResponse`, `FeaturesResponse`, `FeatureFlagResponse` (the API envelopes and filter/aggregate shapes).
 - `config/SecurityConfig.java` — JWT resource-server config, role mapping, method security.
 - `config/LoadTestSecurityConfig.java` — relaxed security for the `LOADTEST` profile.
 - `config/JpaAuditingConfig.java`, `config/WebConfig.java`, `config/OpenApiConfig.java` — JPA
@@ -264,6 +267,9 @@ endpoint each page calls — see [`ui-guide.md`](ui-guide.md). This section is t
 - `src/app/core/auth/auth.guard.ts` — route guard with `returnUrl`.
 - `src/app/core/auth/token-storage.service.ts` — localStorage token store.
 - `src/app/core/auth/auth.models.ts` — auth types.
+- `src/app/core/feature-flags/*` — `feature-flag.service` (signal store; loads
+  `/api/v1/meta/flags` at startup, fail-open), `feature-flag.guard` (redirects a flag-disabled
+  route), `feature-flag.models` (ADR-0015). Gates the nav rail, routes, and voice/hints controls.
 - `src/app/features/audit/*` — the dashboard: `audit.component` (table + filters + stat bar charts),
   `audit.service` (calls `/search` + `/stats`), `audit.models`.
 - `src/app/features/assistant/*` — the chat page: component, `assistant.service`, models.

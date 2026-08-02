@@ -4,7 +4,7 @@ _Part of the [ask-app](../README.md) documentation._
 
 | Area | Responsibility | Main location |
 |---|---|---|
-| UI | Angular routes, auth state, dashboard, chat, GA4 and Sentry | `UI/src/app/` |
+| UI | Angular routes, auth state, DB-backed feature flags (show/hide features), dashboard, chat, GA4 and Sentry | `UI/src/app/` |
 | Edge | TLS, SPA hosting, same-origin proxying, production Grafana route | `Backend/deploy/Caddyfile`, `UI/nginx.conf` |
 | Auth | OAuth/demo login, JWT/JWKS, refresh token lifecycle, event producer | `Backend/Auth/` |
 | Audit | Audit APIs, Kafka consumer, RAG, chat, MCP | `Backend/Audit/` |

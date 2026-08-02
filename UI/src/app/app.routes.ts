@@ -5,6 +5,7 @@ import { ProfileComponent } from './features/profile/profile.component';
 import { AuditComponent } from './features/audit/audit.component';
 import { AssistantComponent } from './features/assistant/assistant.component';
 import { authGuard } from './core/auth/auth.guard';
+import { featureFlagGuard } from './core/feature-flags/feature-flag.guard';
 
 // URLs mirror the nav labels (Chat, Observability). The old paths (/, /about, /audit,
 // /assistant) stay as redirects so bookmarks and inbound links keep working, and anything
@@ -18,13 +19,13 @@ export const routes: Routes = [
     path: 'observability',
     component: AuditComponent,
     title: 'Observability',
-    canActivate: [authGuard],
+    canActivate: [authGuard, featureFlagGuard('observability')],
   },
   {
     path: 'chat',
     component: AssistantComponent,
     title: 'Chat',
-    canActivate: [authGuard],
+    canActivate: [authGuard, featureFlagGuard('chat')],
   },
   // Same component — the id is a ChatGPT-style conversation handle in the URL (set via
   // Location.replaceState on the first message); a direct hit re-opens an empty chat.
@@ -32,7 +33,7 @@ export const routes: Routes = [
     path: 'chat/:id',
     component: AssistantComponent,
     title: 'Chat',
-    canActivate: [authGuard],
+    canActivate: [authGuard, featureFlagGuard('chat')],
   },
   // Legacy paths from before the URL/label alignment (and the removed About page).
   { path: 'about', redirectTo: 'chat' },

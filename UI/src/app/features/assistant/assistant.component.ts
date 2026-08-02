@@ -14,6 +14,7 @@ import { ChatTurn } from './assistant.models';
 import { TranslatePipe } from '../../core/i18n/translate.pipe';
 import { MarkdownPipe } from '../../core/markdown/markdown.pipe';
 import { VoiceService } from '../../core/voice/voice.service';
+import { FeatureFlagService } from '../../core/feature-flags/feature-flag.service';
 
 /** A rendered chat entry; `blocked` marks the server's local guardrail refusals. */
 interface DisplayTurn extends ChatTurn {
@@ -32,6 +33,12 @@ export class AssistantComponent implements OnDestroy {
   private readonly assistant = inject(AssistantService);
   private readonly location = inject(Location);
   private readonly voice = inject(VoiceService);
+  private readonly flags = inject(FeatureFlagService);
+
+  // Feature flags: voice controls and the hints popover are also gated by DB flags (see ADR-0015),
+  // AND-ed with the browser-capability checks below. Default (flag on) leaves behavior unchanged.
+  readonly voiceEnabled = computed(() => this.flags.isEnabled('voice'));
+  readonly hintsEnabled = computed(() => this.flags.isEnabled('hints'));
 
   // Voice I/O via the browser's Web Speech API (no backend). Controls hide where unsupported.
   readonly canListen = this.voice.canListen;

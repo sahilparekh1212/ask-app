@@ -20,3 +20,4 @@ system does; these explain *why* it's built this way.
 | [0012](0012-query-reranking.md) | Two-stage retrieval — cosine recall then a Voyage reranker for top-k precision |
 | [0013](0013-rag-evaluation-and-quality-gate.md) | RAG retrieval evaluation over a 100-question ground-truth set, wired as a secret-gated build quality gate |
 | [0014](0014-ai-interaction-tracing.md) | AI interaction tracing — a separate `ai_trace` table + metrics for answer-quality measurement, keeping the audit trail non-PII |
+| [0015](0015-ui-feature-flags.md) | DB-backed UI feature flags — SPA reads a `feature_flags` table to show/hide features; seeded ON, read-only from the app, flipped via SQL/Liquibase |

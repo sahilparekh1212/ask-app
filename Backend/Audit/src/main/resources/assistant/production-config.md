@@ -33,6 +33,10 @@ default-off in the source does **not** mean it is off in production.
 - **Observability** — Prometheus metrics, Loki logs, Tempo traces, and Grafana (Grafana published
   read-only in production).
 - **Rate limiting**, **RBAC**, and the Kafka-backed **audit trail** — all active.
+- **UI feature flags** — enabled and all ON. The SPA reads `GET /api/v1/meta/flags` (from the
+  `feature_flags` table, seeded ON) to show/hide chat, voice, hints, and observability. They are
+  read-only from the app; an operator flips a feature by updating the row in the production database
+  (no redeploy). See ADR-0015.
 - **CORS** — restricted to the production domain via `CORS_ALLOWED_ORIGINS`.
 
 ## Not enabled in production
