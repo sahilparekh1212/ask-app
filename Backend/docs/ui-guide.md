@@ -27,6 +27,20 @@ control Y and what endpoint does it hit". All paths are under `UI/src/app/` unle
   scroll-spy) and a top bar (page title + GitHub/LinkedIn links) complete the chrome. The routed
   page renders in `<router-outlet>` inside `<main class="app-main">`.
 
+## Feature flags (show/hide features)
+
+The SPA reads DB-backed feature flags at startup — `core/feature-flags/feature-flag.service.ts` calls
+**`GET /api/v1/meta/flags`** — and uses them to gate the four major features: `chat`, `voice`,
+`hints`, and `observability`. Gating happens in three places: the activity rail filters its sections
+on the flags (`app.component.ts`), the routes carry a `featureFlagGuard` (`app.routes.ts`), and the
+assistant's voice/hints controls `@if` on them. The service **fails open** — before flags load, or on
+error, every flag reads as enabled — so the UI never bricks.
+
+**Operator note:** flags are **read-only from the UI**; there is no toggle screen. To hide a feature,
+flip its row in the database (`UPDATE feature_flags SET enabled=false WHERE flag_key='voice'`) via
+Adminer/`psql` (or the H2 console at LOCAL) and reload the SPA. Disabling `chat` is safe — the guard
+redirects to the first still-enabled feature (final fallback `/profile`). See ADR-0015.
+
 ## Routes → components
 
 Defined in `app.routes.ts`:

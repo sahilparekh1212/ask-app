@@ -39,6 +39,7 @@ it under `ddl-auto=none`). Each one backs a specific query the API runs.
 | `idx_secmaster_instrument` (unique) | `security_master` | `instrument_id` | The unique business key + point lookups (`GET /securities/{instrumentId}`). |
 | `idx_secmaster_asset_class` | `security_master` | `asset_class` | Equality filter on the reference-data listing. |
 | `idx_secmaster_currency` | `security_master` | `currency` | Equality filter on the reference-data listing. |
+| `idx_feature_flag_key` (unique) | `feature_flags` | `flag_key` | The unique key the SPA gates on; one row per flag (`GET /api/v1/meta/flags`). |
 
 The reference-data listing's `assetClass`/`currency` filters are low-cardinality equality
 predicates already covered by the two single-column indexes; a composite was not added because
@@ -85,6 +86,31 @@ appends a small number of new rows (default 50), each run starting at the curren
 generated instrument range is entirely new. The rows are also chunked and indexed into RAG, so the
 assistant and MCP search can answer questions about the dataset. Sizes and cadence are configurable
 (`refdata.seed.count`, `refdata.ingest.schedule.count`, `refdata.ingest.schedule.cron`).
+
+## 🚩 UI feature flags (`feature_flags`)
+
+`feature_flags` is a tiny reference table the Angular SPA reads once at startup (via
+`GET /api/v1/meta/flags`) to decide which major features to show: `chat`, `voice`, `hints`, and
+`observability` (see [ADR-0015](../Backend/docs/adr/0015-ui-feature-flags.md)). The four rows are
+**seeded ON** by the Liquibase changeset `009-create-feature-flags` — versioned in the changelog
+rather than a Java seeder because they're static. Each row is `flag_key` (unique), `enabled`, a
+`description`, plus the standard audit columns.
+
+The flags are **read-only from the application** — there is no write endpoint. Flip one directly in
+the database and reload the SPA (the change takes effect on the next load; with all flags ON the UI
+is unchanged from before the feature existed):
+
+```sql
+-- Hide voice chat everywhere in this deployment:
+UPDATE feature_flags SET enabled = false WHERE flag_key = 'voice';
+-- Turn it back on:
+UPDATE feature_flags SET enabled = true  WHERE flag_key = 'voice';
+```
+
+Run it against the environment's database — Adminer (`:8082`) or `psql` on the compose/prod Postgres,
+or the H2 console at `LOCAL`. For a permanent, versioned change (e.g. shipping a feature off by
+default), add a follow-up Liquibase `update` changeset instead. Disabling the core `chat` flag is
+safe: the SPA's route guard redirects to the first still-enabled feature (final fallback `/profile`).
 
 ## 🧹 Retention
 

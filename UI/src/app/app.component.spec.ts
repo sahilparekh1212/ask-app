@@ -6,6 +6,7 @@ import { signal } from '@angular/core';
 import { of } from 'rxjs';
 import { AppComponent } from './app.component';
 import { AuthService } from './core/auth/auth.service';
+import { FeatureFlagService } from './core/feature-flags/feature-flag.service';
 
 describe('AppComponent', () => {
   const authenticated = signal(false);
@@ -26,6 +27,8 @@ describe('AppComponent', () => {
             loadProfile: () => of(null),
           },
         },
+        // All flags on → both nav sections render (matches the default deployment).
+        { provide: FeatureFlagService, useValue: { isEnabled: () => true } },
       ],
     }).compileComponents();
   });

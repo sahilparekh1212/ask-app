@@ -10,7 +10,7 @@ Grafana/Prometheus/Loki/Tempo for how the system is *performing*.
 
 What's in it:
 
-- Angular 21 SPA served by nginx;
+- Angular 21 SPA served by nginx, with DB-backed UI feature flags (show/hide features per deployment);
 - Spring Boot Auth and Audit services;
 - Google OAuth2, RSA-signed JWTs, JWKS, role-based access control;
 - asynchronous audit events through Apache Kafka;

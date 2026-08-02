@@ -47,6 +47,11 @@ Prometheus/Grafana/Loki/Tempo, and error-monitored by Sentry. Everything runs lo
   answers aloud in a short spoken reply, then listens again.
 - An HTTP interceptor attaches `Authorization: Bearer <token>` to our APIs only and silently
   refreshes once on 401.
+- **DB-backed UI feature flags**: at startup the SPA reads `GET /api/v1/meta/flags` (served by the
+  Audit service from a `feature_flags` table) to decide which major features to show — `chat`,
+  `voice`, `hints`, and `observability`. Flags are seeded ON and are read-only from the app; an
+  operator flips a feature by updating the row in the database (no redeploy). The client fails open,
+  so a not-yet-loaded or missing flag reads as enabled. See ADR-0015.
 
 ## Cross-cutting
 - **Rate limiting**: newest-wins per user+endpoint — a newer request supersedes the active
@@ -107,6 +112,8 @@ by a key or flag that is set in prod):
 - **Sentry error monitoring** — both backend services and the SPA (details under Cross-cutting).
 - **Observability** — Prometheus, Loki, Tempo, and Grafana (published read-only in prod).
 - **Rate limiting**, **RBAC**, a Kafka-backed **audit trail**, and **Google OAuth + demo login**.
+- **DB-backed UI feature flags** (`GET /api/v1/meta/flags`) — the SPA reads them to show/hide chat,
+  voice, hints, and observability; all seeded ON, flipped in the database (ADR-0015).
 - Shipped by a keyless GitHub Actions pipeline (Workload Identity Federation) with cosign image
   signing and SBOM attestations.
 

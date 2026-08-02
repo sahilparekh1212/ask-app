@@ -13,7 +13,7 @@
             <p class="bubble">{{ turn.content }}</p>
           }
           <div class="turn-actions">
-            @if (canSpeak && turn.role === 'assistant' && !turn.blocked) {
+            @if (canSpeak && voiceEnabled() && turn.role === 'assistant' && !turn.blocked) {
               <button
                 class="copy-btn speak-btn"
                 type="button"
@@ -86,23 +86,25 @@
         {{ 'assistant.welcome' | t }}
         <!-- The mind mark, rendered white like the favicon (the raw emoji is pink). -->
         <span class="mind" aria-hidden="true">🧠</span>
-        <span class="info">
-          <button class="info-btn" type="button" [attr.aria-label]="'assistant.infoLabel' | t">
-            <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
-              <path
-                d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8Zm8-6.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13ZM6.5 7.75A.75.75 0 0 1 7.25 7h1a.75.75 0 0 1 .75.75v2.75h.25a.75.75 0 0 1 0 1.5h-2a.75.75 0 0 1 0-1.5h.25v-2h-.25a.75.75 0 0 1-.75-.75ZM8 6a1 1 0 1 1 0-2 1 1 0 0 1 0 2Z"
-              />
-            </svg>
-          </button>
-          <span class="info-popover" role="tooltip">
-            <span class="info-line">{{ 'assistant.hint' | t }}</span>
-            <span class="info-line">{{ 'assistant.screening' | t }}</span>
-            <span class="info-line">
-              {{ 'assistant.tryPrefix' | t }} <em>“{{ 'assistant.sample1' | t }}”</em>
-              {{ 'login.or' | t }} <em>“{{ 'assistant.sample2' | t }}”</em>
+        @if (hintsEnabled()) {
+          <span class="info">
+            <button class="info-btn" type="button" [attr.aria-label]="'assistant.infoLabel' | t">
+              <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+                <path
+                  d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8Zm8-6.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13ZM6.5 7.75A.75.75 0 0 1 7.25 7h1a.75.75 0 0 1 .75.75v2.75h.25a.75.75 0 0 1 0 1.5h-2a.75.75 0 0 1 0-1.5h.25v-2h-.25a.75.75 0 0 1-.75-.75ZM8 6a1 1 0 1 1 0-2 1 1 0 0 1 0 2Z"
+                />
+              </svg>
+            </button>
+            <span class="info-popover" role="tooltip">
+              <span class="info-line">{{ 'assistant.hint' | t }}</span>
+              <span class="info-line">{{ 'assistant.screening' | t }}</span>
+              <span class="info-line">
+                {{ 'assistant.tryPrefix' | t }} <em>“{{ 'assistant.sample1' | t }}”</em>
+                {{ 'login.or' | t }} <em>“{{ 'assistant.sample2' | t }}”</em>
+              </span>
             </span>
           </span>
-        </span>
+        }
       </h1>
     </div>
   }
@@ -128,7 +130,7 @@
         [attr.aria-label]="'assistant.placeholder' | t"
       />
     }
-    @if (canListen && !voiceMode()) {
+    @if (canListen && voiceEnabled() && !voiceMode()) {
       <button
         type="button"
         class="mic-btn"
@@ -148,7 +150,7 @@
         </svg>
       </button>
     }
-    @if (canListen) {
+    @if (canListen && voiceEnabled()) {
       <!-- Third control: hands-free "voice only" chat — tap to converse, tap to stop. -->
       <button
         type="button"

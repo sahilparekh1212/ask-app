@@ -12,6 +12,7 @@ import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } fro
 import { filter, fromEvent, map, merge } from 'rxjs';
 
 import { AuthService } from './core/auth/auth.service';
+import { FeatureFlagService } from './core/feature-flags/feature-flag.service';
 import { TranslatePipe } from './core/i18n/translate.pipe';
 
 /** A primary section: an icon-rail entry that also keys its contextual sidebar. */
@@ -20,6 +21,7 @@ interface Section {
   labelKey: string;
   route: string;
   icon: string; // 16x16 path data
+  flagKey: string; // the feature flag that shows/hides this section
 }
 
 /** One item inside a sidebar group — exactly one of route / fragment / href is set. */
@@ -64,6 +66,7 @@ const ICON = {
 export class AppComponent {
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
+  private readonly flags = inject(FeatureFlagService);
 
   readonly title = 'ask-app';
   readonly isAuthenticated = this.auth.isAuthenticated;
@@ -112,16 +115,23 @@ export class AppComponent {
     return 'chat';
   });
 
-  /** The rail: primary sections. Profile/sign-in are rendered separately at the rail's bottom. */
-  readonly sections: Section[] = [
-    { key: 'chat', labelKey: 'nav.chat', route: '/chat', icon: ICON.chat },
+  /**
+   * The rail's primary sections, filtered by their feature flag (all on by default → both show).
+   * Profile/sign-in are rendered separately at the rail's bottom.
+   */
+  private readonly allSections: Section[] = [
+    { key: 'chat', labelKey: 'nav.chat', route: '/chat', icon: ICON.chat, flagKey: 'chat' },
     {
       key: 'observability',
       labelKey: 'nav.observability',
       route: '/observability',
       icon: ICON.observability,
+      flagKey: 'observability',
     },
   ];
+  readonly sections = computed(() =>
+    this.allSections.filter((s) => this.flags.isEnabled(s.flagKey)),
+  );
 
   readonly profileIcon = ICON.profile;
   readonly signinIcon = ICON.signin;
