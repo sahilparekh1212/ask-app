@@ -10,5 +10,5 @@ dependencies {
 	// Sentry error monitoring: captures unhandled exceptions. An empty SENTRY_DSN (the
 	// default — see application.properties) disables the SDK entirely, so this is inert
 	// everywhere until the deployment provides a DSN.
-	implementation 'io.sentry:sentry-spring-boot-starter-jakarta:8.48.0'
+	implementation 'io.sentry:sentry-spring-boot-starter-jakarta:8.51.0'
 }
